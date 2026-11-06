@@ -45,6 +45,9 @@ export interface InspectionReport {
   projects: Project[];
   findings: Finding[];
   largestEntries: SizedEntry[];
+  sizeEntries: SizedEntry[];
+  sizeFilesTruncated: boolean;
+  sizeDirectoriesTruncated: boolean;
   warnings: string[];
   warningsOmitted: number;
   resultsTruncated: boolean;

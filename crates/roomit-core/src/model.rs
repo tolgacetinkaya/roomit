@@ -130,6 +130,10 @@ pub struct InspectionReport {
     /// Bounded top list, not a full in-memory file inventory. Directory entries
     /// overlap their children; do not add rows together to calculate totals.
     pub largest_entries: Vec<SizedEntry>,
+    /// Independent top lists for size filtering; folders cannot displace files.
+    pub size_entries: Vec<SizedEntry>,
+    pub size_files_truncated: bool,
+    pub size_directories_truncated: bool,
     pub warnings: Vec<String>,
     pub warnings_omitted: u64,
     pub results_truncated: bool,

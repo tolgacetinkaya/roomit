@@ -16,7 +16,7 @@
           <button type="button" data-view="overview" aria-pressed="true"><span>Genel bakış</span><small>01</small></button>
           <button type="button" data-view="projects" aria-pressed="false"><span>Projeler</span><small id="project-count">—</small></button>
           <button type="button" data-view="ai" aria-pressed="false"><span>AI araçları</span><small id="ai-count">—</small></button>
-          <button type="button" data-view="largest" aria-pressed="false"><span>Büyük klasörler</span><small>04</small></button>
+          <button type="button" data-view="largest" aria-pressed="false"><span>Büyük öğeler</span><small>04</small></button>
           <button type="button" data-view="details" aria-pressed="false"><span>Tarama ayrıntıları</span><small>05</small></button>
         </nav>
         <div class="sidebar-bottom"><div class="local-badge">Yerel ve sana özel</div><p>Dosyaların cihazında kalır.<br />İçerikler açılmaz, dosyalar değiştirilmez.</p><span class="build-label">ROOMIT / GELİŞTİRME SÜRÜMÜ</span></div>
@@ -45,6 +45,11 @@
         </section>
         <section class="report-panel" aria-labelledby="results-title">
           <div class="results-header"><div><p class="eyebrow">02 / KEŞİF</p><h2 id="results-title">Alanının hikâyesi</h2><p id="result-caption" class="muted">İlk taramanla başlayalım.</p></div><div class="search-row"><label for="result-search" class="sr-only">Sonuçlarda ara</label><input id="result-search" type="search" placeholder="Sonuçlarda ara…" disabled /></div></div>
+          <form id="size-filter-form" class="size-filter-form" hidden>
+            <div><label for="minimum-gb">Minimum boyut</label><p id="minimum-help" class="hint">GB ve üzeri · Örnek: 5 veya 0,5 · Boş / 0: tümü</p></div>
+            <div class="size-filter-controls"><div class="gb-field"><input id="minimum-gb" type="text" inputmode="decimal" maxlength="30" placeholder="Örn. 5" aria-describedby="minimum-help size-filter-error" /><span>GB</span></div><button type="submit">Uygula</button><button id="clear-size-filter" type="button" class="secondary">Temizle</button></div>
+            <p id="size-filter-error" class="warning" role="status" aria-live="polite" hidden></p>
+          </form>
           <p id="reveal-hint" class="hint" hidden></p>
           <div id="results" aria-busy="false"></div>
         </section>

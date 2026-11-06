@@ -178,3 +178,26 @@ AI groups present a location chooser. Keyboard handling is scoped to the focused
 result owner; nested rows take priority over parent projects. Ctrl+Enter on
 Windows and Command+Enter on macOS trigger the same action, while typing fields,
 key repeats, composition and extra modifiers are ignored.
+
+## Minimum-size presentation
+
+The scanner now keeps independent bounded heaps for files and subdirectories,
+controlled by `ScanOptions.max_size_entries_per_kind` (10,000 by default). Their
+merged `sizeEntries` plus per-kind truncation flags are separate from legacy
+`largestEntries`, recognition findings and all measured totals. Full traversal,
+progress, cancellation, link skipping and the absence of disk/computer cutoffs
+are preserved. The chosen root remains in `roots`, not duplicated as a subfolder.
+A low heap candidate is rejected without cloning its path once the heap fills.
+
+`src/size-filter.ts` parses comma/dot decimal GB directly into BigInt bytes (up
+to u64, at most nine fractional digits) and compares inclusively without using
+rounded display strings. Filtering is on measured sizes. A partial directory
+below the threshold may be omitted even if its true unmeasured size is larger;
+existing partial-report notices still apply. Blank/zero clear the size cutoff.
+
+The **Büyük öğeler** view shows flat, independently paged files and directories;
+parent and child sizes overlap and are not summed. Search/threshold changes use
+the retained report and never invoke a scan. Recognition/group totals are not
+filtered. A truncation notice appears when the lowest retained item of that kind
+still meets the threshold (including ties); above that boundary all matches by
+measured size are retained. This is bounded display, not a complete file index.

@@ -96,3 +96,18 @@ Reveal evidence: `artifacts/qa/reveal-locations.jpg` shows the multi-location
 chooser and direct action on a collapsed card; `reveal-error.jpg` records a
 visible missing-path message. A subsequent valid action succeeded and the
 browser error log was empty. These screenshots use labeled sample data.
+
+## Minimum-size follow-up — 2026-11-04
+
+Scoped feature addition in the existing graphite/blue workspace. **Büyük öğeler**
+now has an accessible minimum GB field, explicit Apply/Clear controls, validation,
+filter summary and separate file/folder counts and lists. Unit/core checks cover
+exact byte boundaries; the in-app browser fixture verified 5 GB and comma input
+without rescanning, plus validation and clearing. Screenshot:
+`artifacts/qa/size-filter-5gb.jpg`. This is sample-data evidence, not a real scan.
+
+Additional size-filter evidence: a 999 GB filter produced both empty states;
+5 GB plus path search retained only the matching ISO. Its reveal action worked
+in the mock adapter. At 720 x 600 CSS px, document scrollWidth was 705 px and
+all filter controls remained reachable (`artifacts/qa/size-filter-720.jpg`).
+Scan invocation count stayed at one throughout. Final browser error log was empty.

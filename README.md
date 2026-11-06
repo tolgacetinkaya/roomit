@@ -22,7 +22,9 @@ is configured. MIT licensed.
   Multi-location AI groups ask which location to reveal.
 - Graphite/electric-blue workspace with persistent navigation, grouped results,
   compact completed-scan setup, and per-volume capacity/free-space previews.
-- Filter findings, inspect detected projects and view the largest 100 files/folders.
+- Inspect grouped development/AI results; use **Büyük öğeler** for separate file/folder lists.
+- Enter a minimum GB size (for example 5 or 0,5), apply or clear it without rescanning.
+  The threshold is inclusive, uses exact decimal bytes and combines with path search.
 - Skip symlinks/reparse points; bound work and report memory; keep totals independent
   of paginated or capped result lists.
 
@@ -43,8 +45,10 @@ sizes partial lower bounds. Disk and computer scans have no count/depth cutoff; 
 not a snapshot or a proof that an item can safely be removed.
 
 Folder-mode defaults: 1,000,000 observed entries and 128 directory levels. Disk and computer modes have no entry or depth cutoff. All modes retain
-up to 10,000 findings/projects each, 100 largest entries and 100 retained
-warnings. Hitting a result-list cap does not stop size accounting. Progress is
+up to 10,000 findings/projects each, 100 legacy largest entries, and 100 retained
+warnings. The size view independently retains the largest 10,000 files and 10,000
+subdirectories, with a notice when omitted entries could meet the current threshold.
+The selected root is summarized separately. Hitting a list cap does not stop size accounting. Progress is
 throttled to about 100 ms. Only one desktop scan can run at once.
 
 Byte counts are u64 in Rust and decimal strings in JSON/IPC to preserve precision

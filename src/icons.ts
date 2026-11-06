@@ -7,8 +7,9 @@ import computer from "@phosphor-icons/core/assets/regular/desktop.svg";
 import details from "@phosphor-icons/core/assets/regular/sliders-horizontal.svg";
 import shield from "@phosphor-icons/core/assets/regular/shield-check.svg";
 import arrow from "@phosphor-icons/core/assets/regular/arrow-right.svg";
+import file from "@phosphor-icons/core/assets/regular/file.svg";
 
-const icons = { overview, project, ai, folder, disk, computer, details, shield, arrow };
+const icons = { overview, project, ai, folder, disk, computer, details, shield, arrow, file };
 export type IconName = keyof typeof icons;
 export function icon(name: IconName, className = "ui-icon"): HTMLImageElement {
   const image = document.createElement("img"); image.src = icons[name]; image.alt = "";

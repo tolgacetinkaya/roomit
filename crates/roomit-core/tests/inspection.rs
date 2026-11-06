@@ -247,6 +247,9 @@ fn report_serialization_matches_the_frontend_contract() {
     assert_eq!(value["findings"][0]["kind"], "file");
     assert_eq!(value["findings"][0]["sizeComplete"], true);
     assert!(value["largestEntries"].is_array());
+    assert_eq!(value["sizeEntries"][0]["logicalBytes"], "4");
+    assert_eq!(value["sizeFilesTruncated"], false);
+    assert_eq!(value["sizeDirectoriesTruncated"], false);
 }
 
 #[test]
@@ -305,4 +308,42 @@ fn symbolic_links_and_cycles_are_skipped_and_markers_are_not_followed() {
     assert_eq!(report.warnings_omitted, 2);
     assert!(!report.total_size_complete);
     assert!(inspect_workspace(&fixture.path().join("outside")).is_err());
+}
+
+#[test]
+fn size_lists_keep_files_and_directories_independently_without_changing_totals() {
+    let fixture = tempdir().unwrap();
+    file(fixture.path(), "a/deep/one", 10);
+    file(fixture.path(), "a/deep/two", 20);
+    file(fixture.path(), "b/three", 30);
+    file(fixture.path(), "c/four", 40);
+    let options = ScanOptions { max_largest_entries: 1, max_size_entries_per_kind: 2, ..Default::default() };
+    let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
+    assert_eq!(report.stats.total_logical_bytes, 100);
+    assert_eq!(report.stats.files_scanned, 4);
+    assert!(report.total_size_complete);
+    let files: Vec<_> = report.size_entries.iter().filter(|entry| entry.kind == EntryKind::File).map(|entry| entry.logical_bytes).collect();
+    let directories: Vec<_> = report.size_entries.iter().filter(|entry| entry.kind == EntryKind::Directory).map(|entry| entry.logical_bytes).collect();
+    assert_eq!(files, [40, 30]);
+    assert_eq!(directories, [40, 30]);
+    assert!(report.size_files_truncated && report.size_directories_truncated);
+    assert_eq!(report.largest_entries.len(), 1);
+    assert!(!report.results_truncated); // Recognition and size-list limits are independent.
+}
+
+#[test]
+fn size_lists_keep_zero_and_partial_entries_and_can_be_disabled_without_stopping_scan() {
+    let fixture = tempdir().unwrap();
+    file(fixture.path(), "empty", 0);
+    file(fixture.path(), "nested/deep/file", 11);
+    let options = ScanOptions { max_depth: Some(0), ..Default::default() };
+    let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
+    assert!(report.size_entries.iter().any(|entry| entry.kind == EntryKind::File && entry.logical_bytes == 0 && entry.size_complete));
+    assert!(report.size_entries.iter().any(|entry| entry.kind == EntryKind::Directory && !entry.size_complete));
+    let options = ScanOptions { max_size_entries_per_kind: 0, max_largest_entries: 0, ..Default::default() };
+    let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
+    assert!(report.size_entries.is_empty());
+    assert!(report.size_files_truncated && report.size_directories_truncated);
+    assert_eq!(report.stats.total_logical_bytes, 11);
+    assert!(report.total_size_complete);
 }

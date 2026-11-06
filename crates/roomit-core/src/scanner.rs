@@ -14,6 +14,7 @@ pub struct ScanOptions {
     pub max_depth: Option<usize>,
     pub max_findings: usize,
     pub max_largest_entries: usize,
+    pub max_size_entries_per_kind: usize,
     pub max_warnings: usize,
     pub progress_interval: Duration,
     /// Computer mode partitions volumes; Unix mount crossings are not followed.
@@ -26,6 +27,7 @@ impl Default for ScanOptions {
         Self {
             max_entries: Some(1_000_000), max_depth: Some(128), max_findings: 10_000,
             max_largest_entries: 100, max_warnings: 100,
+            max_size_entries_per_kind: 10_000,
             progress_interval: Duration::from_millis(100),
             same_file_system: false, preferred_path: None,
         }
@@ -90,7 +92,8 @@ fn run_scan<F: FnMut(&ScanProgress)>(
         report: InspectionReport {
             root: root_label, scope: if computer { "computer" } else { "recursive" }, status: ScanStatus::Completed,
             total_size_complete: true, stats: ScanStats::default(), projects: Vec::new(),
-            findings: Vec::new(), largest_entries: Vec::new(), warnings: Vec::new(),
+            findings: Vec::new(), largest_entries: Vec::new(), size_entries: Vec::new(),
+            size_files_truncated: false, size_directories_truncated: false, warnings: Vec::new(),
             warnings_omitted: 0, results_truncated: false, roots: Vec::new(),
         },
         root_count: plans.len(), root_index: 0,
@@ -98,6 +101,7 @@ fn run_scan<F: FnMut(&ScanProgress)>(
         root_device: None,
         options, cancel, on_progress, last_progress: Instant::now(),
         largest: BinaryHeap::new(), halted: false,
+        size_files: BinaryHeap::new(), size_directories: BinaryHeap::new(),
     };
     for (index, (root, error)) in plans.into_iter().enumerate() {
         scanner.root_index = index + 1;
@@ -135,6 +139,8 @@ fn run_scan<F: FnMut(&ScanProgress)>(
     scanner.report.projects.sort_by(|a, b| a.path.cmp(&b.path));
     scanner.report.largest_entries = scanner.largest.drain().map(|v| v.0).collect();
     scanner.report.largest_entries.sort_by(|a, b| b.logical_bytes.cmp(&a.logical_bytes).then(a.path.cmp(&b.path)));
+    scanner.report.size_entries = scanner.size_files.drain().chain(scanner.size_directories.drain()).map(|v| v.0).collect();
+    scanner.report.size_entries.sort_by(|a, b| b.logical_bytes.cmp(&a.logical_bytes).then(a.path.cmp(&b.path)));
     scanner.progress(Path::new(""), true, true);
     Ok(scanner.report)
 }
@@ -163,6 +169,8 @@ struct Scanner<'a, F> {
     on_progress: F,
     last_progress: Instant,
     largest: BinaryHeap<Reverse<SizedEntry>>,
+    size_files: BinaryHeap<Reverse<SizedEntry>>,
+    size_directories: BinaryHeap<Reverse<SizedEntry>>,
     halted: bool,
     partition_roots: Vec<PathBuf>,
     root_device: Option<u64>,
@@ -356,10 +364,20 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
     }
 
     fn keep_largest(&mut self, entry: SizedEntry) {
-        if self.options.max_largest_entries == 0 { return; }
-        self.largest.push(Reverse(entry));
-        if self.largest.len() > self.options.max_largest_entries { self.largest.pop(); }
+        let (heap, truncated) = if entry.kind == EntryKind::File {
+            (&mut self.size_files, &mut self.report.size_files_truncated)
+        } else { (&mut self.size_directories, &mut self.report.size_directories_truncated) };
+        *truncated |= retain_largest(heap, &entry, self.options.max_size_entries_per_kind);
+        retain_largest(&mut self.largest, &entry, self.options.max_largest_entries);
     }
+}
+
+/// Return whether an item was omitted. Avoid copying every path after a heap fills.
+fn retain_largest(heap: &mut BinaryHeap<Reverse<SizedEntry>>, entry: &SizedEntry, limit: usize) -> bool {
+    if limit == 0 { return true; }
+    if heap.len() == limit && heap.peek().is_some_and(|smallest| entry <= &smallest.0) { return true; }
+    heap.push(Reverse(entry.clone()));
+    if heap.len() > limit { heap.pop(); true } else { false }
 }
 
 fn display_path(path: &Path) -> String {

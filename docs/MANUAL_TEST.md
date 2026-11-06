@@ -22,8 +22,7 @@ establish that the new native screen has been accepted.
   findings are counted once. Everything remains read-only.
 - **Projeler** contains all retained software groups. Search by name/tool/path and
   distinguish identical project names using the parent-location label/tooltip.
-- **Büyük klasörler** begins with outer folders; expand for the included large child
-  paths. Individual large files are collapsed separately.
+- **Büyük öğeler** lists files and subdirectories separately, with a minimum GB filter.
 - **Tarama ayrıntıları** contains disk outcomes, warnings and other protected data. Main
   navigation and search must not start a new scan.
 - With many results, verify **Daha fazla göster** and lazy group expansion.
@@ -85,3 +84,20 @@ or macOS native acceptance is claimed by this implementation pass.
   is expected, and another valid item's action must remain usable.
 - Confirm no file is launched and no delete/trash action is present. Check Mac
   Finder and its Command shortcut on a real device separately.
+
+## Minimum GB filter
+
+1. Scan a selected scope, open **Büyük öğeler**, enter **5**, press **Uygula**.
+   Every displayed item must have at least 5,000,000,000 measured logical bytes.
+   Exactly 5 GB is included; a byte less is excluded even if display rounding says 5 GB.
+2. Try **0,5**, **0.5**, **0**, blank and **Temizle**. Lowering/raising/clearing the
+   threshold must not rescan. Only the large-items view is filtered; software/AI
+   grouped views and whole-scan metrics remain the original report.
+3. Apply a negative/non-number value: a validation message must appear and the
+   previous valid threshold must remain applied. A valid unmatched threshold
+   must show empty states rather than inventing results.
+4. Combine the threshold with path search, page through files/directories and
+   verify **Klasörde göster** and keyboard reveal still target each actual row.
+5. File/directory lists retain 10,000 each. When omissions could meet the chosen
+   threshold, the UI must show a list-limit notice. This does not stop scanning.
+6. Check 720 x 600 window layout and repeat native/device acceptance on macOS.

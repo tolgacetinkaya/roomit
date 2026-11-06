@@ -1,3 +1,26 @@
+# Minimum GB filter — 2026-11-04
+
+- **60 tests passed**: 28 core (19 inspection + 9 multi-root), 8 native
+  state/discovery/path checks, 24 frontend. Native Explorer smoke is intentionally
+  ignored in default runs; its prior evidence belongs to the previous build.
+- TypeScript/Vite build, Rust workspace check and Windows debug/no-bundle build
+  passed. The executable is copied and SHA-256 compared with the build output.
+- Core coverage verifies independent file/directory retention, exact totals after
+  caps, zero/partial sizes, disabling retained output without stopping traversal,
+  and the extended IPC contract. Existing cancellation/uncapped disk tests pass.
+- Frontend coverage verifies exact decimal/comma parsing, inclusive equality,
+  byte-below-boundary exclusion, u64 precision/range, invalid input, search,
+  individual item semantics, partial labels and retention-cutoff warnings.
+- Browser fixture checks verify 5 GB, 0,5 GB, invalid input, clear, empty state,
+  combined path search and unchanged scan invocation count while filtering.
+  Evidence: `artifacts/qa/size-filter-5gb.jpg`; values are labeled fixture data.
+- Size view holds at most 10,000 files and 10,000 subdirectories. When omitted
+  entries could meet the filter, the UI explicitly says more matches may exist.
+  This retention cap never stops the scan or changes root/recognition totals.
+- No delete/trash capability or publication. Native Windows full-screen acceptance
+  and a real macOS build/device test remain separate from browser/fixture checks.
+
+---
 # Reveal locations and keyboard shortcut — 2026-11-04
 
 - **52 automated tests passed**: 26 core, 8 native state/discovery/path-validation,

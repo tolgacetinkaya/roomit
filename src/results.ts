@@ -1,9 +1,10 @@
-import { categoryLabels, formatCount, scanSummary, sizeLabel } from "./report";
+import { categoryLabels, formatBytes, formatCount, scanSummary, sizeLabel } from "./report";
 import type { Finding, InspectionReport, SizedEntry } from "./report";
-import { filterGroups, pathName, topLevelFindings } from "./groups";
+import { filterGroups, pathName } from "./groups";
 import type { GroupedReport, ResultGroup } from "./groups";
 import { icon } from "./icons";
 import { revealActions, revealShortcut } from "./reveal";
+import { filterSizeEntries, sizeListIncomplete } from "./size-filter";
 
 export type ResultView = "overview" | "projects" | "ai" | "largest" | "details";
 const node = (tag: string, text = "", className = ""): HTMLElement => {
@@ -81,7 +82,7 @@ function section(title: string, count: number, action?: () => void, unit = "grup
 const empty = (text: string): HTMLElement => node("div", text, "empty-note");
 
 export function renderResults(report: InspectionReport, grouped: GroupedReport, view: ResultView, query: string,
-  navigate: (view: ResultView) => void): HTMLElement {
+  navigate: (view: ResultView) => void, minimumBytes = 0n): HTMLElement {
   const container = node("div", "", "report-view");
   if (view === "overview") {
     const metrics = node("div", "", "metrics");
@@ -118,34 +119,27 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
     container.append(details);
   }
   if (view === "largest") {
-    const matches = (entry: SizedEntry): boolean => !query || entry.path.toLocaleLowerCase("tr").includes(query.toLocaleLowerCase("tr"));
-    const directories = report.largestEntries.filter((entry) => entry.kind === "directory");
-    // Start with outer folders. Their already-included child paths stay inside
-    // the accordion, rather than appearing as separate top-level rows.
-    const outer = topLevelFindings(directories.map((entry) => ({ ...entry }))).filter(matches);
-    container.append(section("Büyük klasörler", outer.length), node("p", "Ölçülen büyük öğeler üst klasörlerinde toplandı. İç içe klasörlerin boyutları birlikte toplanmaz.", "muted"));
-    container.append(outer.length ? paged(outer, (entry) => expandable(pathName(entry.path), entry.path,
-      sizeLabel(entry.logicalBytes, entry.sizeComplete), () => {
-        const body = node("div", "", "group-content");
-        const prefix = entry.path.replace(/\\/g, "/").replace(/\/+$/, "") + "/";
-        const children = report.largestEntries.filter((child) => child.path.replace(/\\/g, "/").startsWith(prefix));
-        body.append(node("p", entry.path, "report-path"));
-        body.append(children.length ? paged(children, (child) => {
-          const row = node("div", "", "member-row");
-          row.append(node("strong", `${pathName(child.path)} · ${sizeLabel(child.logicalBytes, child.sizeComplete)}`), node("p", child.path, "report-path"));
-          attachReveal(row, [child.path], true); return row;
-        }) : empty("Bu klasörün alt öğeleri büyük öğeler listesinde bulunmuyor.")); return body;
-      }, [entry.path])) : empty("Bu görünümde büyük alt klasör bulunamadı."));
-    const files = report.largestEntries.filter((entry) => entry.kind === "file" && matches(entry));
-    if (files.length) {
-      const details = document.createElement("details"); details.className = "additional-details";
-      details.append(node("summary", `Tek tek büyük dosyalar (${files.length})`));
-      let built = false;
-      details.addEventListener("toggle", () => { if (details.open && !built) { details.append(paged(files, (entry) => {
-        const row = node("div", "", "member-row"); row.append(node("strong", `${pathName(entry.path)} · ${sizeLabel(entry.logicalBytes, entry.sizeComplete)}`), node("p", entry.path, "report-path"));
-        attachReveal(row, [entry.path], true); return row;
-      })); built = true; } }); container.append(details);
-    }
+    const entries = report.sizeEntries ?? report.largestEntries;
+    const fileMatches = filterSizeEntries(entries, minimumBytes, query, "file");
+    const directoryMatches = filterSizeEntries(entries, minimumBytes, query, "directory");
+    container.append(node("p", `${minimumBytes > 0n ? formatBytes(minimumBytes.toString()) + " ve üzeri" : "Boyut sınırı yok"} · Ölçülen dosya ve alt klasörler`, "size-filter-summary"));
+    container.append(node("p", "Dosyalar ve klasörler ayrı listelenir. Klasör boyutu alt dosyalarını da içerir; bu boyutları birlikte toplama.", "hint"));
+    const fileLimited = sizeListIncomplete(entries, "file", report.sizeFilesTruncated, minimumBytes);
+    const directoryLimited = sizeListIncomplete(entries, "directory", report.sizeDirectoriesTruncated, minimumBytes);
+    if (fileLimited || directoryLimited) container.append(node("p", "Liste sınırına ulaşıldı: En büyük 10.000 dosya ve 10.000 klasör tutulur. Bu eşiğe uyan başka öğeler olabilir. Tarama ve toplam boyut hesaplaması bu sınırda durmaz.", "result-notice"));
+    const sizeCard = (entry: SizedEntry): HTMLElement => {
+      const card = node("article", "", "result-card size-result");
+      const heading = node("div", "", "member-heading");
+      const title = node("span", "", "size-entry-title");
+      title.append(icon(entry.kind === "file" ? "file" : "folder"), node("strong", pathName(entry.path)));
+      heading.append(title, node("span", sizeLabel(entry.logicalBytes, entry.sizeComplete)));
+      card.append(heading, node("p", entry.path, "report-path"));
+      attachReveal(card, [entry.path], true); return card;
+    };
+    container.append(section("Dosyalar", fileMatches.length, undefined, "dosya"));
+    container.append(fileMatches.length ? paged(fileMatches, sizeCard) : empty("Bu boyut ve arama koşullarına uyan dosya bulunamadı."));
+    container.append(section("Klasörler", directoryMatches.length, undefined, "klasör"));
+    container.append(directoryMatches.length ? paged(directoryMatches, sizeCard) : empty("Bu boyut ve arama koşullarına uyan alt klasör bulunamadı."));
   }
   if (view === "details") {
     container.append(section("Tarama ayrıntıları", report.roots.length, undefined, "konum"), node("p", scanSummary(report), "muted"), node("p", report.root, "report-path"));

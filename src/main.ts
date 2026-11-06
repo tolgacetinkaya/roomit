@@ -11,6 +11,7 @@ import type { LocalDisk, ScanMode } from "./scan";
 import { icon } from "./icons";
 import type { IconName } from "./icons";
 import { installRevealShortcut, revealShortcut } from "./reveal";
+import { parseMinimumGb } from "./size-filter";
 import "./styles.css";
 
 function element<T extends HTMLElement>(selector: string): T {
@@ -150,6 +151,22 @@ diskSelect.addEventListener("change", () => {
 
 const search = element<HTMLInputElement>("#result-search");
 const caption = element<HTMLParagraphElement>("#result-caption");
+const sizeForm = element<HTMLFormElement>("#size-filter-form");
+const minimumInput = element<HTMLInputElement>("#minimum-gb");
+const sizeError = element<HTMLParagraphElement>("#size-filter-error");
+let minimumBytes = 0n;
+sizeForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const parsed = parseMinimumGb(minimumInput.value);
+  sizeError.hidden = parsed.error === null; sizeError.textContent = parsed.error || "";
+  minimumInput.setAttribute("aria-invalid", String(parsed.error !== null));
+  if (parsed.bytes === null) return;
+  minimumBytes = parsed.bytes; renderCurrent();
+});
+element("#clear-size-filter").addEventListener("click", () => {
+  minimumInput.value = ""; minimumBytes = 0n; minimumInput.removeAttribute("aria-invalid");
+  sizeError.hidden = true; sizeError.textContent = ""; renderCurrent(); minimumInput.focus();
+});
 const viewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#result-tabs button"));
 let lastReport: InspectionReport | null = null;
 let grouped: GroupedReport | null = null;
@@ -158,6 +175,7 @@ let settingsExpanded = false;
 toggleScan.addEventListener("click", () => { settingsExpanded = !settingsExpanded; renderCurrent(); });
 function navigate(view: ResultView): void { currentView = view; renderCurrent(); }
 function renderCurrent(): void {
+  sizeForm.hidden = currentView !== "largest";
   form.hidden = Boolean(lastReport) && !settingsExpanded;
   toggleScan.hidden = !lastReport;
   toggleScan.textContent = settingsExpanded ? "Gizle" : "Alanı değiştir";
@@ -170,14 +188,15 @@ function renderCurrent(): void {
   search.disabled = !lastReport;
   element("#reveal-hint").hidden = !lastReport;
   element("#reveal-hint").textContent = `Konumu açmak için öğeye odaklanıp ${revealShortcut} tuşlarına basabilirsin.`;
-  const titles: Record<ResultView, string> = { overview: "Genel bakış", projects: "Projeler", ai: "AI araçları", largest: "Büyük klasörler", details: "Tarama ayrıntıları" };
+  const titles: Record<ResultView, string> = { overview: "Genel bakış", projects: "Projeler", ai: "AI araçları", largest: "Büyük öğeler", details: "Tarama ayrıntıları" };
   element("#page-title").textContent = titles[currentView];
   element("#results-title").textContent = currentView === "overview" ? "Alanının hikâyesi" : titles[currentView];
   element("#project-count").textContent = grouped ? formatCount(grouped.projects.length) : "—";
   element("#ai-count").textContent = grouped ? formatCount(grouped.ai.length) : "—";
   if (lastReport && grouped) {
-    results.replaceChildren(renderResults(lastReport, grouped, currentView, search.value, navigate));
-    caption.textContent = `Listelenen: ${formatCount(grouped.projects.length)} proje grubu · ${formatCount(grouped.ai.length)} AI aracı`;
+    results.replaceChildren(renderResults(lastReport, grouped, currentView, search.value, navigate, minimumBytes));
+    caption.textContent = currentView === "largest" ? "Dosya ve klasör boyutlarını filtrele. Yeniden tarama gerekmez."
+      : `Listelenen: ${formatCount(grouped.projects.length)} proje grubu · ${formatCount(grouped.ai.length)} AI aracı`;
   } else {
     const empty = document.createElement("div"); empty.className = "empty-state";
     const intro = document.createElement("div"); intro.className = "empty-intro";
@@ -207,7 +226,7 @@ function clearReport(): void {
 }
 function showReport(report: InspectionReport): void {
   settingsExpanded = false;
-  lastReport = report; grouped = groupReport(report); currentView = "overview"; renderCurrent();
+  lastReport = report; grouped = groupReport(report); currentView = minimumBytes > 0n ? "largest" : "overview"; renderCurrent();
 }
 for (const tab of viewButtons) tab.addEventListener("click", () => navigate(tab.dataset.view as ResultView));
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
