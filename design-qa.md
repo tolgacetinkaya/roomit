@@ -81,3 +81,18 @@ interaction and macOS acceptance are separate pending checks.
 
 Implementation checklist: visual pass, responsive pass, core interaction pass,
 47 automated tests, Windows executable build and hash comparison.
+
+## Reveal follow-up — 2026-11-04
+
+This is a scoped functional addition, not a new visual direction. The existing
+passed palette/layout review remains historical. Cards now carry a separate
+visible reveal action outside their collapsed details content; nested file rows
+have their own action. The keyboard hint is visible above results. Browser
+fixture interaction evidence covers button target, nested keyboard target,
+multiple locations and recovery after a failed request. Native Windows smoke
+opened the fixture directory; Finder/native Roomit UI acceptance remains pending.
+
+Reveal evidence: `artifacts/qa/reveal-locations.jpg` shows the multi-location
+chooser and direct action on a collapsed card; `reveal-error.jpg` records a
+visible missing-path message. A subsequent valid action succeeded and the
+browser error log was empty. These screenshots use labeled sample data.

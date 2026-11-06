@@ -1,4 +1,5 @@
 mod computer;
+mod reveal;
 
 use std::{
     path::PathBuf,
@@ -87,11 +88,17 @@ fn cancel_scan(scan_id: String, state: tauri::State<'_, ScanRegistry>) -> Result
     state.cancel(&scan_id)
 }
 
+#[tauri::command]
+async fn reveal_path(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || reveal::reveal(&path)).await
+        .map_err(|error| format!("Konum gösterilemedi: {error}"))?
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(ScanRegistry::default())
-        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks])
+        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path])
         .run(tauri::generate_context!())
         .expect("Roomit could not start");
 }

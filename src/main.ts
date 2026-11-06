@@ -10,6 +10,7 @@ import { scanTarget, usedPercent } from "./scan";
 import type { LocalDisk, ScanMode } from "./scan";
 import { icon } from "./icons";
 import type { IconName } from "./icons";
+import { installRevealShortcut, revealShortcut } from "./reveal";
 import "./styles.css";
 
 function element<T extends HTMLElement>(selector: string): T {
@@ -23,6 +24,7 @@ const button = element<HTMLButtonElement>("#inspect-button");
 const cancelButton = element<HTMLButtonElement>("#cancel-button");
 const status = element<HTMLParagraphElement>("#status");
 const results = element<HTMLDivElement>("#results");
+installRevealShortcut(results);
 const progressBar = element<HTMLProgressElement>("#scan-progress");
 const currentPath = element<HTMLParagraphElement>("#current-path");
 const chooseFolder = element<HTMLButtonElement>("#choose-folder");
@@ -166,6 +168,8 @@ function renderCurrent(): void {
     : "Bir alan seç. Roomit içindekileri anlamlandırır.";
   for (const tab of viewButtons) tab.setAttribute("aria-pressed", String(tab.dataset.view === currentView));
   search.disabled = !lastReport;
+  element("#reveal-hint").hidden = !lastReport;
+  element("#reveal-hint").textContent = `Konumu açmak için öğeye odaklanıp ${revealShortcut} tuşlarına basabilirsin.`;
   const titles: Record<ResultView, string> = { overview: "Genel bakış", projects: "Projeler", ai: "AI araçları", largest: "Büyük klasörler", details: "Tarama ayrıntıları" };
   element("#page-title").textContent = titles[currentView];
   element("#results-title").textContent = currentView === "overview" ? "Alanının hikâyesi" : titles[currentView];

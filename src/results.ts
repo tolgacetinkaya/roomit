@@ -3,6 +3,7 @@ import type { Finding, InspectionReport, SizedEntry } from "./report";
 import { filterGroups, pathName, topLevelFindings } from "./groups";
 import type { GroupedReport, ResultGroup } from "./groups";
 import { icon } from "./icons";
+import { revealActions, revealShortcut } from "./reveal";
 
 export type ResultView = "overview" | "projects" | "ai" | "largest" | "details";
 const node = (tag: string, text = "", className = ""): HTMLElement => {
@@ -23,7 +24,12 @@ function paged<T>(items: T[], render: (item: T) => HTMLElement, pageSize = 25): 
   };
   more.addEventListener("click", append); wrapper.append(list, more); append(); return wrapper;
 }
-function expandable(title: string, subtitle: string, size: string, build: () => HTMLElement): HTMLElement {
+function attachReveal(target: HTMLElement, paths: string[], focusable = false): void {
+  target.dataset.revealOwner = "";
+  if (focusable) target.tabIndex = 0;
+  target.append(revealActions(paths));
+}
+function expandable(title: string, subtitle: string, size: string, build: () => HTMLElement, paths: string[] = []): HTMLElement {
   const details = document.createElement("details"); details.className = "group-card";
   const summary = document.createElement("summary");
   const row = node("span", "", "group-row");
@@ -36,7 +42,11 @@ function expandable(title: string, subtitle: string, size: string, build: () => 
   details.addEventListener("toggle", () => {
     if (details.open && !built) { details.append(build()); built = true; }
   });
-  return details;
+  if (!paths.length) return details;
+  const card = node("div", "", "result-card"); card.append(details);
+  attachReveal(card, paths);
+  summary.title = `Ayrıntıları aç · Konumu göster: ${revealShortcut}`;
+  return card;
 }
 function findingRow(item: Finding): HTMLElement {
   const row = node("div", "", "member-row");
@@ -44,6 +54,7 @@ function findingRow(item: Finding): HTMLElement {
   heading.append(node("strong", pathName(item.path)), node("span", sizeLabel(item.logicalBytes, item.sizeComplete)));
   const path = node("p", item.path, "report-path");
   row.append(heading, node("p", `${categoryLabels[item.category]} · ${item.disposition === "protected" ? "Korunuyor" : "İnceleme gerekli"}`, "muted"), path, node("p", item.reason, "hint"));
+  attachReveal(row, [item.path], true);
   return row;
 }
 function groupCard(group: ResultGroup): HTMLElement {
@@ -53,7 +64,7 @@ function groupCard(group: ResultGroup): HTMLElement {
     const body = node("div", "", "group-content");
     if (group.location) body.append(node("p", group.location, "report-path"));
     body.append(paged(group.items, findingRow, 20)); return body;
-  });
+  }, group.location ? [group.location] : group.items.map((item) => item.path));
   card.title = group.location || group.title;
   card.querySelector(".group-row")?.prepend(icon(group.kind === "ai" ? "ai" : group.kind === "project" ? "project" : "shield", "ui-icon group-icon"));
   return card;
@@ -121,16 +132,18 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
         body.append(node("p", entry.path, "report-path"));
         body.append(children.length ? paged(children, (child) => {
           const row = node("div", "", "member-row");
-          row.append(node("strong", `${pathName(child.path)} · ${sizeLabel(child.logicalBytes, child.sizeComplete)}`), node("p", child.path, "report-path")); return row;
+          row.append(node("strong", `${pathName(child.path)} · ${sizeLabel(child.logicalBytes, child.sizeComplete)}`), node("p", child.path, "report-path"));
+          attachReveal(row, [child.path], true); return row;
         }) : empty("Bu klasörün alt öğeleri büyük öğeler listesinde bulunmuyor.")); return body;
-      })) : empty("Bu görünümde büyük alt klasör bulunamadı."));
+      }, [entry.path])) : empty("Bu görünümde büyük alt klasör bulunamadı."));
     const files = report.largestEntries.filter((entry) => entry.kind === "file" && matches(entry));
     if (files.length) {
       const details = document.createElement("details"); details.className = "additional-details";
       details.append(node("summary", `Tek tek büyük dosyalar (${files.length})`));
       let built = false;
       details.addEventListener("toggle", () => { if (details.open && !built) { details.append(paged(files, (entry) => {
-        const row = node("div", "", "member-row"); row.append(node("strong", `${pathName(entry.path)} · ${sizeLabel(entry.logicalBytes, entry.sizeComplete)}`), node("p", entry.path, "report-path")); return row;
+        const row = node("div", "", "member-row"); row.append(node("strong", `${pathName(entry.path)} · ${sizeLabel(entry.logicalBytes, entry.sizeComplete)}`), node("p", entry.path, "report-path"));
+        attachReveal(row, [entry.path], true); return row;
       })); built = true; } }); container.append(details);
     }
   }
@@ -140,6 +153,7 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
       const row = node("div", "", "member-row");
       const label = root.status === "failed" ? "Erişilemedi" : root.status === "notScanned" ? "Taranmadı" : sizeLabel(root.logicalBytes, root.sizeComplete);
       row.append(node("strong", `${root.path} · ${label}`));
+      attachReveal(row, [root.path], true);
       if (root.error) row.append(node("p", root.error, "warning")); container.append(row);
     }
     container.append(node("p", "Boyutlar dosya uzunluklarının toplamıdır. Diskte ayrılan veya boşaltılabilecek alanı göstermez; hardlinkler her yol için sayılır.", "hint"));

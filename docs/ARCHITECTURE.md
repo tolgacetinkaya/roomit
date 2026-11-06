@@ -161,3 +161,20 @@ The existing vanilla TS UI uses local Phosphor SVG assets, graphite tokens and
 blue accents; completed reports compact setup to keep results prominent. The
 Vite asset inline limit is zero to keep images compatible with native strict CSP.
 UI fixture evidence is separate from native/platform acceptance; see design QA.
+
+## Reveal result locations
+
+`reveal_path` is the only new desktop command. It checks an existing absolute
+file/directory and calls the official tauri-plugin-opener Rust reveal function
+on a blocking worker. The plugin's general open-path/open-URL IPC is not
+registered and no shell/opener frontend capability is granted. The app never
+opens a file in its associated program. Windows uses native Explorer APIs;
+macOS uses NSWorkspace/Finder. Missing/invalid targets yield a visible message.
+Explorer can fall back to showing the containing folder if selection fails.
+
+Every result location has an explicit action. Group actions are siblings of the
+native details element so they remain available on a collapsed card. Multi-path
+AI groups present a location chooser. Keyboard handling is scoped to the focused
+result owner; nested rows take priority over parent projects. Ctrl+Enter on
+Windows and Command+Enter on macOS trigger the same action, while typing fields,
+key repeats, composition and extra modifiers are ignored.

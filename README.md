@@ -17,13 +17,16 @@ is configured. MIT licensed.
 - Identify Codex, Claude Code, Cursor and Ollama directories; protect AI data,
   instructions, recognized settings/model stores, Git data and environment files.
 - Live progress, cancellation and clearly labeled partial results.
+- Show result paths in Windows Explorer / macOS Finder with **Klasörde göster**.
+  On a focused card/row, use **Ctrl+Enter** (Windows) or **Command+Enter** (Mac).
+  Multi-location AI groups ask which location to reveal.
 - Graphite/electric-blue workspace with persistent navigation, grouped results,
   compact completed-scan setup, and per-volume capacity/free-space previews.
 - Filter findings, inspect detected projects and view the largest 100 files/folders.
 - Skip symlinks/reparse points; bound work and report memory; keep totals independent
   of paginated or capped result lists.
 
-There is **no deletion, move-to-trash, native reveal, exclusion UI, age filter,
+There is **no deletion, move-to-trash, exclusion UI, age filter,
 telemetry, or cloud/LLM call**. Custom AI storage locations and arbitrary tool
 versions are not automatically discovered outside the selected directory.
 

@@ -1,3 +1,29 @@
+# Reveal locations and keyboard shortcut — 2026-11-04
+
+- **52 automated tests passed**: 26 core, 8 native state/discovery/path-validation,
+  18 frontend. The native reveal smoke test is ignored during default checks and
+  was run explicitly afterward: **1 additional test passed** (53 total).
+- TypeScript/Vite build, Rust workspace check and Windows debug/no-bundle exe
+  build passed. The delivered copy is SHA-256 checked against that output.
+- Real Windows smoke test used a local fixture named
+  `Konum denemesi, Türkçe & (1).txt`. Explorer opened its containing folder;
+  that window and the expected filename were observed through native UI state.
+  No assertion that Windows always selects the item is made (native fallback can
+  open the containing folder). The test file was never executed.
+- Browser mocked-IPC checks: visible action on a collapsed card; correct path
+  from button; Ctrl+Enter on project summary; Ctrl+Enter on nested row selects
+  the row path rather than its parent; multi-location chooser opens and receives
+  keyboard focus; failure messages leave subsequent actions usable.
+- Unit coverage includes missing/relative/URL paths, existing files/directories,
+  spaces, Turkish characters and punctuation; Windows vs Mac modifier handling,
+  plain Enter, extra modifiers, held keys and text composition.
+- Only the Rust reveal function is used; general URL/file-open plugin IPC is not
+  exposed. No deletion, write/trash controls, GitHub publication or remote.
+- Finder implementation uses the official library; macOS build/device execution
+  and the full native Roomit-to-Explorer UI flow remain user acceptance checks.
+  Browser evidence uses labeled fixture data and is not native UI certification.
+
+---
 # Single disk and graphite workspace — 2026-11-04
 
 - `scripts/check.ps1` passed: 26 core tests, 6 Tauri state/discovery/selection

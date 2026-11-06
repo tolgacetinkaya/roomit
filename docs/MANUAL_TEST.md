@@ -68,3 +68,20 @@ or macOS native acceptance is claimed by this implementation pass.
    minimum window size and keyboard scope selection, scan, cancel and navigation.
 6. On macOS, separately check system/Data volumes and external volume selection.
    APFS shared container capacities are OS-reported snapshots, not additive totals.
+
+## Klasörde göster and direct shortcut
+
+- On a collapsed project card, click **Klasörde göster**. Its containing folder
+  should open in Explorer/Finder with the item selected when supported.
+- Expand the card and use the action on a specific result. It should reveal that
+  result, not its parent project. Try a large-file row and a root-volume row too.
+- Focus a card summary or result row with Tab (or click it); press **Ctrl+Enter**
+  on Windows / **Command+Enter** on Mac. The same location should be shown.
+  Typing in search must not trigger the shortcut. Holding Enter must not repeatedly
+  launch windows. Plain Enter retains normal expand/button behavior.
+- An AI group with several locations must show a chooser. The shortcut opens the
+  chooser and focuses its first choice; it must not silently pick a location.
+- Move/remove a test item after scanning and click its action. A readable message
+  is expected, and another valid item's action must remain usable.
+- Confirm no file is launched and no delete/trash action is present. Check Mac
+  Finder and its Command shortcut on a real device separately.

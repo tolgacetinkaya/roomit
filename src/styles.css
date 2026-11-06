@@ -164,3 +164,21 @@ footer span:last-child { font-size: 8px; letter-spacing: 1.2px; }
 #toggle-scan { padding: 7px 11px; font-size: 11px; }
 #scan-caption { overflow-wrap: anywhere; }
 @media (min-width: 960px) { .scan-panel { padding: 19px 22px 14px; } .scan-modes { margin-top: 17px; margin-bottom: 13px; } .scan-modes label { padding-block: 13px; } }
+.reveal-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; min-width: 0; }
+.group-card > .reveal-actions { padding: 0 18px 13px; }
+.reveal-button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; font-size: 10px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.reveal-button .ui-icon { width: 15px; height: 15px; }
+.reveal-message { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.reveal-message.warning { color: #ebcc8f; }
+.reveal-locations { min-width: 0; max-width: 100%; }
+.reveal-locations > summary { cursor: pointer; color: var(--green); font-size: 11px; padding: 6px 0; }
+.reveal-location-list { display: grid; gap: 7px; padding-top: 8px; }
+.member-row > .reveal-actions { margin-top: 10px; }
+#reveal-hint { margin: -8px 0 18px; }
+[data-reveal-owner]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 740px) { .group-card > .reveal-actions { padding-inline: 12px; } }
+.result-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.result-card > .group-card { border: 0; border-radius: 0; }
+.result-card > .reveal-actions { padding: 0 18px 13px; }
+.result-card:focus-within { border-color: #4168a4; }
+@media (max-width: 740px) { .result-card > .reveal-actions { padding-inline: 12px; } }
