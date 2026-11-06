@@ -1,3 +1,22 @@
+# RAM units and installed capacity, version 0.3.1 — 2026-11-06
+
+- Full suite passed: 33 core, 50 native, 37 frontend (120 tests), with the one
+  existing ignored reveal smoke. New regressions cover binary RAM formatting,
+  installed/OS-visible separation, unknown capacity, overflow and unchanged
+  decimal disk sizes/GB filters. TypeScript/Vite and workspace check passed.
+- A separate read-only native monitor probe on this computer returned installed
+  **137438953472 bytes = 128 GiB**, OS-visible **137123209216 bytes = 127.71 GiB**.
+  The production formatter outputs “128 GiB takılı · 127,71 GiB sistem belleği”.
+  These are real API reads, not a screenshot or a fabricated capacity override.
+- RAM device/tool/process values use GiB/MiB; installed RAM comes from Windows
+  firmware capacity and is distinct from OS-visible total. Missing data remains
+  explicit. Decimal storage/network formatting and minimum-GB filters stay intact.
+- Native Tauri build and final EXE version/hash/GUI subsystem are recorded in the
+  current manifest. No GUI was launched for this patch; existing 0.3.0 browser
+  shell QA and its native window-control/macOS acceptance gaps remain historical.
+- Delivery: `artifacts/current/Roomit-0.3.1.exe`. Earlier open builds are preserved.
+  No deletion, automatic rescan, state reset or publication added.
+
 # Integrated desktop shell, version 0.3.0 — 2026-11-06
 
 - Full existing check suite passed: 33 core, 49 native and 35 frontend tests

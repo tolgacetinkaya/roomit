@@ -2,6 +2,26 @@ export type GpuStatus="measured"|"partial"|"warmingUp"|"noCounter"|"unavailable"
 export interface GpuReading {percent:number|null;status:GpuStatus;reason:string;measuredProcesses:number;totalProcesses:number}
 export interface ProcessRow { pid:number; name:string; toolId:string|null; cpuPercent:number|null; memoryBytes:string;gpu?:GpuReading }
 export type ProcessSort="memory"|"cpu"|"gpu";
+const memoryNumber=new Intl.NumberFormat("tr-TR");
+// RAM follows binary units. Disk sizes and the user's decimal GB filter use
+// their existing formatter; neither can be reused for physical/process memory.
+export function formatMemory(value:string):string {
+  const bytes=BigInt(value);
+  if(bytes<0n)throw new RangeError("Memory byte count must be nonnegative");
+  const units=["B","KiB","MiB","GiB","TiB","PiB","EiB"];
+  let unit=0,divisor=1n;
+  while(bytes>=divisor*1024n&&unit<units.length-1){divisor*=1024n;unit++;}
+  if(!unit)return `${memoryNumber.format(bytes)} B`;
+  const rounded=(bytes*100n+divisor/2n)/divisor;
+  const fraction=(rounded%100n).toString().padStart(2,"0").replace(/0+$/,"");
+  return `${memoryNumber.format(rounded/100n)}${fraction?`,${fraction}`:""} ${units[unit]}`;
+}
+export function memoryCapacity(total:string,installed?:string|null):string {
+  // Installed capacity and OS-visible capacity differ when firmware reserves
+  // memory. Do not round the OS total up to the user's expected DIMM capacity.
+  if(installed&&BigInt(installed)>0n&&BigInt(installed)>=BigInt(total))return `${formatMemory(installed)} takılı · ${formatMemory(total)} sistem belleği`;
+  return `${formatMemory(total)} sistem belleği · Takılı RAM okunamadı`;
+}
 export function gpuText(reading?:GpuReading):string {
   if(!reading)return "Ölçülemiyor";
   if(reading.status==="noProcess")return "Çalışan süreç yok";

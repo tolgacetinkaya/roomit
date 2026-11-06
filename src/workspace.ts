@@ -5,14 +5,14 @@ import type { InspectionReport } from "./report";
 import type { GroupedReport } from "./groups";
 import { renderStorageMap } from "./storage-map";
 import { toolLogo, toolId } from "./tool-logos";
-import { toolUsage, processPage, gpuText } from "./workspace-model";
+import { toolUsage, processPage, gpuText, formatMemory, memoryCapacity } from "./workspace-model";
 import type { ProcessRow, GpuReading, ProcessSort } from "./workspace-model";
 import { revealActions } from "./reveal";
 export type WorkspaceView="control"|"tools"|"activity";
 interface InstalledTool {id:string;name:string;kind:string;installations:string[];dataPaths:string[];evidence:string[]}
 interface Inventory {tools:InstalledTool[];supportedCount:number;warnings:string[]}
 interface NetworkRow {name:string;receivedPerSecond:number|null;sentPerSecond:number|null}
-interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;processes:ProcessRow[];networks:NetworkRow[];gpuStatus:string;gpuAi?:GpuReading;gpuTools?:{toolId:string;reading:GpuReading}[];appNetworkStatus:string}
+interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;memoryInstalled?:string|null;processes:ProcessRow[];networks:NetworkRow[];gpuStatus:string;gpuAi?:GpuReading;gpuTools?:{toolId:string;reading:GpuReading}[];appNetworkStatus:string}
 const el=(tag:string,text="",cls=""):HTMLElement=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
 const percent=(n:number|null)=>n===null?"Ölçülüyor…":`%${n.toLocaleString("tr-TR",{maximumFractionDigits:1})}`;
 const rate=(n:number|null)=>n===null?"Ölçülüyor…":`${formatBytes(Math.max(0,Math.round(n)).toString())}/sn`;
@@ -45,16 +45,18 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(!available.some(n=>n.name===networkName))networkName=[...available].sort((a,b)=>(b.receivedPerSecond||0)+(b.sentPerSecond||0)-(a.receivedPerSecond||0)-(a.sentPerSecond||0))[0]?.name||"";
       const network=available.find(n=>n.name===networkName);
       metrics.replaceChildren(metric("CPU · cihaz",snapshot?percent(snapshot.cpuPercent):"—","Toplam işlemci kapasitesine göre"),
-        metric("RAM · cihaz",snapshot?formatBytes(snapshot.memoryUsed):"—",snapshot?`${formatBytes(snapshot.memoryTotal)} toplam bellek`:"İlk ölçüm bekleniyor"),
+        metric("RAM · cihaz",snapshot?formatMemory(snapshot.memoryUsed):"—",snapshot?memoryCapacity(snapshot.memoryTotal,snapshot.memoryInstalled):"İlk ölçüm bekleniyor"),
         metric("GPU · AI süreçleri",snapshot?gpuText(monitorError?undefined:snapshot.gpuAi):"Ölçüm bekleniyor",`Bu bilgisayarda · ${running} çalışan AI aracı`),
         metric("Ağ · indirme",network?rate(network.receivedPerSecond):"—",network?.name||"Adaptör ölçümü bekleniyor"));
       const gpuMetric=metrics.children[2] as HTMLElement;gpuMetric.classList.add("gpu-metric");
+      const ramMetric=metrics.children[1] as HTMLElement;ramMetric.classList.add("ram-metric");
+      ramMetric.title=`${snapshot?memoryCapacity(snapshot.memoryTotal,snapshot.memoryInstalled):"Ölçüm bekleniyor"}. RAM 1024 tabanlı GiB/MiB olarak gösterilir. Sistem belleği işletim sisteminin kullanabildiği toplamdır; boş RAM değildir.`;
       gpuMetric.title=monitorError?`Canlı GPU ölçümü alınamadı: ${monitorError}`:snapshot?.gpuAi?.reason||"GPU ölçümü henüz alınamadı.";
     }
     if(sampleLabel)sampleLabel.textContent=monitorError?`Ölçüm alınamadı: ${monitorError}`:paused?"Canlı ölçüm duraklatıldı.":snapshot?`Son ölçüm ${new Date(snapshot.sampledAtMs).toLocaleTimeString("tr-TR")} · 2 sn aralıkla` : "İlk ölçüm alınıyor…";
     for(const card of container.querySelectorAll<HTMLElement>("[data-tool-usage]")){
       const id=card.dataset.toolUsage!, usage=toolUsage(snapshot?.processes||[],id);
-      card.textContent=snapshot?usage.processes?`${usage.processes} süreç · CPU ${percent(usage.cpu)} · RAM ${formatBytes(usage.memory)}`:"Şu anda çalışan süreç görülmedi":"Canlı ölçüm bekleniyor…";
+      card.textContent=snapshot?usage.processes?`${usage.processes} süreç · CPU ${percent(usage.cpu)} · RAM ${formatMemory(usage.memory)}`:"Şu anda çalışan süreç görülmedi":"Canlı ölçüm bekleniyor…";
     }
     for(const card of container.querySelectorAll<HTMLElement>("[data-tool-gpu]")){
       const id=card.dataset.toolGpu!, usage=toolUsage(snapshot?.processes||[],id);
@@ -116,7 +118,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(p.toolId){name.append(toolLogo(p.toolId,20));title.append(el("small",catalog.find(t=>t.id===p.toolId)?.name||p.toolId));}
       else if(p.name.toLowerCase().includes("chrome"))name.append(toolLogo("chrome",20));
       else if(p.name.toLowerCase().includes("docker"))name.append(toolLogo("docker",20));
-      name.append(title);row.append(name);for(const value of [String(p.pid),percent(p.cpuPercent),formatBytes(p.memoryBytes)]){const td=document.createElement("td");td.textContent=value;row.append(td);}
+      name.append(title);row.append(name);for(const value of [String(p.pid),percent(p.cpuPercent),formatMemory(p.memoryBytes)]){const td=document.createElement("td");td.textContent=value;row.append(td);}
       const gpuCell=document.createElement("td");gpuCell.className="process-gpu";gpuCell.dataset.pid=String(p.pid);gpuCell.textContent=gpuText(monitorError?undefined:p.gpu);gpuCell.title=monitorError?`Canlı ölçüm alınamadı: ${monitorError}`:p.gpu?.reason||"Bu süreç için GPU değeri alınamadı; sıfır kullanım anlamına gelmez.";row.append(gpuCell);tbody.append(row);}
     table.append(tbody);processes.append(table);
     if(!page.length)processes.append(el("p","Aramana uyan süreç yok.","hint"));

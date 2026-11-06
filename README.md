@@ -9,12 +9,18 @@ is configured. MIT licensed.
 
 ## Current capabilities
 
-**Current Windows build: 0.3.0 (integrated desktop shell).** Open
-`G:\special-repos\roomit\artifacts\current\Roomit-0.3.0.exe` after closing an older
-Roomit window. The sidebar and Roomit menu show 0.3.0. Older executables at the root
+**Current Windows build: 0.3.1 (RAM units and capacity correction).** Open
+`G:\special-repos\roomit\artifacts\current\Roomit-0.3.1.exe` after closing an older
+Roomit window. The sidebar and Roomit menu show 0.3.1. Older executables at the root
 of `artifacts` are historical development builds.
 The older `artifacts/current/Roomit.exe` was open/locked during this delivery and
-was preserved; the current manifest points to the versioned 0.3.0 executable.
+was preserved; the current manifest points to the versioned 0.3.1 executable.
+
+- RAM uses binary GiB/MiB throughout device, tool and process displays. On Windows,
+  installed firmware capacity is shown separately from OS-visible total memory;
+  an unreadable installed capacity is explicit. 128 GiB no longer appears as
+  137.44 GB. Storage and minimum-size filters retain decimal GB. See
+  `docs/RAM_MEASUREMENT.md`.
 
 - The Windows titlebar is integrated into the interface, with custom minimize,
   maximize/restore, close and drag controls. The Roomit menu and grouped sidebar

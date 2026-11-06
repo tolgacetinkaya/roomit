@@ -28,9 +28,25 @@ pub(crate) struct NetworkRow { pub name: String, pub received_per_second: Option
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Snapshot {
     pub sampled_at_ms: u64, pub cpu_percent: Option<f32>, pub memory_used: String, pub memory_total: String,
+    pub memory_installed: Option<String>,
     pub processes: Vec<ProcessRow>, pub networks: Vec<NetworkRow>, pub cpu_count: usize,
     pub gpu_status: String, pub app_network_status: String,
     pub gpu_ai: crate::gpu::Reading, pub gpu_tools: Vec<ToolGpu>,
+}
+#[cfg(windows)]
+fn installed_kib_to_bytes(kib:u64)->Option<u64>{kib.checked_mul(1024).filter(|bytes|*bytes>0)}
+fn installed_memory()->Option<u64>{
+    #[cfg(windows)] {
+        // Firmware capacity is stable for the lifetime of this process. Read
+        // once, without spawning commands or confusing it with OS-visible RAM.
+        static INSTALLED:std::sync::OnceLock<Option<u64>>=std::sync::OnceLock::new();
+        *INSTALLED.get_or_init(||{
+            let mut kib=0;
+            let ok=unsafe{windows_sys::Win32::System::SystemInformation::GetPhysicallyInstalledSystemMemory(&mut kib)};
+            if ok==0 {None}else{installed_kib_to_bytes(kib)}
+        })
+    }
+    #[cfg(not(windows))] {None}
 }
 fn network_rates(previous: Option<(u64,u64)>, current:(u64,u64), seconds: Option<f64>) -> (Option<f64>,Option<f64>) {
     match (previous,seconds) {
@@ -136,6 +152,7 @@ impl Sampler {
         let gpu_ai=gpu_reading(&owners.keys().copied().collect::<Vec<_>>());
         let snapshot = Snapshot { sampled_at_ms: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
             cpu_percent: warmed.then(|| self.system.global_cpu_usage().clamp(0.0, 100.0)), memory_used: self.system.used_memory().to_string(), memory_total: self.system.total_memory().to_string(),
+            memory_installed:installed_memory().filter(|bytes|*bytes>=self.system.total_memory()).map(|bytes|bytes.to_string()),
             processes, networks, cpu_count, gpu_status: gpu_frame.reason.clone(), gpu_ai, gpu_tools,
             app_network_status: "Ağ hızı adaptör bazındadır. Uygulama başına trafik ve LAN / internet ayrımı henüz ölçülmüyor.".into() };
         self.process_starts=process_starts;self.last = Some(Instant::now()); self.cached = Some(snapshot.clone()); snapshot
@@ -143,6 +160,12 @@ impl Sampler {
 }
 #[cfg(test)] mod tests {
     use super::*;
+    #[cfg(windows)]
+    #[test] fn installed_ram_kib_conversion_rejects_missing_and_overflow_without_rounding(){
+        assert_eq!(installed_kib_to_bytes(134217728),Some(137438953472));
+        assert_eq!(installed_kib_to_bytes(0),None);
+        assert_eq!(installed_kib_to_bytes(u64::MAX),None);
+    }
     #[test] fn reused_new_and_unknown_process_start_times_are_not_gpu_identities() {
         let previous=HashMap::from([(1,100),(2,200),(3,0)]);
         let current=HashMap::from([(1,101),(2,200),(3,0),(4,400)]);
@@ -187,6 +210,8 @@ impl Sampler {
         assert_eq!(sampler.sample().sampled_at_ms, first.sampled_at_ms);
         std::thread::sleep(std::time::Duration::from_millis(1100));
         let next = sampler.sample(); assert!(next.cpu_percent.is_some());
+        if let Some(installed)=&next.memory_installed {assert!(installed.parse::<u64>().unwrap()>=next.memory_total.parse::<u64>().unwrap());}
+        println!("Native RAM bytes: installed={:?}; OS-visible={}; used={}",next.memory_installed,next.memory_total,next.memory_used);
         assert!(next.processes.iter().all(|p| p.cpu_percent.is_some_and(|v| (0.0..=100.0).contains(&v))));
         assert!(next.networks.iter().all(|n| n.received_per_second.is_some()));
         assert!(next.processes.iter().all(|p|p.gpu.percent.is_none_or(|value|value.is_finite()&&(0.0..=100.0).contains(&value))));
