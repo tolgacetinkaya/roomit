@@ -88,7 +88,7 @@ fn entry_budget_and_result_caps_are_shared_across_roots() {
     assert_eq!(report.largest_entries.len(), 1);
     assert_eq!(report.stats.total_logical_bytes, 8);
     assert!(report.results_truncated);
-    let options = ScanOptions { max_entries: 1, ..Default::default() };
+    let options = ScanOptions { max_entries: Some(1), ..Default::default() };
     let limited = scan_locations(&roots, options, &AtomicBool::new(false), |_| {}).unwrap();
     assert_eq!(limited.status, ScanStatus::Limited);
     assert_eq!(limited.stats.total_logical_bytes, 3);
@@ -111,8 +111,42 @@ fn preferred_user_branch_is_visited_before_other_directories_under_a_budget() {
     let fixture = tempdir().unwrap();
     file(fixture.path(), "a-noise/file", 1);
     file(fixture.path(), "z-user/file", 9);
-    let options = ScanOptions { max_entries: 3, preferred_path: Some(fixture.path().join("z-user")), ..Default::default() };
+    let options = ScanOptions { max_entries: Some(3), preferred_path: Some(fixture.path().join("z-user")), ..Default::default() };
     let report = scan_locations(&[fixture.path().to_path_buf()], options, &AtomicBool::new(false), |_| {}).unwrap();
     assert_eq!(report.stats.total_logical_bytes, 9);
     assert_eq!(report.status, ScanStatus::Limited);
+}
+
+#[test]
+fn computer_mode_has_no_count_or_depth_cutoff_and_visits_later_roots() {
+    let fixture = tempdir().unwrap();
+    let deep = std::iter::repeat_n("x", 140).collect::<Vec<_>>().join("/");
+    file(fixture.path(), &format!("one/{deep}/data"), 7);
+    for index in 0..250 { file(fixture.path(), &format!("two/{index}"), 1); }
+    let roots = [fixture.path().join("one"), fixture.path().join("two")];
+    let options = ScanOptions::computer(None);
+    assert_eq!(options.max_entries, None);
+    assert_eq!(options.max_depth, None);
+    let report = scan_locations(&roots, options, &AtomicBool::new(false), |_| {}).unwrap();
+    assert_eq!(report.status, ScanStatus::Completed);
+    assert!(report.total_size_complete);
+    assert_eq!(report.stats.total_logical_bytes, 257);
+    assert_eq!(report.stats.files_scanned, 251);
+    assert!(report.roots.iter().all(|root| root.status == RootStatus::Completed));
+}
+
+#[test]
+fn unlimited_computer_scan_still_cancels_with_bounded_output() {
+    let fixture = tempdir().unwrap();
+    for index in 0..100 { file(fixture.path(), &format!("{index}"), 2); }
+    let cancel = AtomicBool::new(false);
+    let options = ScanOptions { progress_interval: Duration::ZERO, max_largest_entries: 3,
+        ..ScanOptions::computer(None) };
+    let report = scan_locations(&[fixture.path().to_path_buf()], options, &cancel, |progress| {
+        if progress.stats.files_scanned >= 12 { cancel.store(true, Ordering::Relaxed); }
+    }).unwrap();
+    assert_eq!(report.status, ScanStatus::Cancelled);
+    assert_eq!(report.stats.files_scanned, 12);
+    assert_eq!(report.stats.total_logical_bytes, 24);
+    assert_eq!(report.largest_entries.len(), 3);
 }

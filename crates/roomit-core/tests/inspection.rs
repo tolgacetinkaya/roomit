@@ -128,7 +128,7 @@ fn a_directory_named_like_a_project_marker_is_not_evidence() {
 fn entries_limit_returns_explicit_partial_totals() {
     let fixture = tempdir().unwrap();
     for i in 0..10 { file(fixture.path(), &format!("{i}.txt"), 2); }
-    let options = ScanOptions { max_entries: 3, ..Default::default() };
+    let options = ScanOptions { max_entries: Some(3), ..Default::default() };
     let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
     assert_eq!(report.status, ScanStatus::Limited);
     assert!(!report.total_size_complete);
@@ -165,7 +165,7 @@ fn depth_limit_marks_ancestor_sizes_partial_and_keeps_scanning_siblings() {
     let fixture = tempdir().unwrap();
     file(fixture.path(), "a/deep/file", 20);
     file(fixture.path(), "b/file", 7);
-    let options = ScanOptions { max_depth: 1, ..Default::default() };
+    let options = ScanOptions { max_depth: Some(1), ..Default::default() };
     let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
     assert_eq!(report.status, ScanStatus::Limited);
     assert!(!report.total_size_complete);
@@ -256,7 +256,7 @@ fn rejects_relative_missing_and_file_roots() {
     file(fixture.path(), "file", 0);
     assert!(inspect_workspace(&fixture.path().join("file")).is_err());
     assert!(inspect_workspace(&fixture.path().join("missing")).is_err());
-    let options = ScanOptions { max_entries: 0, ..Default::default() };
+    let options = ScanOptions { max_entries: Some(0), ..Default::default() };
     assert!(scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).is_err());
 }
 

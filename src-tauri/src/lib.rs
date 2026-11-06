@@ -55,10 +55,7 @@ async fn inspect_workspace(
         };
         if mode == "computer" {
             let roots = computer::computer_roots()?;
-            let options = roomit_core::ScanOptions {
-                same_file_system: true, preferred_path: computer::preferred_home(&roots),
-                ..Default::default()
-            };
+            let options = roomit_core::ScanOptions::computer(computer::preferred_home(&roots));
             roomit_core::scan_locations(&roots, options, &_lease.cancel, &mut progress)
         } else {
             roomit_core::scan_workspace(&PathBuf::from(root), roomit_core::ScanOptions::default(), &_lease.cancel, &mut progress)

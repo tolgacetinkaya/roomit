@@ -34,11 +34,11 @@ child rows; use the report root total, not a sum of displayed rows. Recognized
 space counts nested findings only once.
 
 Skipped links, inaccessible entries, cancelled scans and depth/entry limits make
-sizes partial lower bounds. The filesystem may change during a scan; this is
+sizes partial lower bounds. Computer scans have no count/depth cutoff; folder-mode limits remain configurable in the library. The filesystem may change during a scan; this is
 not a snapshot or a proof that an item can safely be removed.
 
-Defaults (shared across disks in computer mode): 1,000,000 observed entries, 128 directory levels below each root,
-10,000 retained findings/projects each, 100 largest entries and 100 retained
+Folder-mode defaults: 1,000,000 observed entries and 128 directory levels. Computer mode has no entry or depth cutoff. Both modes retain
+up to 10,000 findings/projects each, 100 largest entries and 100 retained
 warnings. Hitting a result-list cap does not stop size accounting. Progress is
 throttled to about 100 ms. Only one desktop scan can run at once.
 
@@ -119,7 +119,7 @@ is no longer needed.
 volumes are not included. The scan starts only when **Taramayı başlat** is pressed;
 roots are refreshed at start. **Diskleri yenile** refreshes the preview.
 
-Computer scans share one worker, cancellation token, entry budget, bounded
+Computer scans share one worker, cancellation token, bounded
 largest-item list and cumulative progress across roots. Failed and unscanned
 roots are listed. The user's home branch/volume is preferred where possible.
 Overlapping requested roots are partitioned to avoid duplicate measurement.
@@ -130,3 +130,20 @@ skips conservatively mark totals partial. Native Mac behavior awaits testing.
 Normal OS permissions apply; the app does not request elevation. Inaccessible
 areas, mount boundaries and entry limits yield partial results. Whole-computer
 mode is not a guarantee that every protected/hidden volume can be inspected.
+
+## Grouped results
+
+The compact desktop layout keeps scan controls on the left and results on the
+right. Overview, Projects, AI tools, Large folders and Details are separate
+working views with search. Software findings are grouped by nearest project,
+AI locations by tool, and other protected data in a collapsed secondary section.
+Individual paths and reasons are built lazily when a group is opened. Lists are
+paged, so large reports do not create thousands of initial DOM rows.
+
+Nested directory findings are counted once before grouping. Group bytes are
+recognized artifact/data totals, not complete project sizes or reclaimable
+space. If the retained report was truncated, group sizes are explicitly lower
+bounds. Root scan totals still account for all measured files, independently
+of output-list retention. Whole-computer scanning stops on cancellation, access
+failures for particular subtrees, or OS errors, never because of an item/depth
+budget. Existing link/mount partition rules continue to apply.

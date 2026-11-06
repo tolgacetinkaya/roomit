@@ -1,3 +1,44 @@
+# Unlimited computer scan and grouped workspace — 2026-11-04
+
+## Automated evidence
+
+- `scripts/check.ps1` passed: 26 core integration tests (17 inspection + 9
+  multi-root), 5 native state/discovery tests, and 12 frontend report/grouping
+  tests. Total: 43 passing tests.
+- TypeScript/Vite production build and Rust workspace check passed.
+- Windows native build passed (`tauri build --debug --no-bundle`). The final
+  exe is copied for user testing and hash-checked against the build output.
+- Computer-mode options have no entry/depth cutoff. A test traversed 140 nested
+  directories, then a later root; a separate test verifies unlimited scans still
+  cancel promptly and retain bounded output.
+- Group tests cover parent/child deduplication, exact byte totals/sorting,
+  nearest-project assignment, AI tool merging, Windows/Mac path semantics,
+  protected-data separation, search and partial/truncated labels.
+- No actual whole-computer scan, current screenshot audit, native screen
+  automation or Mac device acceptance was performed. UI checks remain with
+  the user, as established in the conversation.
+
+## Current behavior
+
+The desktop computer command uses `ScanOptions::computer`: no file-count or
+folder-depth budget, with progress/cancellation preserved. Folder-mode defaults
+remain 1,000,000 entries / 128 levels. Output-list and warning retention caps
+continue independently and never stop unlimited traversal. Link/reparse and
+mount partition rules still apply; access failures are reported as partial.
+
+The compact layout keeps controls on the left and separates Overview, Projects,
+AI tools, Large folders and Details on the right. Results begin with group cards;
+paths and individual entries are lazy detail content. Protected technical data
+and warnings are secondary. Nested findings contribute their bytes only once.
+Groups from truncated retained lists are labeled lower bounds. Search/navigation
+do not rescan, and no delete/trash action was added.
+
+Windows executable output and source hash are recorded in ignored
+`artifacts/Roomit-build.json`. See `MANUAL_TEST.md` for current acceptance steps.
+Prior sections below are historical evidence for earlier builds.
+
+---
+
 # Native folder picker and computer scope — 2026-11-04
 
 ## Automated evidence

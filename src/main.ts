@@ -1,7 +1,11 @@
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { categoryLabels, formatBytes, formatCount, matchesFilter, scanSummary, sizeLabel } from "./report";
-import type { Finding, FindingFilter, InspectionReport, ScanProgress } from "./report";
+import { formatBytes, formatCount, scanSummary } from "./report";
+import type { InspectionReport, ScanProgress } from "./report";
+import { groupReport } from "./groups";
+import type { GroupedReport } from "./groups";
+import { renderResults } from "./results";
+import type { ResultView } from "./results";
 import "./styles.css";
 
 function element<T extends HTMLElement>(selector: string): T {
@@ -69,7 +73,7 @@ chooseFolder.addEventListener("click", async () => {
       canCreateDirectories: false, fileAccessMode: "scoped" });
     if (folder !== null) {
       input.value = folder;
-      results.replaceChildren();
+      clearReport();
       status.className = "";
       status.textContent = "Klasör seçildi. Hazır olduğunda taramayı başlat.";
     }
@@ -80,132 +84,48 @@ chooseFolder.addEventListener("click", async () => {
 });
 for (const radio of modeInputs) radio.addEventListener("change", () => {
   diskRequest += 1; rootsLoading = false;
-  results.replaceChildren(); status.className = "";
+  clearReport(); status.className = "";
   status.textContent = "Tarama kapsamı seçildi. Hazır olduğunda taramayı başlat.";
   updateControls();
   if (scanMode() === "computer") void loadComputerRoots();
 });
 refreshRoots.addEventListener("click", () => { void loadComputerRoots(); });
 
-// Paths, errors and other filesystem-derived values are untrusted text.
-function textNode(tag: string, value: string, className?: string): HTMLElement {
-  const node = document.createElement(tag);
-  node.textContent = value;
-  if (className) node.className = className;
-  return node;
+const search = element<HTMLInputElement>("#result-search");
+const caption = element<HTMLParagraphElement>("#result-caption");
+const viewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#result-tabs button"));
+let lastReport: InspectionReport | null = null;
+let grouped: GroupedReport | null = null;
+let currentView: ResultView = "overview";
+function navigate(view: ResultView): void { currentView = view; renderCurrent(); }
+function renderCurrent(): void {
+  for (const tab of viewButtons) tab.setAttribute("aria-pressed", String(tab.dataset.view === currentView));
+  search.disabled = !lastReport;
+  if (lastReport && grouped) {
+    results.replaceChildren(renderResults(lastReport, grouped, currentView, search.value, navigate));
+    caption.textContent = `Listelenen: ${formatCount(grouped.projects.length)} proje grubu · ${formatCount(grouped.ai.length)} AI aracı`;
+  } else {
+    const empty = document.createElement("div"); empty.className = "empty-state";
+    const title = document.createElement("h3"); title.textContent = activeScan ? "Tarama devam ediyor…" : "Sonuçları gruplar halinde gör.";
+    const message = document.createElement("p"); message.textContent = activeScan
+      ? "Ölçüm tamamlandığında projeler ve AI araçları burada özetlenecek. İlerlemeyi soldan takip edebilirsin."
+      : "Soldan bir klasör veya bütün bilgisayarı seçip taramayı başlat. Tek tek kayıtları grup içinden açabilirsin.";
+    empty.append(title, message); results.replaceChildren(empty);
+    caption.textContent = activeScan ? "Dosyalar inceleniyor; sonuçlar hazırlanacak." : "Tarama tamamlandığında özet burada görünecek.";
+  }
 }
-function pagedList<T>(items: T[], render: (value: T) => HTMLElement): HTMLElement {
-  const container = textNode("div", "");
-  const list = document.createElement("ul");
-  list.className = "findings";
-  const more = document.createElement("button");
-  more.type = "button";
-  more.className = "secondary load-more";
-  let count = 0;
-  const appendPage = (): void => {
-    const end = Math.min(count + 100, items.length);
-    const fragment = document.createDocumentFragment();
-    for (; count < end; count++) fragment.append(render(items[count]));
-    list.append(fragment);
-    more.hidden = count >= items.length;
-    more.textContent = `Sonraki öğeleri göster (${formatCount(count)} / ${formatCount(items.length)})`;
-  };
-  more.addEventListener("click", appendPage);
-  container.append(list, more);
-  appendPage();
-  return container;
-}
-function renderFinding(finding: Finding): HTMLElement {
-  const item = document.createElement("li");
-  const heading = textNode("div", "", "finding-heading");
-  heading.append(textNode("strong", `${finding.tool} · ${categoryLabels[finding.category]}`));
-  heading.append(textNode("span", finding.disposition === "protected" ? "Korunuyor" : "İnceleme gerekli", "tag"));
-  item.append(heading, textNode("p", finding.path, "report-path"),
-    textNode("strong", `${finding.kind === "directory" ? "Klasör" : "Dosya"} · ${sizeLabel(finding.logicalBytes, finding.sizeComplete)}`, "finding-size"),
-    textNode("p", finding.reason, "muted"));
-  return item;
+function clearReport(): void {
+  lastReport = null; grouped = null; search.value = ""; currentView = "overview"; renderCurrent();
 }
 function showReport(report: InspectionReport): void {
-  results.append(textNode("p", report.root, "report-path"));
-  if (report.scope === "computer") {
-    const disks = document.createElement("details");
-    disks.open = true;
-    disks.append(textNode("summary", `Disk sonuçları (${report.roots.length})`));
-    disks.append(pagedList(report.roots, (root) => {
-      const row = document.createElement("li");
-      const labels = { completed: root.sizeComplete ? "Tamamlandı" : "Kısmi", cancelled: "İptal edildi", limited: "Sınıra ulaşıldı", failed: "Erişilemedi", notScanned: "Taranmadı" };
-      row.append(textNode("strong", labels[root.status]), textNode("p", root.path, "report-path"));
-      if (root.status !== "failed" && root.status !== "notScanned") row.append(textNode("p", sizeLabel(root.logicalBytes, root.sizeComplete), "muted"));
-      if (root.error) row.append(textNode("p", root.error, "warning"));
-      return row;
-    }));
-    results.append(disks);
-  }
-  const metrics = textNode("div", "", "metrics");
-  for (const [label, value] of [
-    ["Taranan mantıksal boyut", sizeLabel(report.stats.totalLogicalBytes, report.totalSizeComplete)],
-    ["Tanımlanan alan · iç içe öğeler tek sayılır", sizeLabel(report.stats.recognizedLogicalBytes, report.totalSizeComplete)],
-    ["Tanınan proje / bulgu", `${formatCount(report.stats.projectsFound)} / ${formatCount(report.stats.findingsFound)}`],
-  ]) {
-    const metric = textNode("div", "", "metric");
-    metric.append(textNode("span", label), textNode("strong", value));
-    metrics.append(metric);
-  }
-  results.append(metrics, textNode("p", "Boyutlar dosya uzunluklarının toplamıdır; diskte ayrılan veya boşaltılabilecek alan değildir. Hardlinkler her dosya yolunda sayılır. Dosyalar değiştirilmez.", "hint"));
-  if (report.resultsTruncated) results.append(textNode("p", "Ölçüm devam etti; proje veya bulgu listesi 10.000 kayıtla sınırlandı. Toplam sayaçlar listeden bağımsızdır.", "warning"));
-
-  const filterLabel = document.createElement("label");
-  filterLabel.textContent = "Bulgu türü";
-  filterLabel.htmlFor = "finding-filter";
-  const filter = document.createElement("select");
-  filter.id = "finding-filter";
-  for (const [value, label] of [["all", "Tümü"], ["development", "Yazılım çıktıları ve bağımlılıklar"], ["ai", "AI araçları"], ["protected", "Korunan veriler"]]) {
-    const option = document.createElement("option");
-    option.value = value; option.textContent = label; filter.append(option);
-  }
-  const findings = textNode("div", "");
-  const renderFiltered = (): void => {
-    findings.replaceChildren();
-    const matched = report.findings.filter((finding) => matchesFilter(finding, filter.value as FindingFilter));
-    if (matched.length) findings.append(pagedList(matched, renderFinding));
-    else findings.append(textNode("p", "Bu görünümde eşleşen öğe yok. Bu, diğer dosyaların gereksiz olduğu anlamına gelmez.", "empty-state"));
-  };
-  filter.addEventListener("change", renderFiltered);
-  results.append(filterLabel, filter, findings);
-  renderFiltered();
-
-  if (report.projects.length) {
-    const details = document.createElement("details");
-    details.append(textNode("summary", `Tanınan proje klasörleri (${formatCount(report.stats.projectsFound)})`));
-    details.append(pagedList(report.projects, (project) => {
-      const row = document.createElement("li");
-      row.append(textNode("strong", project.ecosystems.join(" · ")), textNode("p", project.path, "report-path"));
-      return row;
-    }));
-    results.append(details);
-  }
-  if (report.largestEntries.length) {
-    const details = document.createElement("details");
-    details.append(textNode("summary", `En büyük dosya ve klasörler (${report.largestEntries.length} öğe)`));
-    details.append(textNode("p", "Kök klasör hariç en büyük 100 öğeye kadar gösterilir. Üst ve alt klasörler örtüşür; satırların boyutları toplanmamalıdır.", "hint"));
-    details.append(pagedList(report.largestEntries, (entry) => {
-      const row = document.createElement("li");
-      row.append(textNode("strong", `${entry.kind === "directory" ? "Klasör" : "Dosya"} · ${sizeLabel(entry.logicalBytes, entry.sizeComplete)}`), textNode("p", entry.path, "report-path"));
-      return row;
-    }));
-    results.append(details);
-  }
-  if (report.warnings.length || report.warningsOmitted) {
-    const details = document.createElement("details");
-    details.append(textNode("summary", `Atlanan öğeler / uyarılar (${formatCount(report.warnings.length + report.warningsOmitted)})`));
-    for (const warning of report.warnings) details.append(textNode("p", warning, "warning"));
-    if (report.warningsOmitted) details.append(textNode("p", `${formatCount(report.warningsOmitted)} ek uyarı listede tutulmadı.`, "hint"));
-    results.append(details);
-  }
+  lastReport = report; grouped = groupReport(report); currentView = "overview"; renderCurrent();
 }
+for (const tab of viewButtons) tab.addEventListener("click", () => navigate(tab.dataset.view as ResultView));
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderCurrent, 120); });
 
 if (isTauri()) {
-  element("#runtime-note").textContent = "Klasör seçmek veya kapsam değiştirmek taramayı başlatmaz. İçerikler açılmaz; dosyalar değiştirilmez.";
+  element("#runtime-note").textContent = "Klasör seçimi taramayı başlatmaz.";
 } else {
   button.disabled = true; input.disabled = true;
   status.textContent = "Tarayıcı önizlemesi: Gerçek tarama için Roomit’i masaüstünde aç.";
@@ -240,14 +160,14 @@ form.addEventListener("submit", async (event) => {
   button.disabled = true; input.disabled = true;
   cancelButton.hidden = false; cancelButton.disabled = true;
   progressBar.hidden = false;
-  results.replaceChildren(); results.setAttribute("aria-busy", "true");
+  clearReport(); results.setAttribute("aria-busy", "true");
   status.className = ""; status.textContent = "Tarama başlatılıyor…";
   currentPath.textContent = mode === "computer" ? "Yerel diskler hazırlanıyor…" : root;
   const onProgress = new Channel<ScanProgress>();
   onProgress.onmessage = (progress) => {
     if (activeScan !== scanId) return;
     cancelButton.disabled = progress.finished || cancelRequested;
-    currentPath.textContent = progress.currentPath;
+    currentPath.textContent = progress.currentPath; currentPath.title = progress.currentPath;
     const disk = mode === "computer" ? ` · Disk ${progress.rootIndex}/${progress.rootCount}` : "";
     if (!cancelRequested) status.textContent = `${progress.finished ? "Sonuçlar hazırlanıyor" : "Taranıyor"}${disk} · ${formatCount(progress.stats.filesScanned)} dosya · ${formatCount(progress.stats.directoriesScanned)} klasör · ${formatBytes(progress.stats.totalLogicalBytes)}`;
   };

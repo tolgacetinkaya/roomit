@@ -32,8 +32,7 @@ to their parent. No file contents, hashes or AI transcripts are opened.
 
 File entries are not retained as a full inventory. A bounded min-heap keeps the
 largest 100 files/directories; up to 10,000 findings and 10,000 projects are
-retained. Directory queues are bounded by the global 1,000,000-entry limit.
-Depth is capped at 128. Warnings are capped at 100 with an omitted counter.
+retained. Folder mode defaults to 1,000,000 entries and 128 levels; computer mode has neither count nor depth cutoff. Pending directory queues can grow with the scanned tree. Warnings are capped at 100 with an omitted counter.
 Files are not deterministically ordered by the filesystem; completed reports
 are sorted, while partial selection can depend on enumeration order.
 
@@ -125,3 +124,25 @@ are manual; Windows automated evidence does not verify macOS runtime behavior.
 
 Reference: https://v2.tauri.app/plugin/dialog/
 Disk discovery source: https://github.com/GuillaumeGomez/sysinfo/tree/v0.37.2/src
+
+## Unlimited computer traversal and result presentation
+
+`ScanOptions.max_entries` / `max_depth` are optional. The desktop computer command
+uses `ScanOptions::computer`, setting both to None, while normal folder/library
+defaults remain bounded. Work is still iterative and cancellation/progress are
+preserved. Report list/warning limits remain independent of traversal. Tests
+exercise traversal beyond the former depth cap, later roots, and cancellation.
+
+`src/groups.ts` normalizes Windows paths without case sensitivity, retains case
+on Mac paths, removes nested/duplicate byte contributions, associates outputs
+with the nearest project, and merges AI locations by tool. Truncated retained
+reports produce lower-bound group labels. `src/results.ts` renders lazy,
+paginated group accordions and separate result views. Large folders are shown
+at their outer boundary, with included child paths inside the accordion.
+Search and view navigation do not rescan. Full paths/warnings are secondary.
+
+The existing Roomit palette, system fonts and logo are preserved; the large
+introductory area was replaced with a compact two-column analysis workspace.
+This is an implementation pass based on the user's usability feedback and the
+existing code target, not a screenshot-backed audit. No live visual or native
+screen acceptance is claimed; screen checks remain with the user.

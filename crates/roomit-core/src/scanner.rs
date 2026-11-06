@@ -10,8 +10,8 @@ use std::{
 
 #[derive(Debug, Clone)]
 pub struct ScanOptions {
-    pub max_entries: u64,
-    pub max_depth: usize,
+    pub max_entries: Option<u64>,
+    pub max_depth: Option<usize>,
     pub max_findings: usize,
     pub max_largest_entries: usize,
     pub max_warnings: usize,
@@ -24,11 +24,20 @@ pub struct ScanOptions {
 impl Default for ScanOptions {
     fn default() -> Self {
         Self {
-            max_entries: 1_000_000, max_depth: 128, max_findings: 10_000,
+            max_entries: Some(1_000_000), max_depth: Some(128), max_findings: 10_000,
             max_largest_entries: 100, max_warnings: 100,
             progress_interval: Duration::from_millis(100),
             same_file_system: false, preferred_path: None,
         }
+    }
+}
+
+impl ScanOptions {
+    /// Computer scans have no entry or depth cutoff. Output retention is still
+    /// bounded independently; progress and cancellation continue throughout.
+    pub fn computer(preferred_path: Option<PathBuf>) -> Self {
+        Self { max_entries: None, max_depth: None, same_file_system: true,
+            preferred_path, ..Default::default() }
     }
 }
 
@@ -63,7 +72,7 @@ fn checked_root(root: &Path) -> io::Result<PathBuf> {
 fn run_scan<F: FnMut(&ScanProgress)>(
     roots: &[PathBuf], mut options: ScanOptions, cancel: &AtomicBool, on_progress: F, computer: bool,
 ) -> io::Result<InspectionReport> {
-    if roots.is_empty() || roots.len() > 256 || roots.iter().any(|root| !root.is_absolute()) || options.max_entries == 0 {
+    if roots.is_empty() || roots.len() > 256 || roots.iter().any(|root| !root.is_absolute()) || options.max_entries == Some(0) {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "1–256 mutlak klasör yolu ve pozitif tarama sınırı gerekir."));
     }
     let mut plans = Vec::new();
@@ -177,7 +186,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 let depth = parent.depth + 1;
                 let matched_ancestor = parent.matched_ancestor || parent.rule.is_some();
                 let (context, rule) = rules::directory_rule(&child, parent.context, &parent.evidence);
-                let frame = if depth > self.options.max_depth {
+                let frame = if self.options.max_depth.is_some_and(|limit| depth > limit) {
                     self.report.status = ScanStatus::Limited;
                     self.warn(format!("Derinlik sınırı nedeniyle alt ağaç atlandı: {}", display_path(&child)));
                     Frame::unread(child, depth, context, rule, matched_ancestor)
@@ -247,11 +256,11 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
         frame.complete = true;
         for entry in iterator {
             if self.should_stop() { frame.complete = false; break; }
-            if self.report.stats.entries_seen >= self.options.max_entries {
+            if self.options.max_entries.is_some_and(|limit| self.report.stats.entries_seen >= limit) {
                 self.halted = true;
                 self.report.status = ScanStatus::Limited;
                 frame.complete = false;
-                self.warn(format!("{} öğe sınırına ulaşıldı; sonuçlar kısmi.", self.options.max_entries));
+                self.warn(format!("{} öğe sınırına ulaşıldı; sonuçlar kısmi.", self.options.max_entries.unwrap()));
                 break;
             }
             self.report.stats.entries_seen += 1;

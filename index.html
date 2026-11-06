@@ -4,53 +4,62 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>Roomit — Çalışma alanını tanı</title>
+    <title>Roomit — Depolama analizi</title>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
     <div class="app">
       <header class="topbar">
-        <a class="brand" href="#main" aria-label="Roomit ana ekran"><span class="brand-mark" aria-hidden="true">r.</span>Roomit</a>
-        <span class="local-badge"><span aria-hidden="true">●</span> Yerel · Salt okunur</span>
+        <a class="brand" href="#main" aria-label="Roomit ana ekran"><img src="/src/assets/roomit.svg" width="34" height="34" alt="" />Roomit</a>
+        <span class="local-badge">Yerel analiz · Salt okunur</span>
       </header>
       <main id="main">
-        <section class="intro" aria-labelledby="title">
-          <p class="eyebrow">ÇALIŞMA ALANINI TANI</p>
-          <h1 id="title">Neyin yer kapladığını<br />anlamakla başla.</h1>
-          <p class="lead">Geliştirme ve AI araçlarının bıraktığı dosyaları tanı.<br />Neyin kalacağına sen karar ver.</p>
-        </section>
-        <section class="inspection panel" aria-labelledby="inspect-title">
-          <div class="section-heading"><div><p class="eyebrow">01 / GELİŞTİRME & AI</p><h2 id="inspect-title">Yazılım ve AI dosyalarını tara</h2></div><span class="tag">Alt klasörler dahil</span></div>
-          <p class="muted">Seçtiğin klasörün altındaki projeler, yazılım çıktıları ve AI verileri tanınır; dosya ve klasör boyutları hesaplanır. Dosya içerikleri açılmaz.</p>
-          <form id="inspect-form">
-            <fieldset class="scan-modes">
-              <legend>Tarama kapsamı</legend>
-              <label><input type="radio" name="scan-mode" value="folder" checked /> Bir klasör</label>
-              <label><input type="radio" name="scan-mode" value="computer" /> Bütün bilgisayar</label>
-            </fieldset>
-            <div id="folder-target">
-              <label for="root">Seçilen klasör</label>
-              <div class="input-row"><input id="root" name="root" type="text" placeholder="Taranacak klasörü seç…" readonly /><button id="choose-folder" type="button" class="secondary">Klasör seç…</button></div>
+        <div class="page-heading"><div><h1>Depolamanı tanı.</h1><p>Yazılım projelerini ve AI verilerini, kapladıkları alanla birlikte gör.</p></div></div>
+        <div class="workspace">
+          <aside class="scan-panel" aria-labelledby="inspect-title">
+            <h2 id="inspect-title">Yeni tarama</h2>
+            <p class="muted">Önce taranacak alanı seç.</p>
+            <form id="inspect-form">
+              <fieldset class="scan-modes">
+                <legend>Tarama kapsamı</legend>
+                <label><input type="radio" name="scan-mode" value="folder" checked /><span><strong>Bir klasör</strong><small>Seçtiğin klasör ve alt klasörleri</small></span></label>
+                <label><input type="radio" name="scan-mode" value="computer" /><span><strong>Bütün bilgisayar</strong><small>Bağlı yerel diskler · Öğe sınırı yok</small></span></label>
+              </fieldset>
+              <div id="folder-target">
+                <label for="root">Seçilen klasör</label>
+                <input id="root" name="root" type="text" placeholder="Henüz klasör seçilmedi" readonly />
+                <button id="choose-folder" type="button" class="secondary full-width">Klasör seç…</button>
+              </div>
+              <div id="computer-target" hidden>
+                <p id="computer-roots" class="scope-list" role="status"></p>
+                <button id="refresh-roots" type="button" class="text-button">Diskleri yenile</button>
+                <p class="hint">Tüm erişilebilir yerel dosyalar taranır. Ağ diskleri ve bağlantı yolları kapsam dışıdır.</p>
+              </div>
+              <div class="scan-actions"><button id="inspect-button" type="submit" disabled>Taramayı başlat</button><button id="cancel-button" type="button" class="secondary" hidden>İptal et</button></div>
+              <p id="runtime-note" class="hint">Tarama masaüstü uygulamasında kullanılabilir.</p>
+            </form>
+            <div class="scan-state">
+              <progress id="scan-progress" aria-label="Tarama sürüyor" hidden></progress>
+              <p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p>
+              <p id="current-path" class="current-path" aria-live="off"></p>
             </div>
-            <div id="computer-target" hidden>
-              <p id="computer-roots" class="report-path" role="status"></p>
-              <button id="refresh-roots" type="button" class="secondary">Diskleri yenile</button>
-              <p class="hint">Bağlı yerel diskler taranır; ağ diskleri dahil değildir. Erişilemeyen alanlar atlanır. Toplam 1.000.000 öğe sınırına ulaşılırsa sonuç kısmi gösterilir.</p>
-            </div>
-            <div class="scan-actions"><button id="inspect-button" type="submit" disabled>Taramayı başlat <span aria-hidden="true">↗</span></button><button id="cancel-button" type="button" class="secondary" hidden>İptal et</button></div>
-            <p id="runtime-note" class="hint">Tarama yalnızca Roomit masaüstü uygulamasında kullanılabilir.</p>
-          </form>
-          <progress id="scan-progress" aria-label="Klasör taraması sürüyor" hidden></progress>
-          <p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p>
-          <p id="current-path" class="report-path" aria-live="off"></p>
-          <div id="results" aria-busy="false"></div>
-        </section>
-        <div class="bottom-grid">
-          <section class="panel detail" aria-labelledby="protect-title"><span class="detail-symbol" aria-hidden="true">◇</span><h2 id="protect-title">Önce anlamak, sonra karar vermek.</h2><p>AI geçmişleri, modeller, proje talimatları ve ortam ayarları korunacak veri olarak işaretlenir. Geliştirme çıktıları inceleme gerektirir. Bu sürümde silme işlemi yoktur.</p></section>
-          <section class="panel detail upcoming" aria-labelledby="next-title"><p class="eyebrow">02 / SONRAKİ AŞAMA</p><h2 id="next-title">Büyük dosyalar, açık bir görünüm.</h2><p>Belirleyeceğin GB eşiğinin üzerindeki dosya ve klasörleri bul. Hariç tut, Finder veya Explorer’da incele, seçtiklerini çöp kutusuna taşı.</p><span class="tag">Planlandı</span></section>
+            <p class="privacy-note">Dosya içerikleri açılmaz.<br />Hiçbir dosya değiştirilmez.</p>
+          </aside>
+          <section class="report-panel" aria-labelledby="results-title">
+            <div class="results-header"><div><h2 id="results-title">Sonuçlar</h2><p id="result-caption" class="muted">Tarama tamamlandığında özet burada görünecek.</p></div></div>
+            <nav id="result-tabs" class="result-tabs" aria-label="Sonuç görünümleri">
+              <button type="button" data-view="overview" aria-pressed="true">Genel bakış</button>
+              <button type="button" data-view="projects" aria-pressed="false">Projeler</button>
+              <button type="button" data-view="ai" aria-pressed="false">AI araçları</button>
+              <button type="button" data-view="largest" aria-pressed="false">Büyük klasörler</button>
+              <button type="button" data-view="details" aria-pressed="false">Ayrıntılar</button>
+            </nav>
+            <div class="search-row"><label for="result-search" class="sr-only">Sonuçlarda ara</label><input id="result-search" type="search" placeholder="Proje, araç veya klasör ara…" disabled /></div>
+            <div id="results" aria-busy="false"><div class="empty-state"><h3>Daha anlaşılır bir görünüm.</h3><p>Dosyalar tek tek sıralanmak yerine proje ve araç gruplarında toplanır. Ayrıntıları yalnızca istediğinde açarsın.</p><p class="hint">Başlamak için soldan bir klasör veya bütün bilgisayarı seç.</p></div></div>
+          </section>
         </div>
       </main>
-      <footer>Roomit <span>0.1.0 · Yerel geliştirme sürümü</span></footer>
+      <footer>Roomit <span>Yerel geliştirme sürümü</span></footer>
     </div>
   </body>
 </html>
