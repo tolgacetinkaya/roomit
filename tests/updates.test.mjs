@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {updateProgress} from '../src/update-model.ts';
+import {updateProgress,updateInstallationCopy} from '../src/update-model.ts';
 import {reportMessage} from '../src/legacy-messages.ts';
+
+test('Mac update consent describes app replacement while Windows retains portable installer warning',()=>{
+  const mac=updateInstallationCopy(false), windows=updateInstallationCopy(true);
+  assert.match(mac.body,/Applications/);
+  assert.match(mac.body,/replaces this Roomit app/);
+  assert.doesNotMatch(mac.body,/EXE|runs an installer/);
+  assert.match(windows.body,/will not replace that file/);
+});
 
 test('download progress handles missing totals, measured zero and complete downloads',()=>{
   assert.equal(updateProgress(0,100),0);

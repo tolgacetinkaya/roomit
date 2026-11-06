@@ -1,6 +1,6 @@
 import {Channel,invoke,isTauri} from "@tauri-apps/api/core";
 import {formatBytes} from "./report";
-import {updateProgress} from "./update-model";
+import {updateProgress,updateInstallationCopy} from "./update-model";
 import "./updates.css";
 interface Release {version:string;notes:string}
 interface Progress {phase:"downloading"|"installing";downloaded:number;total:number|null}
@@ -15,6 +15,10 @@ export function installUpdates(scanBusy:()=>boolean,onBusyChange:()=>void):{busy
   const cancel=document.getElementById("cancel-install-update") as HTMLButtonElement;
   const portableButtons=["download-portable","menu-download-portable","confirm-download-portable"].map(id=>document.getElementById(id) as HTMLButtonElement);
   const windows=/Win/i.test(navigator.platform);
+  const copy=updateInstallationCopy(windows);
+  document.getElementById("update-confirm-title")!.textContent=copy.title;
+  document.getElementById("update-confirm-copy")!.textContent=copy.body;
+  document.getElementById("update-portable-hint")!.hidden=!windows;
   portableButtons.forEach(button=>button.hidden=!windows);
   let checking=false,installing=false,downloading=false,release:Release|null=null;
   const locked=()=>installing||downloading||confirmation.open;
