@@ -246,7 +246,7 @@ pub fn run() {
             app.manage(saved_scan::SavedScanStore::new(app.path().app_local_data_dir()?.join("last-scan")));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status, discover_ai_tools, resource_snapshot, map_children, updates::check_for_update, updates::install_release])
+        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status, discover_ai_tools, resource_snapshot, map_children, updates::check_for_update, updates::install_release, updates::download_latest_portable])
         .run(tauri::generate_context!())
         .expect("Roomit could not start");
 }

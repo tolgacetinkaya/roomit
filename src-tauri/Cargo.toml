@@ -1,6 +1,6 @@
 [package]
 name = "roomit"
-version = "0.4.1"
+version = "0.4.2"
 description = "Roomit desktop workspace inspector"
 license.workspace = true
 edition = "2024"

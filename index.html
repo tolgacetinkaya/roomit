@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Roomit 0.4.1 — Your AI workspace</title>
+    <title>Roomit 0.4.2 — Your AI workspace</title>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
@@ -23,7 +23,8 @@
             <button type="button" id="menu-sidebar">Collapse sidebar</button>
             <hr />
             <button type="button" id="menu-check-updates">Check for updates</button>
-            <small>Roomit 0.4.1 · On this device</small>
+            <button type="button" id="menu-download-portable" hidden>Download latest portable EXE</button>
+            <small>Roomit 0.4.2 · On this device</small>
           </div>
         </details>
       </div>
@@ -47,13 +48,19 @@
           <button type="button" data-view="largest" aria-pressed="false"><span>Large items</span></button>
           <button type="button" data-view="details" aria-pressed="false"><span>Scan details</span></button>
         </nav>
-        <div class="sidebar-bottom"><div class="local-badge" title="Your data stays on this device"><span>This device</span></div><p>Your data stays here.<br />Your files stay unchanged.</p><span class="build-label">ROOMIT 0.4.1 · RELEASE</span></div>
+        <div class="sidebar-bottom"><div class="local-badge" title="Your data stays on this device"><span>This device</span></div><p>Your data stays here.<br />Your files stay unchanged.</p><span class="build-label">ROOMIT 0.4.2 · RELEASE</span></div>
       </aside>
       <main id="main" tabindex="-1">
         <section id="update-banner" class="update-banner" aria-label="App updates" hidden>
           <div><strong id="update-message" role="status" aria-live="polite"></strong><p id="update-notes"></p><progress id="update-progress" aria-label="Update download progress" hidden></progress></div>
-          <div class="update-banner-actions"><button id="install-update" type="button" hidden>Update and restart</button><button id="dismiss-update" type="button" class="secondary" aria-label="Dismiss update notice">Later</button></div>
+          <div class="update-banner-actions"><button id="install-update" type="button" hidden>Review update…</button><button id="download-portable" type="button" class="secondary" hidden>Download latest portable EXE</button><button id="dismiss-update" type="button" class="secondary" aria-label="Dismiss update notice">Later</button></div>
         </section>
+        <dialog id="update-confirmation" class="update-confirmation" aria-labelledby="update-confirm-title" aria-describedby="update-confirm-copy">
+          <h2 id="update-confirm-title">Install Roomit on this computer?</h2>
+          <p id="update-confirm-copy">This update runs an installer and installs or updates Roomit on your computer. If you opened a portable EXE, it will not replace that file. After installation, use the installed Roomit app. Roomit will close during installation and restart afterward. Your saved scans and settings are kept.</p>
+          <p>Prefer no installation? Download the latest portable EXE and open it yourself.</p>
+          <div class="update-confirm-actions"><button id="confirm-install-update" type="button">Install and restart</button><button id="confirm-download-portable" type="button" class="secondary">Download latest portable EXE</button><button id="cancel-install-update" type="button" class="secondary" autofocus>Cancel</button></div>
+        </dialog>
         <header class="page-heading"><div><p class="eyebrow">YOUR LOCAL AI CONTROL CENTER</p><h1 id="page-title">Your AI workspace</h1><p id="page-description">Your tools, live resources, and the AI data they leave behind.</p></div><div class="heading-actions"><span class="read-only">Read-only</span><button id="quick-ai-scan" type="button">Scan AI data</button><button id="new-scan" type="button" class="secondary">New scan</button></div></header>
         <section id="ai-scan-panel" class="ai-scan-panel" aria-labelledby="ai-start-title">
           <div class="ai-start-copy"><p class="eyebrow">AI-FOCUSED SCANNING</p><h2 id="ai-start-title">Your AI tools. Your resources.<br />All in one place.</h2><p class="ai-start-description">Roomit helps you understand the AI tools on your computer and the data they leave behind. Explore models, history, and large data folders.</p><div class="ai-start-actions"><button id="scan-ai" type="button">Scan AI folders</button><button id="configure-scan" type="button" class="secondary">Choose folder or disk</button></div><p class="hint ai-start-trust">Other disks are not scanned. Your files stay unchanged.</p></div>

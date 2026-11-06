@@ -6,8 +6,11 @@ version is an update. A push to `main` alone does not update installed apps.
 The Windows app checks on startup (after five seconds) and every six hours while
 open. Use **Roomit → Check for updates** to check immediately. Checks only request
 the public release manifest; no scan results or telemetry are uploaded. A new
-version displays a notice and plain-text release notes. **Update and restart**
-downloads, verifies, and installs it using the official Tauri updater. A scan and
+version displays a notice and plain-text release notes. From 0.4.2, **Review update…**
+opens an installation explanation; only **Install and restart** confirms it.
+Cancel and Escape do not install. Confirmation is required for every installation,
+so a portable executable can never bypass it through misclassification.
+The official Tauri updater downloads, verifies, and installs the package. A scan and
 an update installation cannot run concurrently. Failed downloads/signatures show
 an error and permit retry. Saved results and exclusions keep the same app ID.
 
@@ -18,6 +21,13 @@ an error and permit retry. Saved results and exclusions keep the same app ID.
 - `Roomit-VERSION.exe`: directly runnable executable. WebView2 must already be
   installed. Updating a portable copy launches the standard installer; it does not
   overwrite or remove the original portable EXE. Use the installed copy afterward.
+- From 0.4.2, **Download latest portable EXE** is also available in the Roomit menu,
+  update notice and confirmation dialog. It resolves the latest published manifest
+  on every click, even for an up-to-date client, and opens the versioned EXE download
+  in the default browser. It never invokes the installer or executes the download.
+  The browser controls the save location and download prompts. Windows EXE names
+  must retain the `Roomit-VERSION.exe` convention. Existing 0.4.0/0.4.1 clients keep
+  their previous update UI until upgraded; publishing cannot retrofit that UI.
 - `latest.json` and the setup `.sig`: signed-update metadata for `windows-x86_64`.
 - `SHA256SUMS.txt` and `Roomit-build.json`: download checksums and build provenance.
 
