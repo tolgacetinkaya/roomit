@@ -1,3 +1,24 @@
+# Retained AI view and targeted scan — 2026-11-05
+
+- **90 automated tests passed**: 33 core, 30 native, 27 frontend; one existing
+  interactive reveal smoke ignored. Full frontend build/tests, core tests,
+  workspace check and native tests passed. Windows debug/no-bundle build passed;
+  delivered executable is hash-matched against the native output.
+- Native AI-root fixtures verify only supported direct user-data roots enter the
+  plan: ordinary sibling trees/files remain outside, exact Codex/Ollama byte
+  totals/classification are retained, and absent roots never become a broad scan.
+  A saved AI scope round-trips through the persistent store. Frontend target tests
+  verify AI mode is independent of disk discovery/loading/selection.
+- Browser mocked-IPC navigation regression: AI remains selected at scan start,
+  completion and cancellation. Direct action invokes mode=ai; disk-list calls stay
+  zero. Reopening the cancelled AI record restores AI view/partial flags with zero
+  scans and zero disk-list calls. This fixture proves UI flow, not native sizing.
+- 720 x 600 layout had scrollWidth 705, the AI action visible and a clean console.
+  `artifacts/qa/ai-targeted-scan.jpg` uses labeled sample data. Native desktop UI and
+  Mac device acceptance remain separate; existing scan/watch/exclusion tests pass.
+- This action targets known AI data, not all custom/project storage or exclusively
+  temporary/disposable files. No deletion capability or GitHub publication added.
+
 # Live change detection with manual rescan — 2026-11-04
 
 - **86 automated tests passed**: 33 core, 27 native, 26 frontend; one existing

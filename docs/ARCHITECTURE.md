@@ -359,3 +359,26 @@ lists, alter filters, or call inspect_workspace. Stale events show **Sonuçlar g
 değil**; incomplete monitoring shows **Güncellik doğrulanamıyor**. Restored reports
 also retain an offline caveat. New scanning is still exclusively a user action.
 No deletion command or expanded WebView capability is added.
+
+
+## Targeted AI scope and retained navigation — 2026-11-05
+
+The native `ai::roots` planner probes just four supported per-user root names
+(.codex/.claude/.cursor/.ollama), with metadata-only existence/directory/link
+checks. It does not enumerate home, discover projects across volumes, or fall
+back to other scopes when none exist. An `ai` command mode feeds those roots into
+the existing uncapped shared scanner/sink, exclusion policy, watcher and snapshot
+pipeline. The saved report scope is `ai`; its reader whitelist and UI restoration
+support that scope. Root classification already recognizes these data directories.
+This does not introduce unverified temporary-file or deletion-safety labels.
+
+The AI view exposes a direct action and the setup adds an AI-location scope.
+Disk-list loading and capacity cards are restricted to disk/computer modes; the
+AI action/restore does not request a disk list. The native automatic exclusion
+policy still probes volume metadata, independently of filesystem traversal.
+
+`clearReport` only discards data/search and `showReport` only publishes results;
+neither resets currentView to overview/largest. Navigation during a scan is also
+preserved on completion/cancel/failure. Startup selects AI for an AI saved scope
+only when no newer user navigation occurred during restore. Other explicit user
+navigation remains authoritative. Mode selection alone never starts scanning.

@@ -23,16 +23,19 @@
       </aside>
       <main id="main">
         <header class="page-heading"><div><p class="eyebrow">DEPOLAMA İÇGÖRÜLERİ</p><h1 id="page-title">Genel bakış</h1><p>Projelerin, araçların, dosyaların. Hepsi yerli yerinde.</p></div><span class="read-only">Salt okunur analiz</span></header>
+        <section id="ai-scan-panel" class="ai-scan-panel" hidden><div><strong>AI araçlarının kapladığı alanı bul</strong><p class="hint">Yalnızca bu kullanıcıya ait bilinen Codex, Claude Code, Cursor ve Ollama klasörlerini tarar. Tüm diskleri dolaşmaz.</p><p class="hint">Geçmiş, ayarlar ve modeller de bulunabilir; bunların hepsi geçici dosya değildir. Özel depolama konumları için bir klasör seçerek tara.</p></div><button id="scan-ai" type="button">AI klasörlerini tara</button></section>
         <section class="scan-panel" aria-labelledby="inspect-title">
           <div class="scan-heading"><div><h2 id="inspect-title">Nereye bakalım?</h2><p id="scan-caption" class="muted">Bir alan seç. Roomit içindekileri anlamlandırır.</p></div><div class="scan-header-actions"><span class="step-label">01 / TARAMA</span><button id="toggle-scan" type="button" class="secondary" aria-expanded="false" aria-controls="inspect-form" hidden>Alanı değiştir</button></div></div>
           <form id="inspect-form">
             <fieldset class="scan-modes">
               <legend class="sr-only">Tarama kapsamı</legend>
+              <label><input type="radio" name="scan-mode" value="ai" /><span><strong>AI konumları</strong><small>Bilinen kullanıcı klasörleri</small></span></label>
               <label><input type="radio" name="scan-mode" value="folder" checked /><span><strong>Bir klasör</strong><small>Alt klasörleriyle birlikte</small></span></label>
               <label><input type="radio" name="scan-mode" value="disk" /><span><strong>Tek disk</strong><small>Seçtiğin diskin tamamı</small></span></label>
               <label><input type="radio" name="scan-mode" value="computer" /><span><strong>Bütün bilgisayar</strong><small>Bağlı tüm yerel diskler</small></span></label>
             </fieldset>
             <div class="target-row">
+              <div id="ai-target" class="target-control" hidden><p class="scope-list">Codex · Claude Code · Cursor · Ollama<br /><span class="hint">Kullanıcı klasöründeki bilinen konumlar · Tüm diskler taranmaz</span></p></div>
               <div id="folder-target" class="target-control"><label for="root" class="sr-only">Seçilen klasör</label><input id="root" name="root" type="text" placeholder="Taramak istediğin klasörü seç" readonly /><button id="choose-folder" type="button" class="secondary">Klasör seç…</button></div>
               <div id="disk-target" class="target-control" hidden><label for="disk-select" class="sr-only">Taranacak disk</label><select id="disk-select"><option value="">Diskler yükleniyor…</option></select></div>
               <div id="computer-target" class="target-control" hidden><p id="computer-roots" class="scope-list" role="status">Yerel diskler bulunuyor…</p></div>

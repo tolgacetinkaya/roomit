@@ -39,7 +39,7 @@ export interface RootReport {
 }
 export interface InspectionReport {
   root: string;
-  scope: "recursive" | "computer" | "disk";
+  scope: "recursive" | "computer" | "disk" | "ai";
   status: ScanStatus;
   totalSizeComplete: boolean;
   stats: ScanStats;

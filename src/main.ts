@@ -38,6 +38,7 @@ const refreshRoots = element<HTMLButtonElement>("#refresh-roots");
 const folderTarget = element<HTMLDivElement>("#folder-target");
 const computerTarget = element<HTMLDivElement>("#computer-target");
 const diskTarget = element<HTMLDivElement>("#disk-target");
+const aiTarget = element<HTMLDivElement>("#ai-target");
 const diskSelect = element<HTMLSelectElement>("#disk-select");
 const diskInfo = element<HTMLDivElement>("#disk-info");
 const toggleScan = element<HTMLButtonElement>("#toggle-scan");
@@ -67,8 +68,9 @@ function updateControls(): void {
   const busy = scanBusy || Boolean(exclusions?.busy);
   const mode = scanMode();
   folderTarget.hidden = mode !== "folder"; computerTarget.hidden = mode !== "computer";
-  diskTarget.hidden = mode !== "disk"; refreshRoots.hidden = mode === "folder";
-  diskInfo.hidden = mode === "folder" || rootsLoading || !disks.length;
+  diskTarget.hidden = mode !== "disk"; aiTarget.hidden = mode !== "ai";
+  refreshRoots.hidden = mode === "folder" || mode === "ai";
+  diskInfo.hidden = mode === "folder" || mode === "ai" || rootsLoading || !disks.length;
   diskSelect.disabled = !native || busy || rootsLoading;
   input.disabled = !native || busy;
   chooseFolder.disabled = !native || busy;
@@ -77,7 +79,9 @@ function updateControls(): void {
   button.disabled = !native || busy || !exclusions?.ready || !target();
   element<HTMLButtonElement>("#retry-last-scan").disabled = !native || busy;
   element<HTMLButtonElement>("#rescan-snapshot").disabled = !native || busy || !exclusions?.ready;
+  element<HTMLButtonElement>("#scan-ai").disabled = !native || busy || !exclusions?.ready;
   element("#runtime-note").textContent = !native ? "Tarayıcı önizlemesi · Tarama masaüstü uygulamasında kullanılabilir."
+    : mode === "ai" ? "Yalnızca bilinen AI veri konumları · Özel disk/klasör konumları kapsam dışı"
     : mode === "folder" ? "Seçim taramayı başlatmaz. Alt klasörler de incelenir."
     : mode === "disk" ? "Yalnızca seçilen disk · Öğe ve derinlik sınırı yok"
     : "Tüm yerel diskler · Ağ diskleri kapsam dışı · Öğe sınırı yok";
@@ -151,7 +155,7 @@ for (const radio of modeInputs) radio.addEventListener("change", () => {
   clearReport(); status.className = "";
   status.textContent = "Tarama kapsamı seçildi. Hazır olduğunda taramayı başlat.";
   updateControls();
-  if (scanMode() !== "folder" && isTauri()) void loadComputerRoots();
+  if (["disk", "computer"].includes(scanMode()) && isTauri()) void loadComputerRoots();
 });
 refreshRoots.addEventListener("click", () => {
   if (!activeScan && !rootsLoading && isTauri()) { clearReport(); void loadComputerRoots(); }
@@ -185,11 +189,13 @@ let grouped: GroupedReport | null = null;
 let currentView: ResultView = "overview";
 let settingsExpanded = false;
 let restoredReport = false;
+let navigationRevision = 0;
 toggleScan.addEventListener("click", () => { settingsExpanded = !settingsExpanded; renderCurrent(); });
-function navigate(view: ResultView): void { currentView = view; renderCurrent(); }
+function navigate(view: ResultView): void { navigationRevision++; currentView = view; renderCurrent(); }
 function renderCurrent(): void {
   clearTimeout(searchTimer);
   disposeSizeBrowser();
+  element("#ai-scan-panel").hidden = currentView !== "ai";
   element("#snapshot-banner").hidden = !lastReport;
   freshness.set(lastReport?.sizeIndexId || null);
   if (lastReport) {
@@ -207,7 +213,7 @@ function renderCurrent(): void {
   toggleScan.setAttribute("aria-expanded", String(!form.hidden));
   element("#inspect-title").textContent = lastReport ? "Tarama alanı" : "Nereye bakalım?";
   element("#scan-caption").textContent = lastReport
-    ? `${lastReport.scope === "disk" ? "Tek disk" : lastReport.scope === "computer" ? "Bütün bilgisayar" : "Bir klasör"} · ${lastReport.root}`
+    ? `${lastReport.scope === "ai" ? "AI konumları" : lastReport.scope === "disk" ? "Tek disk" : lastReport.scope === "computer" ? "Bütün bilgisayar" : "Bir klasör"} · ${lastReport.root}`
     : "Bir alan seç. Roomit içindekileri anlamlandırır.";
   for (const tab of viewButtons) tab.setAttribute("aria-pressed", String(tab.dataset.view === currentView));
   search.disabled = !lastReport;
@@ -247,16 +253,17 @@ function renderCurrent(): void {
   }
 }
 function clearReport(): void {
-  lastReport = null; grouped = null; search.value = ""; currentView = "overview"; renderCurrent();
+  lastReport = null; grouped = null; search.value = ""; renderCurrent();
 }
 function showReport(report: InspectionReport, restored = false): void {
   restoredReport = restored;
   settingsExpanded = false;
-  lastReport = report; grouped = groupReport(report); currentView = minimumBytes > 0n ? "largest" : "overview"; renderCurrent();
+  lastReport = report; grouped = groupReport(report); renderCurrent();
 }
 async function loadLastScan(): Promise<void> {
   if (!isTauri() || activeScan || pickingFolder) return;
   restoring = true; updateControls();
+  const requestedAt = navigationRevision;
   try {
     const report = await invoke<InspectionReport | null>("load_last_scan");
     element("#restore-state").hidden = true;
@@ -264,9 +271,10 @@ async function loadLastScan(): Promise<void> {
       const mode = report.scope === "recursive" ? "folder" : report.scope;
       for (const radio of modeInputs) radio.checked = radio.value === mode;
       if (mode === "folder") input.value = report.root;
+      if (mode === "ai" && requestedAt === navigationRevision) currentView = "ai";
       showReport(report, true);
       status.className = ""; status.textContent = "Son kayıt açıldı. Yeniden tarama yapılmadı.";
-      if (mode !== "folder") {
+      if (mode === "disk" || mode === "computer") {
         await loadComputerRoots();
         if (mode === "disk") { diskSelect.value = disks.some(disk => disk.path === report.root) ? report.root : ""; renderDisks(); }
       }
@@ -285,7 +293,7 @@ element("#rescan-snapshot").addEventListener("click", async () => {
   settingsExpanded = true; renderCurrent();
   for (const radio of modeInputs) radio.checked = radio.value === mode;
   if (mode === "folder") input.value = report.root;
-  else {
+  else if (mode === "disk" || mode === "computer") {
     await loadComputerRoots();
     if (mode === "disk") { diskSelect.value = disks.some(disk => disk.path === report.root) ? report.root : ""; renderDisks(); }
   }
@@ -294,6 +302,12 @@ element("#rescan-snapshot").addEventListener("click", async () => {
   else { status.className = "warning"; status.textContent = "Önceki tarama diski şu an kullanılamıyor. Taranacak alanı seç."; }
 });
 for (const tab of viewButtons) tab.addEventListener("click", () => navigate(tab.dataset.view as ResultView));
+element("#scan-ai").addEventListener("click", () => {
+  if (!isTauri() || activeScan || restoring || preparingRescan || pickingFolder || !exclusions?.ready) return;
+  diskRequest++; rootsLoading = false;
+  for (const radio of modeInputs) radio.checked = radio.value === "ai";
+  settingsExpanded = true; navigate("ai"); updateControls(); form.requestSubmit();
+});
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderCurrent, 120); });
 

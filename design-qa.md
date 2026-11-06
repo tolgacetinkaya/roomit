@@ -184,3 +184,19 @@ verified by real Windows file operations in the automated suite.
 600, scrollWidth was 705, the warning remained present and scan count stayed one.
 The console was clean, the override was reset and the own test tab/server closed.
 Native Roomit full-screen acceptance and real Mac FSEvents checks remain pending.
+
+
+## AI scope/navigation fix — 2026-11-05
+
+Removed unconditional overview/largest assignments from scan-clear/report-publish.
+The AI view now exposes **AI klasörlerini tara** and a scope note explaining the
+known user-data roots and that not all detected data is temporary. The setup uses
+four scope cards with a two-column layout below 1100px.
+
+Browser fixture validated selected AI view at scan start/completion/cancellation,
+mode=ai with zero disk-list requests, and reopening the saved cancelled AI result
+in AI view with zero scans/disk-list calls. Native tests separately establish the
+root planner and persistent AI scope. `artifacts/qa/ai-targeted-scan.jpg` is sample
+UI evidence, not user disk data. At 720 x 600, width was 705 with no horizontal
+overflow; the AI action stayed visible. Console was clean, viewport reset and own
+test tab/server closed. Native desktop/Mac screen acceptance is still pending.

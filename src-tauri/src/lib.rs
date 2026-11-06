@@ -4,6 +4,7 @@ mod size_index;
 mod exclusions;
 mod saved_scan;
 mod watch;
+mod ai;
 
 use std::{
     path::PathBuf,
@@ -64,7 +65,7 @@ async fn inspect_workspace(
     saved: tauri::State<'_, saved_scan::SavedScanStore>,
     watches: tauri::State<'_, watch::WatchRegistry>,
 ) -> Result<DesktopReport, String> {
-    if mode != "folder" && mode != "computer" && mode != "disk" { return Err("Geçersiz tarama kapsamı.".into()); }
+    if !["folder", "computer", "disk", "ai"].contains(&mode.as_str()) { return Err("Geçersiz tarama kapsamı.".into()); }
     let lease = state.begin(scan_id)?;
     let scanned_at_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
     let saved = saved.inner().clone();
@@ -82,7 +83,7 @@ async fn inspect_workspace(
         // Keep the previous snapshot available until the replacement succeeds.
         let mut writer = size_index::IndexWriter::new_in(&saved.directory).map_err(|e| format!("Sonuç dizini oluşturulamadı: {e}"))?;
         excluded_paths.extend(writer.directories_to_exclude());
-        let roots = if mode == "folder" { vec![PathBuf::from(&root)] } else {
+        let roots = if mode == "ai" { ai::roots()? } else if mode == "folder" { vec![PathBuf::from(&root)] } else {
             let roots = computer::computer_roots()?;
             if mode == "disk" { vec![computer::selected_root(&root, &roots)?] } else { roots }
         };
@@ -95,7 +96,7 @@ async fn inspect_workspace(
                     _lease.cancel.store(true, Ordering::Relaxed);
                 }
         };
-        let report = if mode == "computer" || mode == "disk" {
+        let report = if mode != "folder" {
             let mut options = roomit_core::ScanOptions::computer(computer::preferred_home(&roots));
             options.excluded_paths = excluded_paths;
             options.exclude_app_bundles = cfg!(target_os = "macos");
@@ -103,6 +104,7 @@ async fn inspect_workspace(
             let mut report = roomit_core::scan_locations_with_sink(&roots, options, &_lease.cancel, &mut progress, &mut writer)
                 .map_err(|error| error.to_string())?;
             if mode == "disk" { report.scope = "disk".into(); report.root = root; }
+            if mode == "ai" { report.scope = "ai".into(); report.root = "Bilinen AI veri konumları".into(); }
             Ok(report)
         } else {
             let options = roomit_core::ScanOptions { max_entries: None, max_depth: None,

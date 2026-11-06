@@ -9,6 +9,12 @@ is configured. MIT licensed.
 
 ## Current capabilities
 
+- Open **AI araçları → AI klasörlerini tara** to scan this user's existing
+  `.codex`, `.claude`, `.cursor` and `.ollama` directories without walking every
+  disk. Missing locations never fall back to a home/disk/computer scan. Custom
+  locations and project-local AI data still require selecting a folder.
+- Keep the selected result view when starting, completing or cancelling a scan.
+  Reopening an AI-scope saved scan opens **AI araçları** without scanning again.
 - Pick a folder using the native Windows/macOS dialog; its path stays visible.
 - Scan one folder, one selected local disk, or all detected local disks, without opening file contents.
 - Add multiple folders to **Hariç tutulanlar** using the native picker; choices persist
@@ -243,3 +249,8 @@ app-owned settings/index trees, standard system/install exclusions and app-bundl
 rules are filtered before invalidation. Windows access-only activity is ignored.
 Monitoring is session-only: no background service or observation while closed,
 and observed-change flags are not a durable filesystem journal.
+
+The targeted AI action measures known tool data; histories, settings and models
+are not automatically classified as disposable temporary files. A dedicated
+AI temporary-file classifier remains incomplete. System/install exclusions,
+progress/cancel, persisted results and live change warnings also apply in AI scope.

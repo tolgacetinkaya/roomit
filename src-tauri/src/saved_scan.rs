@@ -56,7 +56,7 @@ impl SavedScanStore {
         let json: String = connection.query_row("SELECT json FROM saved_report WHERE id=1", [], |row| row.get(0)).map_err(|e| e.to_string())?;
         let report: DesktopReport = serde_json::from_str(&json).map_err(|e| e.to_string())?;
         if report.size_index_id.is_empty() || report.size_index_id.len() > 128 || report.scanned_at_ms == 0 ||
-            !["recursive", "disk", "computer"].contains(&report.report.scope.as_str()) {
+            !["recursive", "disk", "computer", "ai"].contains(&report.report.scope.as_str()) {
             return Err("Kayıtlı tarama bilgileri geçersiz.".into());
         }
         connection.prepare("SELECT kind,sort_key,path,search_key,complete FROM entries LIMIT 0").map_err(|e| e.to_string())?;
@@ -103,6 +103,15 @@ mod tests {
         json.as_object_mut().unwrap().remove("watchPolicy");
         let restored: DesktopReport = serde_json::from_value(json).unwrap();
         assert!(restored.watch_policy.is_none()); assert_eq!(restored.size_index_id, "legacy");
+    }
+    #[test]
+    fn ai_scope_survives_saved_scan_reopening() {
+        let fixture = tempfile::tempdir().unwrap();
+        let store = SavedScanStore::new(fixture.path().join("saved"));
+        let mut report = report("ai", fixture.path()); report.report.scope = "ai".into();
+        let mut snapshot = IndexWriter::new_in(&store.directory).unwrap().finish("ai".into()).unwrap();
+        store.save(&mut snapshot, &report).unwrap(); drop(snapshot);
+        assert_eq!(store.load().unwrap().unwrap().0.report.scope, "ai");
     }
     #[test]
     fn reopened_store_restores_report_exact_bytes_partial_flags_and_full_paged_index() {

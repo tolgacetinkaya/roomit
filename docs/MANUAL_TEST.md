@@ -175,3 +175,18 @@ scan. Ordinary filesystem mutations/permission errors still yield partial result
    the saved report must keep its offline caveat. While-open flags are session-only.
 7. On Mac, repeat with native FSEvents and verify privacy/access errors are explicit.
    Do not use browser fixture behavior as native Mac acceptance evidence.
+
+
+## AI navigation regression and targeted action
+
+1. Select **AI araçları** on the left, then **AI klasörlerini tara**. Do not choose
+   **Bütün bilgisayar** for this test. Only the four supported per-user AI data
+   roots should be measured. Check actual paths and sizes in the resulting cards.
+2. AI must stay selected at start and after completion. Start again and cancel;
+   AI must remain selected and results must be marked partial. Navigating to a
+   different tab during a scan should keep that chosen tab when the result arrives.
+3. Close/reopen after an AI scan. Its saved result should open in AI view without
+   starting another scan or loading all disk choices. Manual rescan uses AI scope.
+4. User exclusions still apply. Custom AI directories on other disks/project roots
+   require a folder scan. Missing supported directories must not start a broader
+   scan. Histories, settings and models must not be called temporary by default.
