@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { snapshotTitle, snapshotDate } from '../src/snapshot.ts';
 
+test('app-scoped saved results identify their scope even when cancelled', () => {
+  const report={scope:'ai',aiToolId:'codex',root:'Codex data locations',status:'cancelled',totalSizeComplete:false};
+  assert.equal(snapshotTitle(report,true),'Saved scan results · Codex data locations · Cancelled, partial');
+});
+
 test('saved snapshots distinguish partial and cancelled scans', () => {
   assert.equal(snapshotTitle({status:'completed',totalSizeComplete:true}, true), 'Saved scan results');
   assert.match(snapshotTitle({status:'cancelled',totalSizeComplete:false}, true), /Cancelled, partial/);

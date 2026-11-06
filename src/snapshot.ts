@@ -1,7 +1,8 @@
 import type { InspectionReport } from "./report";
 
 export function snapshotTitle(report: InspectionReport, restored: boolean): string {
-  const title = restored ? "Saved scan results" : "Latest scan results";
+  const base = restored ? "Saved scan results" : "Latest scan results";
+  const title = report.scope === "ai" ? `${base} · ${report.root}` : base;
   return report.status === "cancelled" ? `${title} · Cancelled, partial`
     : report.status === "limited" || !report.totalSizeComplete ? `${title} · Partial` : title;
 }

@@ -77,7 +77,7 @@
               <label><input type="radio" name="scan-mode" value="computer" /><span><strong>Whole computer</strong><small>All connected local disks</small></span></label>
             </fieldset>
             <div class="target-row">
-              <div id="ai-target" class="target-control" hidden><p class="scope-list">Codex · Claude Code · OpenCode · Cursor · Ollama and other supported tools<br /><span class="hint">Known locations in your home folder · Other disks are not scanned</span></p></div>
+              <div id="ai-target" class="target-control" hidden><label for="ai-tool-select">AI application</label><select id="ai-tool-select"><option value="">All AI tools</option></select><p class="hint">Scan known data locations for one app or all supported tools. Custom locations are outside this scope. This replaces the latest saved scan.</p></div>
               <div id="folder-target" class="target-control"><label for="root" class="sr-only">Selected folder</label><input id="root" name="root" type="text" placeholder="Select a folder to scan" readonly /><button id="choose-folder" type="button" class="secondary">Choose folder…</button></div>
               <div id="disk-target" class="target-control" hidden><label for="disk-select" class="sr-only">Disk to scan</label><select id="disk-select"><option value="">Loading disks…</option></select></div>
               <div id="computer-target" class="target-control" hidden><p id="computer-roots" class="scope-list" role="status">Finding local disks…</p></div>

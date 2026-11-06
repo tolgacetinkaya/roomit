@@ -9,6 +9,11 @@ Tauri 2 + TypeScript interface. The project is open source under the MIT license
 
 ## Current capabilities
 
+- **Per-app AI data scans (source):** choose **Scan app data** on an AI tool card,
+  or select a single app in the AI scan settings. The selected scope persists
+  with saved results and is reused for rescanning. See [app data scans](docs/APP_DATA_SCANS.md)
+  for known-location coverage and limitations.
+
 **Current source: 0.4.1 — expandable application groups.**
 Live resources shows combined CPU, RAM and GPU usage per app. Expand an app to
 inspect individual processes. Groups and member lists are paged; open groups and

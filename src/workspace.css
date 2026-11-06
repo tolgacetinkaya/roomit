@@ -135,3 +135,5 @@ main { max-width:1600px; }
 .gpu-status-note { font-size:11px; color:#abc0de; padding:10px 12px; border:1px solid #31445f; border-radius:8px; background:#142034; margin:12px 0; }
 .activity-filters input[type=search] { padding:10px 12px; border:1px solid #354056; border-radius:8px; background:#101723; color:var(--ink); min-height:40px; font-size:12px; }
 .activity-filters select { width:auto; flex:0 1 205px; max-width:100%; }
+.tool-scan-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.tool-scan-actions button{font-size:12px}

@@ -9,9 +9,9 @@ export interface LocalDisk {
 
 // No fallback: a missing disk must never turn into a computer-wide scan.
 export function scanTarget(mode: ScanMode, folder: string, selectedDisk: string,
-  disks: LocalDisk[], loading: boolean): { mode: ScanMode; root: string } | null {
+  disks: LocalDisk[], loading: boolean, aiToolId = ""): { mode: ScanMode; root: string; aiToolId?: string } | null {
   if (mode === "folder") return folder.trim() ? { mode, root: folder.trim() } : null;
-  if (mode === "ai") return { mode, root: "" };
+  if (mode === "ai") return aiToolId ? { mode, root: "", aiToolId } : { mode, root: "" };
   if (loading) return null;
   if (mode === "computer") return disks.length ? { mode, root: "" } : null;
   const disk = disks.find((disk) => disk.path === selectedDisk);

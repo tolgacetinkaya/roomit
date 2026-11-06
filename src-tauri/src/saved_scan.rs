@@ -91,7 +91,7 @@ mod tests {
     use roomit_core::{EntryKind, SizedEntry, SizeSink};
     use std::sync::atomic::AtomicBool;
     fn report(id: &str, root: &Path) -> DesktopReport {
-        DesktopReport { report: roomit_core::inspect_workspace(root).unwrap(), size_index_id: id.into(), scanned_at_ms: 1_794_000_000_000, persistence_error: None, watch_policy: None }
+        DesktopReport { report: roomit_core::inspect_workspace(root).unwrap(), size_index_id: id.into(), scanned_at_ms: 1_794_000_000_000, persistence_error: None, watch_policy: None, ai_tool_id: None }
     }
     fn request(id: &str, query: &str) -> PageRequest {
         PageRequest { index_id: id.into(), request_id: "test-query".into(), kind: "file".into(), minimum_bytes: "5000000000".into(), query: query.into(), cursor: None, direction: "next".into(), include_total: true }
@@ -101,17 +101,22 @@ mod tests {
         let fixture = tempfile::tempdir().unwrap();
         let mut json = serde_json::to_value(report("legacy", fixture.path())).unwrap();
         json.as_object_mut().unwrap().remove("watchPolicy");
+        json.as_object_mut().unwrap().remove("aiToolId");
         let restored: DesktopReport = serde_json::from_value(json).unwrap();
         assert!(restored.watch_policy.is_none()); assert_eq!(restored.size_index_id, "legacy");
+        assert!(restored.ai_tool_id.is_none());
     }
     #[test]
     fn ai_scope_survives_saved_scan_reopening() {
         let fixture = tempfile::tempdir().unwrap();
         let store = SavedScanStore::new(fixture.path().join("saved"));
         let mut report = report("ai", fixture.path()); report.report.scope = "ai".into();
+        report.ai_tool_id = Some("codex".into());
         let mut snapshot = IndexWriter::new_in(&store.directory).unwrap().finish("ai".into()).unwrap();
         store.save(&mut snapshot, &report).unwrap(); drop(snapshot);
-        assert_eq!(store.load().unwrap().unwrap().0.report.scope, "ai");
+        let restored = store.load().unwrap().unwrap().0;
+        assert_eq!(restored.report.scope, "ai");
+        assert_eq!(restored.ai_tool_id.as_deref(), Some("codex"));
     }
     #[test]
     fn reopened_store_restores_report_exact_bytes_partial_flags_and_full_paged_index() {
