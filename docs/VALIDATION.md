@@ -1,3 +1,15 @@
+# Windows console window fix — 2026-11-05
+
+- The delivered debug executable used PE subsystem 3 (console), because the
+  Tauri template's GUI subsystem attribute applied only without debug assertions.
+  The entry point now selects the Windows GUI subsystem in both build profiles.
+- TypeScript/Vite and the Windows debug/no-bundle build passed. Binary inspection
+  confirms the new executable is PE subsystem 2 (Windows GUI). The copied delivery
+  is SHA-256 matched to the build output. No scan/storage/UI logic changed.
+- This check verifies the executable's launch subsystem; an interactive native
+  launch was not performed for this fix. The earlier 92-test run remains the
+  behavioral baseline, not a newly repeated suite.
+
 # AI-first interface refresh — 2026-11-05
 
 - **92 automated tests passed**: 33 core, 30 native, 29 frontend; one existing
