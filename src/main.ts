@@ -23,6 +23,7 @@ import { installShell } from "./shell";
 import "./shell.css";
 import {installUpdates} from "./updates";
 import {reportMessage} from "./legacy-messages";
+import aiCatalog from "./ai-catalog.json";
 
 function element<T extends HTMLElement>(selector: string): T {
   const result = document.querySelector<T>(selector);
@@ -46,6 +47,15 @@ const folderTarget = element<HTMLDivElement>("#folder-target");
 const computerTarget = element<HTMLDivElement>("#computer-target");
 const diskTarget = element<HTMLDivElement>("#disk-target");
 const aiTarget = element<HTMLDivElement>("#ai-target");
+const aiToolSelect = element<HTMLSelectElement>("#ai-tool-select");
+for (const tool of [...aiCatalog].sort((a,b)=>a.name.localeCompare(b.name,"en"))) aiToolSelect.add(new Option(tool.name,tool.id));
+const aiScopeLabel = () => aiToolSelect.value ? `${aiToolSelect.selectedOptions[0]?.textContent || "Selected app"} data locations` : "Known AI data locations";
+function restoreAiScope(report: InspectionReport): void {
+  const id = report.scope === "ai" ? report.aiToolId || "" : "";
+  // Keep an unrecognized saved ID explicit so a rescan cannot silently broaden.
+  if (id && ![...aiToolSelect.options].some(option=>option.value===id)) aiToolSelect.add(new Option(`Unavailable tool (${id})`,id));
+  aiToolSelect.value = id;
+}
 const diskSelect = element<HTMLSelectElement>("#disk-select");
 const diskInfo = element<HTMLDivElement>("#disk-info");
 const toggleScan = element<HTMLButtonElement>("#toggle-scan");
@@ -69,7 +79,7 @@ let diskRequest = 0;
 let exclusions: ReturnType<typeof installExclusions> | undefined;
 const updates = installUpdates(() => Boolean(activeScan) || restoring || preparingRescan, updateControls);
 const scanMode = (): ScanMode => (modeInputs.find((radio) => radio.checked)?.value || "folder") as ScanMode;
-const target = () => scanTarget(scanMode(), input.value, diskSelect.value, disks, rootsLoading);
+const target = () => scanTarget(scanMode(), input.value, diskSelect.value, disks, rootsLoading, aiToolSelect.value);
 
 function updateControls(): void {
   const native = isTauri();
@@ -82,6 +92,8 @@ function updateControls(): void {
   refreshRoots.hidden = mode === "folder" || mode === "ai";
   diskInfo.hidden = mode === "folder" || mode === "ai" || rootsLoading || !disks.length;
   diskSelect.disabled = !native || busy || rootsLoading;
+  aiToolSelect.disabled = !native || busy;
+  for (const action of document.querySelectorAll<HTMLButtonElement>("[data-scan-tool]")) action.disabled = !native || busy || !exclusions?.ready;
   input.disabled = !native || busy;
   chooseFolder.disabled = !native || busy;
   refreshRoots.disabled = !native || busy || rootsLoading;
@@ -207,7 +219,8 @@ const viewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#re
 let lastReport: InspectionReport | null = null;
 let grouped: GroupedReport | null = null;
 let currentView: ResultView = "control";
-const workspace = installWorkspace(element("#workspace-panel"), navigate);
+const workspace = installWorkspace(element("#workspace-panel"), navigate, startAiScan,
+  () => !isTauri() || Boolean(activeScan) || pickingFolder || restoring || preparingRescan || updates.busy() || Boolean(exclusions?.busy) || !exclusions?.ready);
 const shell = installShell(navigate, () => element<HTMLButtonElement>("#new-scan").click());
 let settingsExpanded = false;
 let restoredReport = false;
@@ -241,8 +254,8 @@ function renderScanLayout(): void {
   toggleScan.hidden = !expanded || running || needsExclusionSetup;
   toggleScan.textContent = "Close";
   toggleScan.setAttribute("aria-expanded", String(!form.hidden));
-  element("#inspect-title").textContent = running ? (scanMode() === "ai" ? "Scanning AI folders" : "Scan in progress") : "Choose a scan scope";
-  element("#scan-caption").textContent = scanMode() === "ai" ? "Known AI user folders · Other disks are not scanned"
+  element("#inspect-title").textContent = running ? (scanMode() === "ai" ? `Scanning ${aiScopeLabel()}` : "Scan in progress") : "Choose a scan scope";
+  element("#scan-caption").textContent = scanMode() === "ai" ? `${aiScopeLabel()} · Other disks are not scanned`
     : scanMode() === "computer" ? "All connected local disks" : scanMode() === "disk" ? `One disk · ${diskSelect.value || "Select disk"}` : input.value || "Select a folder to inspect, including its subfolders.";
   element("#scan-elapsed").hidden = !running;
   element(".report-panel").hidden = ["control", "tools", "activity"].includes(currentView) || (!lastReport && (currentView === "ai" || running || expanded));
@@ -339,6 +352,7 @@ async function loadLastScan(): Promise<void> {
     element("#restore-state").hidden = true;
     if (report) {
       const mode = report.scope === "recursive" ? "folder" : report.scope;
+      restoreAiScope(report);
       for (const radio of modeInputs) radio.checked = radio.value === mode;
       if (mode === "folder") input.value = report.root;
       if (mode === "ai" && requestedAt === navigationRevision && currentView !== "control") currentView = "ai";
@@ -360,6 +374,7 @@ element("#rescan-snapshot").addEventListener("click", async () => {
   preparingRescan = true;
   const report = lastReport;
   const mode = report.scope === "recursive" ? "folder" : report.scope;
+  restoreAiScope(report);
   settingsExpanded = true; renderCurrent();
   for (const radio of modeInputs) radio.checked = radio.value === mode;
   if (mode === "folder") input.value = report.root;
@@ -372,12 +387,17 @@ element("#rescan-snapshot").addEventListener("click", async () => {
   else { status.className = "warning"; status.textContent = "The previous scan disk is unavailable. Choose a scan scope."; }
 });
 for (const tab of viewButtons) tab.addEventListener("click", () => navigate(tab.dataset.view as ResultView));
-element("#scan-ai").addEventListener("click", () => {
-  if (!isTauri() || activeScan || restoring || preparingRescan || pickingFolder || !exclusions?.ready) return;
+function startAiScan(toolId = ""): void {
+  if (!isTauri() || activeScan || restoring || preparingRescan || pickingFolder || updates.busy() || exclusions?.busy || !exclusions?.ready) return;
+  if (toolId && !aiCatalog.some(tool=>tool.id===toolId)) return;
+  aiToolSelect.value = toolId;
   diskRequest++; rootsLoading = false;
   for (const radio of modeInputs) radio.checked = radio.value === "ai";
   settingsExpanded = true; renderCurrent(); updateControls(); form.requestSubmit();
-});
+  scanPanel.scrollIntoView({block:"start"});
+}
+element("#scan-ai").addEventListener("click", () => startAiScan());
+aiToolSelect.addEventListener("change", () => { updateControls(); renderScanLayout(); });
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderCurrent, 120); });
 
@@ -420,7 +440,7 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const selection = target();
   if (!selection || !isTauri() || activeScan || pickingFolder || restoring || preparingRescan || updates.busy() || !exclusions?.ready) return;
-  const { root, mode } = selection;
+  const { root, mode, aiToolId } = selection;
   const scanId = crypto.randomUUID();
   const previousReport = lastReport; const previouslyRestored = restoredReport;
   activeScan = scanId; cancelRequested = false; lastScanError = false; scanStartedAt = Date.now();
@@ -446,7 +466,7 @@ form.addEventListener("submit", async (event) => {
     if (!cancelRequested) status.textContent = `${progress.finished ? "Preparing results" : "Scanning"}${disk} · ${formatCount(progress.stats.filesScanned)} files · ${formatCount(progress.stats.directoriesScanned)} folders · ${formatBytes(progress.stats.totalLogicalBytes)}`;
   };
   try {
-    const report = await invoke<InspectionReport>("inspect_workspace", { root, mode, scanId, onProgress });
+    const report = await invoke<InspectionReport>("inspect_workspace", { root, mode, aiToolId: aiToolId || null, scanId, onProgress });
     showReport(report);
     element("#restore-state").hidden = true;
     status.textContent = scanSummary(report);
@@ -459,6 +479,7 @@ form.addEventListener("submit", async (event) => {
     status.textContent = `Scan could not be completed: ${String(error)}`;
   } finally {
     activeScan = null;
+    workspace.show(currentView, lastReport, grouped);
     results.setAttribute("aria-busy", "false");
     progressBar.hidden = true; cancelButton.hidden = true;
     currentPath.textContent = "";

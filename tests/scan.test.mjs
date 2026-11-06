@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { scanTarget, usedPercent } from '../src/scan.ts';
 const disk = (path, totalSpace = '1000', availableSpace = '300') => ({ path, name: path, totalSpace, availableSpace, removable: false });
+
+test('app scope is preserved for AI scans only and unknown IDs never become all-tools scans', () => {
+  for (const id of ['codex', 'claude-code', 'unknown-saved-id']) {
+    assert.deepEqual(scanTarget('ai', '/unused', '', [], true, id), {mode:'ai',root:'',aiToolId:id});
+  }
+  assert.deepEqual(scanTarget('folder', '/project', '', [], false, 'codex'), {mode:'folder',root:'/project'});
+});
 test('AI scan targets known locations without requiring or falling back to disks', () => {
   assert.deepEqual(scanTarget('ai', '', '', [], true), {mode:'ai',root:''});
   assert.deepEqual(scanTarget('ai', '/ordinary-folder', 'G:\\', [disk('G:\\')], false), {mode:'ai',root:''});

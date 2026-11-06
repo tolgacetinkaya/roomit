@@ -24,7 +24,7 @@ interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;
 const el=(tag:string,text="",cls=""):HTMLElement=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
 const percent=(n:number|null)=>n===null?"Measuring…":`${n.toLocaleString("en-US",{maximumFractionDigits:1})}%`;
 const rate=(n:number|null)=>n===null?"Measuring…":`${formatBytes(Math.max(0,Math.round(n)).toString())}/s`;
-export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tools"|"activity")=>void):{show:(view:string,report:InspectionReport|null,groups:GroupedReport|null)=>void}{
+export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tools"|"activity")=>void,scanTool?:(id:string)=>void,scanBlocked:()=>boolean=()=>false):{show:(view:string,report:InspectionReport|null,groups:GroupedReport|null)=>void}{
   let current:string="",report:InspectionReport|null=null,groups:GroupedReport|null=null;
   let inventory:Inventory|null=null,snapshot:Snapshot|null=null,inventoryError="",monitorError="",inventoryBusy=false,monitorBusy=false,paused=false;
   let networkName="",processQuery="",processSort:ProcessSort="memory",timer:ReturnType<typeof setTimeout>|undefined;
@@ -112,13 +112,17 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       const gpu=el("p","GPU · Waiting for measurement","tool-gpu");gpu.dataset.toolGpu=tool.id;
       const measured=groups?.ai.filter(g=>toolId(g.title)===tool.id)||[];
       const storage=measured.reduce((s,g)=>s+BigInt(g.logicalBytes),0n);
-      const bytes=el("div","","tool-storage");bytes.append(el("span","Scanned data"),el("strong",measured.length?sizeLabel(storage.toString(),Boolean(report?.totalSizeComplete)&&!report?.resultsTruncated&&measured.every(g=>g.sizeComplete)):"Not measured yet"));
+      const scoped = report?.scope === "ai" && report.aiToolId === tool.id;
+      const bytes=el("div","","tool-storage");bytes.append(el("span",scoped?"Latest app scan":"Scanned data"),el("strong",scoped&&report?sizeLabel(report.stats.totalLogicalBytes,report.totalSizeComplete&&report.status==="completed"):measured.length?sizeLabel(storage.toString(),Boolean(report?.totalSizeComplete)&&!report?.resultsTruncated&&measured.every(g=>g.sizeComplete)):"Not measured yet"));
+      const actions=el("div","","tool-scan-actions");
+      if(scanTool){const scan=document.createElement("button");scan.type="button";scan.className="secondary";scan.textContent="Scan app data";scan.dataset.scanTool=tool.id;scan.setAttribute("aria-label",`Scan ${tool.name} app data`);scan.disabled=scanBlocked();scan.title="Scan known data locations only. Replaces the latest saved scan; files stay unchanged.";scan.onclick=()=>scanTool(tool.id);actions.append(scan);}
+      if(scoped||measured.length){const view=document.createElement("button");view.type="button";view.className="text-button";view.textContent="View scanned data";view.onclick=()=>navigate("ai");actions.append(view);}
       const details=document.createElement("details");details.className="tool-evidence";details.open=opened.has(tool.id);const summary=document.createElement("summary");summary.textContent="Discovery evidence and locations";details.append(summary);
       for(const evidence of tool.evidence)details.append(el("p",evidence,"hint"));
       if(!tool.evidence.length&&!tool.installations.length)details.append(el("p","A data folder is not proof of installation. It may remain from a previous installation.","hint"));
       const paths=[...new Set([...tool.installations,...tool.dataPaths])];
       for(const path of paths)details.append(el("p",path,"report-path"));
-      details.append(revealActions(paths));card.append(heading,usage,gpu,bytes,details);toolsList.append(card);
+      details.append(revealActions(paths));card.append(heading,usage,gpu,bytes,actions,details);toolsList.append(card);
     }
     if(focusedCard&&focusIndex>=0){const restored=[...toolsList.querySelectorAll<HTMLElement>("article[data-tool-id]")].find(card=>card.dataset.toolId===focusedCard.dataset.toolId);restored?.querySelectorAll<HTMLElement>("button,summary,a,input,select")[focusIndex]?.focus({preventScroll:true});}
     updateLive();

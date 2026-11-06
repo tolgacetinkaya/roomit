@@ -48,6 +48,7 @@ export interface InspectionReport {
   largestEntries: SizedEntry[];
   sizeIndexId: string;
   scannedAtMs?: number;
+  aiToolId?: string | null;
   persistenceError?: string | null;
   warnings: string[];
   warningsOmitted: number;

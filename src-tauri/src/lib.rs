@@ -30,6 +30,7 @@ struct DesktopReport {
     scanned_at_ms: u64,
     persistence_error: Option<String>,
     #[serde(default)] watch_policy: Option<watch::WatchPolicy>,
+    #[serde(default)] ai_tool_id: Option<String>,
 }
 
 impl ScanRegistry {
@@ -61,6 +62,7 @@ impl Drop for ScanLease {
 async fn inspect_workspace(
     root: String,
     mode: String,
+    ai_tool_id: Option<String>,
     scan_id: String,
     on_progress: Channel<roomit_core::ScanProgress>,
     state: tauri::State<'_, ScanRegistry>,
@@ -71,6 +73,8 @@ async fn inspect_workspace(
     watches: tauri::State<'_, watch::WatchRegistry>,
 ) -> Result<DesktopReport, String> {
     if !["folder", "computer", "disk", "ai"].contains(&mode.as_str()) { return Err("Invalid scan scope.".into()); }
+    if mode != "ai" && ai_tool_id.is_some() { return Err("An AI tool can only be selected for an AI scan.".into()); }
+    let ai_tool_name = ai::tool_name(ai_tool_id.as_deref())?;
     let lease = state.begin(scan_id)?;
     let scanned_at_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
     let saved = saved.inner().clone();
@@ -88,7 +92,7 @@ async fn inspect_workspace(
         // Keep the previous snapshot available until the replacement succeeds.
         let mut writer = size_index::IndexWriter::new_in(&saved.directory).map_err(|e| format!("Could not create result directory: {e}"))?;
         excluded_paths.extend(writer.directories_to_exclude());
-        let roots = if mode == "ai" { ai::roots()? } else if mode == "folder" { vec![PathBuf::from(&root)] } else {
+        let roots = if mode == "ai" { ai::roots(ai_tool_id.as_deref())? } else if mode == "folder" { vec![PathBuf::from(&root)] } else {
             let roots = computer::computer_roots()?;
             if mode == "disk" { vec![computer::selected_root(&root, &roots)?] } else { roots }
         };
@@ -109,7 +113,7 @@ async fn inspect_workspace(
             let mut report = roomit_core::scan_locations_with_sink(&roots, options, &_lease.cancel, &mut progress, &mut writer)
                 .map_err(|error| error.to_string())?;
             if mode == "disk" { report.scope = "disk".into(); report.root = root; }
-            if mode == "ai" { report.scope = "ai".into(); report.root = "Known AI data locations".into(); }
+            if mode == "ai" { report.scope = "ai".into(); report.root = ai_tool_name.map(|name| format!("{name} data locations")).unwrap_or_else(|| "Known AI data locations".into()); }
             Ok(report)
         } else {
             let options = roomit_core::ScanOptions { max_entries: None, max_depth: None,
@@ -119,7 +123,7 @@ async fn inspect_workspace(
         }.map_err(|error| error.to_string())?;
         let id = _lease.id.clone();
         let mut snapshot = writer.finish(id.clone())?;
-        let mut report = DesktopReport { report, size_index_id: id, scanned_at_ms, persistence_error: None, watch_policy: Some(watch_policy) };
+        let mut report = DesktopReport { report, size_index_id: id, scanned_at_ms, persistence_error: None, watch_policy: Some(watch_policy), ai_tool_id };
         if let Err(error) = saved.save(&mut snapshot, &report) { report.persistence_error = Some(error); }
         indexes.publish(snapshot)?;
         watches.publish(monitoring)?;
