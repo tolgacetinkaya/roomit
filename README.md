@@ -1,334 +1,150 @@
-# Roomit
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" width="80" alt="Roomit logo" />
+</p>
 
-Your local AI workspace: tools, resources, and the data they leave behind.
+<h1 align="center">Roomit</h1>
+<p align="center"><strong>See what your AI tools leave behind.</strong></p>
+<p align="center">Discover AI apps. Monitor local resources. Understand their disk usage.</p>
 
-Roomit is a local-first Windows/macOS desktop project for understanding files
-left by development and AI tools. Its Rust library is independent of the
-Tauri 2 + TypeScript interface. The project is open source under the MIT license:
-[tolgacetinkaya/roomit](https://github.com/tolgacetinkaya/roomit).
+<p align="center">
+  <a href="https://github.com/tolgacetinkaya/roomit/releases/latest"><img src="https://img.shields.io/github/v/release/tolgacetinkaya/roomit?label=download&amp;color=4778ff" alt="Latest release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
+  <a href="https://github.com/tolgacetinkaya/roomit/releases/latest"><img src="https://img.shields.io/badge/Windows-x64-4778ff" alt="Windows x64 downloads" /></a>
+</p>
 
-## Current capabilities
+<p align="center">
+  <a href="https://github.com/tolgacetinkaya/roomit/releases/latest">Download</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="docs/ROADMAP.md">Roadmap</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a> ·
+  <a href="https://github.com/tolgacetinkaya/roomit/issues/new/choose">Report an issue</a>
+</p>
 
-- **Per-app AI data scans (source):** choose **Scan app data** on an AI tool card,
-  or select a single app in the AI scan settings. The selected scope persists
-  with saved results and is reused for rescanning. See [app data scans](docs/APP_DATA_SCANS.md)
-  for known-location coverage and limitations.
+Roomit is an open-source desktop app for people using AI coding assistants and
+local model tools. Find supported desktop and CLI apps such as **Claude Code,
+Codex, Ollama and LM Studio**, see their local resource usage, and inspect the
+data they accumulate — from one workspace.
 
-**Current source: 0.4.4 — per-app AI data scans.**
-Live resources shows combined CPU, RAM and GPU usage per app. Expand an app to
-inspect individual processes. Groups and member lists are paged; open groups and
-focused controls survive live updates. See [live resources](docs/LIVE_RESOURCES.md).
+Built with **Rust + Tauri + TypeScript**. Scans stay on your device and leave
+scanned files unchanged. No account or AI API key is required.
 
-Download the [latest published Windows release](https://github.com/tolgacetinkaya/roomit/releases/latest)
-or build from source below. Choose the Windows x64 setup for installation and
-future in-app updates, or the standalone EXE to run directly with WebView2
-installed. Roomit checks new published releases and offers **Review update…**, with installation
-confirmation or a portable EXE download;
-a Git push alone does not trigger an update. Local build caches, scan indexes,
-EXEs and signing keys are excluded from Git. See [releasing](docs/RELEASING.md)
-for signing, portable-update behavior, and verification. Windows binaries do not
-have an Authenticode publisher certificate. macOS native acceptance is pending.
+## What you can do
 
-- CPU, RAM and recognized-AI GPU cards include live two-minute charts on a fixed
-  0–100% scale. History uses actual sequential samples, stays bounded in memory
-  and is not persisted. Missing measurements and pause/hidden intervals are gaps;
-  partial GPU coverage is dashed and remains an explicit lower bound.
-- The RAM card separates used, available and OS-visible total memory, retaining
-  installed capacity separately. Available RAM includes reusable cache. The
-  **RAM display** selector chooses GiB/MiB, percent or both, applies to device,
-  tool and process values, and persists locally. RAM percentages use OS-visible
-  total as their denominator. See `docs/LIVE_RESOURCES.md`.
+| Question | In Roomit |
+| --- | --- |
+| Which AI tools are on this machine? | **My tools** lists supported apps and CLI tools, their discovery evidence and known locations. Running tools appear first. |
+| What is using CPU, RAM or GPU? | **Live resources** shows device charts and expandable app/process groups. Windows GPU values report missing or partial coverage explicitly. |
+| How much data does one tool keep? | Choose **Scan app data** on its card, or select one application in AI scan settings. |
+| Where is that space going? | Explore the **AI storage map**, inspect paths and use **Show in folder** to open Explorer or Finder. |
+| Can I keep the results? | The latest scan and exclusions persist. Changes detected while Roomit is open show a stale warning; you decide when to rescan. |
+| What about other large files? | Scan a folder, one disk or local disks, then filter **Large items** by minimum GB without rescanning. |
 
-- RAM uses binary GiB/MiB throughout device, tool and process displays. On Windows,
-  installed firmware capacity is shown separately from OS-visible total memory;
-  an unreadable installed capacity is explicit. 128 GiB no longer appears as
-  137.44 GB. Storage and minimum-size filters retain decimal GB. See
-  `docs/RAM_MEASUREMENT.md`.
+**Current release: [v0.4.4](https://github.com/tolgacetinkaya/roomit/releases/tag/v0.4.4)** — per-app AI data scans with a saved application scope.
 
-- The Windows titlebar is integrated into the interface, with custom minimize,
-  maximize/restore, close and drag controls. The Roomit menu and grouped sidebar
-  keep AI resources and file inspection distinct. Toggle the sidebar with its
-  top-left button or Ctrl+B / Command+B; the preference persists locally.
-  macOS uses a native overlay titlebar and keeps its system window controls.
-  Browser layout/interaction checks passed; native window-control acceptance
-  is pending because the Computer Use launch approval timed out. See
-  `docs/DESKTOP_SHELL.md` and `design-qa.md` for evidence and limits.
+## Download
 
-- **AI control center** combines live resource panels, detected AI tools with
-  local brand logos, and an interactive AI storage map. **My tools** shows all
-  discoveries and their evidence; the control center's list scrolls without
-  dropping tools after the first six.
-- Discovery supports 19 catalog entries: desktop apps and CLI files on PATH,
-  common user binary directories, Windows uninstall/app-package registrations
-  and macOS app locations. This is not universal discovery of all AI software.
-  ZCode, Qwen, Kimi and LM Studio are included. Data-only traces are labeled
-  separately from installation evidence. No discovered program is executed.
-- Open **AI datani tara** to scan existing supported AI user-data roots
-  (including `.codex`, `.claude`, `.cursor`, `.ollama` and OpenCode) without walking every
-  disk. Missing locations never fall back to a home/disk/computer scan. Custom
-  locations and project-local AI data still require selecting a folder.
-- Keep the selected result view when starting, completing or cancelling a scan.
-  Startup opens the AI control center and restores results without scanning again.
-- Select a measured map sector to navigate tool → data location → direct children;
-  use **Up one level** / Escape to go back. New indexes return the largest 80
-  children and an explicit remainder; every measured item remains available in
-  **Large items**. Old saved indexes require a manual rescan for deep navigation.
-- **Live resources** samples native CPU/RAM per accessible process and network
-  rates per adapter while its workspace is visible, roughly every two seconds.
-  Search Chrome/Docker/PID, filter AI processes, sort and page 50 rows at a time.
-  Pause/resume is available; leaving the workspace pauses polling. Network rates
-  need two samples and reset/disconnected counters never become fabricated traffic.
-- Windows GPU Engine counters now measure local GPU usage in tool cards and the
-  process table (including GPU sorting). Processes sharing an engine are summed;
-  the busiest engine across adapters is reported, never a sum of every engine.
-  Missing/unsupported counters say **Unavailable**; new measurements warm up and
-  partially covered tool groups show **En az … · partial**. A valid measured zero
-  remains distinct. This measures the local GPU, not cloud inference or VRAM.
-- Pick a folder using the native Windows/macOS dialog; its path stays visible.
-- Scan one folder, one selected local disk, or all detected local disks, without opening file contents.
-- Add multiple folders to **Exclusions** using the native picker; choices persist
-  locally across restarts and apply to folder/disk/computer scans. Remove a rule
-  with **Remove from list**; this does not change the folder itself.
-- Automatically prune standard system/install locations, Windows SYSTEM-attribute
-  entries, registered Windows InstallLocation/App Paths and macOS `.app` bundles.
-  Automatic rules cannot be disabled. Unknown portable/unregistered installations
-  require an explicit user exclusion; this is not universal application ownership detection.
-- Compute individual file lengths and directory totals in one iterative traversal.
-- Discover nested .NET, Node.js, Python, Rust and Java/Gradle projects from markers.
-- Identify development outputs/dependencies with reasons and review-required status.
-- Identify supported AI user-data directories; protect AI data,
-  instructions, recognized settings/model stores, Git data and environment files.
-- Live progress, cancellation and clearly labeled partial results.
-- Restore the last saved scan on startup, including grouped results and the entire
-  paged size index. Search and GB filtering work without scanning again.
-- Monitor the last scan's folder/disk/computer scope while Roomit is open.
-  Included file/folder changes show **Results are out of date** without changing
-  results or starting a scan. **Rescan** remains a manual action.
-- A visible scan date and separate offline notice explain that edits made while
-  Roomit was closed are unknown. Cancelled scans remain explicitly partial.
-  Interrupted/incomplete monitoring shows **Freshness could not be verified**.
-- Show result paths in Windows Explorer / macOS Finder with **Show in folder**.
-  On a focused card/row, use **Ctrl+Enter** (Windows) or **Command+Enter** (Mac).
-  Multi-location AI groups ask which location to reveal.
-- Graphite/electric-blue workspace with persistent navigation, grouped results,
-  compact completed-scan setup, and per-volume capacity/free-space previews.
-- Inspect grouped development/AI results; use **Large items** for separate file/folder lists.
-- Enter a minimum GB size (for example 5 or 0,5), apply or clear it without rescanning.
-  **All measured matches** are available through Previous/Next pages, with no result-count cutoff.
-  The threshold is inclusive, uses exact decimal bytes and combines with path search.
-- Skip symlinks/reparse points; bound work and report memory; keep totals independent
-  of paginated or capped result lists.
+Open the **[latest Windows release](https://github.com/tolgacetinkaya/roomit/releases/latest)** and choose:
 
-There is **no deletion, move-to-trash, age filter,
-telemetry, or cloud/LLM call**. Custom AI storage locations and arbitrary tool
-versions are not automatically discovered outside the selected directory.
+| File | Use it for |
+| --- | --- |
+| `Roomit-VERSION-windows-x64-setup.exe` | A per-user Windows installation. |
+| `Roomit-VERSION.exe` | Running directly without installation. Requires WebView2. |
+| `SHA256SUMS.txt` | Checking download hashes. |
 
-Per-app network attribution, LAN-versus-internet separation, container internals,
-browser tabs, and long-term use/unused-file determination are **not implemented**.
-The UI reports those limits explicitly. CPU is normalized to total device capacity;
-process RAM may include shared pages. Only recognized process identities and known
-helpers in the same installation are attributed to an AI tool; launching another
-application does not make that application part of the parent's usage.
-Per-process GPU measurement on macOS is not implemented in this build and is
-reported as unsupported. macOS native build/device acceptance remains pending.
+Roomit checks published releases for updates. On 0.4.2 and later, **Roomit → Check
+for updates → Review update…** offers **Install and restart** or **Download latest
+portable EXE**. Installing from a portable copy installs Roomit; it does not replace
+the original portable file. [Update behavior and signatures →](docs/RELEASING.md)
 
-## Size semantics and limits
+Windows packages carry updater signatures, but currently have no Windows
+Authenticode publisher certificate. **macOS is experimental source support**:
+there is no published Mac binary, and native Mac validation is pending.
 
-Sizes are **logical bytes**, not allocated disk space or reclaimable space.
-Hardlinked files count once per encountered path. Sparse/compressed files and
-filesystem clones may occupy different physical space. Directory totals overlap
-child rows; use the report root total, not a sum of displayed rows.
-Totals measure the included scope, excluding pruned data; they are not full sizes
-of folders containing excluded children. Recognized
-space counts nested findings only once.
+## Get started
 
-Skipped links, inaccessible entries and cancelled scans make sizes partial lower
-bounds. All desktop scopes (folder, one disk, computer) have no entry/depth cutoff.
-The library retains configurable traversal budgets for other callers. A live
-filesystem scan is not an atomic snapshot or proof that an item can be removed.
+1. Open **My tools** to see detected AI applications and terminal tools.
+2. Choose **Scan app data** on a tool such as Codex. To scan all supported tools,
+   use **Scan AI data**. Known per-user locations are scanned; other disks are
+   not searched for custom model folders.
+3. Read the total on the tool card, then choose **View scanned data** to explore
+   the map and locations. Progress and cancellation remain available.
+4. Reopen Roomit to view the saved result. Use **Rescan** when you want a fresh
+   measurement; each completed or cancelled scan replaces the latest snapshot.
 
-The desktop streams every measured file/subdirectory into an app-owned local
-SQLite index. The size view has **no 10,000-result cap** and requests only 50 rows
-per file/directory page. Changing GB size or search queries the existing index;
-there is no rescan. Progress, scan cancellation and result-loading cancellation
-are available. Cancelled scans retain the metadata measured so far. The selected
-root is summarized separately; links and the running app's own result directory
-are excluded. The latter also has a macOS APFS Data alias exclusion.
+For data on another drive, use a folder scan. Configure **Exclusions** before
+scanning folders you want to leave out. See [per-app scans](docs/APP_DATA_SCANS.md).
 
-Scanned user files remain unchanged. The index stores paths, types and sizes on
-the local device. Successful scans (including cancelled/partial results) persist
-under Tauri's per-user app local data folder in `last-scan`. Normal app shutdown
-keeps the current result; a successful replacement retires the previous index
-once its readers finish. Failed scans/saves preserve the previous saved result.
-Write failures are displayed, and unsaved current results are labeled temporary.
-Available local disk space bounds storage.
-No full-result array is kept in the UI. SQLite page caches are configured to
-4 MiB per connection; this is not a total process-memory guarantee.
+## Supported AI tools
 
-Development/AI summaries still retain 10,000 findings/projects each, plus 100
-legacy largest entries and 100 warnings. These summary limits do not limit the
-size index or stop traversal. Progress is throttled to about 100 ms, and only one
-desktop scan can run at once.
-Byte counts are u64 in Rust and decimal strings in JSON/IPC to preserve precision
-in JavaScript. The UI uses decimal units: 1 GB = 1,000,000,000 bytes.
+The bundled catalog currently contains 19 tool families:
 
-## Product order
+| | Tools |
+| --- | --- |
+| Coding assistants and editors | Codex, Claude Code, OpenCode, Cursor, Windsurf, Gemini CLI, Aider, GitHub Copilot, Antigravity, Trae |
+| Local models and AI workspaces | Ollama, LM Studio, Jan, AnythingLLM |
+| Other desktop / CLI tools | Claude, ChatGPT, ZCode, Qwen, Kimi |
 
-1. Development and AI-tool data recognition, with evidence and impact.
-2. Files/directories at or above a user-entered GB threshold. No age filter.
-3. Shared review and optional OS trash actions (exclusions and Finder/Explorer reveal exist).
+Support means known discovery rules, not a guarantee that every installation or
+version will be found. Custom aliases, WSL/container installations, browser AI
+sites and arbitrary model locations are outside automatic discovery. A leftover
+data folder is labeled separately from installation evidence.
 
-See [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and
-[manual screen checks](docs/MANUAL_TEST.md).
+Missing a tool? [Request detection support](https://github.com/tolgacetinkaya/roomit/issues/new?template=03_tool_support.md)
+with its official link, platform and a redacted example path.
 
-## Prerequisites
+## Local data, honest measurements
 
-- Node.js supported by the locked Vite release, and npm. Frontend logic tests use
-  Node's native TypeScript support (Node 22.18+ or a newer supported release).
-- Rust stable; use a current stable toolchain for desktop dependencies.
-- Windows: Visual Studio C++ build tools, Windows SDK and WebView2.
-- macOS: Xcode Command Line Tools.
+- **Metadata-only scans:** file paths, types and sizes are indexed locally. Source
+  code, secrets and AI conversation contents are not read to classify files.
+- **No deletion actions:** models, histories and settings are not treated as
+  disposable simply because they are large or old. Detailed temporary/cache
+  classification is a [proposed next step](docs/ROADMAP.md).
+- **No telemetry or cloud inference:** update checks and downloads contact GitHub;
+  opening external links uses your browser. Scan results are not uploaded.
+- **Explicit coverage:** sizes are logical bytes, not reclaimable space. Exclusions,
+  inaccessible items and cancellation can produce partial totals. RAM uses GiB/MiB;
+  storage uses decimal GB.
+- **Local resource usage:** CPU/RAM and supported Windows GPU measurements concern
+  processes on this device. Cloud model GPU, VRAM, per-app network traffic and
+  long-term activity history are not measured. Monitoring pauses when its workspace
+  is hidden or paused; there is no background service.
 
-Official setup: https://v2.tauri.app/start/prerequisites/
+See [measurement details](docs/LIVE_RESOURCES.md) and [scan semantics](docs/SCANNING.md).
 
-## Run locally
+## Build and contribute
+
+Install Node.js, Rust and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/), then:
 
 ```sh
+git clone https://github.com/tolgacetinkaya/roomit.git
+cd roomit
 npm ci
 npm run tauri -- dev
 ```
 
-Windows helper (also handles the existing user toolchain missing from PATH,
-without changing system settings):
+Use Node 22.18+ for the native TypeScript tests and a Rust toolchain compatible
+with the workspace's minimum version. Windows also needs C++ build tools, the
+Windows SDK and WebView2. `npm run dev` is a frontend preview; native scanning is
+only available in the desktop app.
 
-```powershell
-.\scripts\dev.ps1
-```
+Useful contributions include detection rules with fixtures, false-positive
+reports, accessibility improvements and Mac validation. Changes go through a
+**feature branch → tests → pull request → review → merge** workflow.
 
-Frontend-only preview: `npm run dev`. Native scanning is disabled in a browser.
+[Contribution guide](CONTRIBUTING.md) · [Proposed roadmap](docs/ROADMAP.md) ·
+[Issue templates](https://github.com/tolgacetinkaya/roomit/issues/new/choose)
 
-## Checks
+## Documentation
 
-```sh
-npm run build
-npm test
-cargo test -p roomit-core --locked
-cargo check --workspace --locked
-cargo test -p roomit --lib --locked
-```
+- [AI workspace and discovery](docs/AI_WORKSPACE.md)
+- [Per-application data scans](docs/APP_DATA_SCANS.md)
+- [Live resources and measurement limits](docs/LIVE_RESOURCES.md)
+- [Scan sizes, exclusions and saved results](docs/SCANNING.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Validation](docs/VALIDATION.md) and [manual checks](docs/MANUAL_TEST.md)
+- [Release process and updates](docs/RELEASING.md)
 
-Windows combined check: `.\scripts\check.ps1`. Link/junction fixture tests require
-normal OS permissions; the agent sandbox may block their creation. The Windows
-helper keeps its Cargo cache in ignored `.local/cargo`.
+## License
 
-Core-only recursive JSON report (absolute directory required):
-
-```sh
-cargo run -p roomit-core --example inspect -- /absolute/project/path
-```
-
-Build a local executable without an installer or publishing:
-
-```sh
-npm run tauri -- build --debug --no-bundle
-```
-
-Windows output: `target/debug/roomit.exe`. macOS builds and runtime checks require
-a Mac. This implementation has no Windows-versus-Mac speed benchmark claim.
-
-## Folder and computer targets
-
-Use **Choose folder…** to open the native directory picker. Cancelling keeps the
-previous selection. Selection alone does not start scanning. Manual path typing
-is no longer needed.
-
-**Whole computer** previews detected local fixed/removable disk roots. Network
-volumes are not included. The scan starts only when **Start scan** is pressed;
-roots are refreshed at start. **Refresh disks** refreshes the preview.
-
-Computer scans share one worker, cancellation token, bounded
-largest-item list and cumulative progress across roots. Failed and unscanned
-roots are listed. The user's home branch/volume is preferred where possible.
-Overlapping requested roots are partitioned to avoid duplicate measurement.
-On Unix, volume crossings are skipped; macOS APFS System and Data are separate
-roots, avoiding traversal through Data firmlinks from the System tree. These
-skips conservatively mark totals partial. Native Mac behavior awaits testing.
-
-Normal OS permissions apply; the app does not request elevation. Inaccessible
-areas, mount boundaries and entry limits yield partial results. Whole-computer
-mode is not a guarantee that every protected/hidden volume can be inspected.
-
-## Grouped results
-
-The compact desktop layout keeps scan controls on the left and results on the
-right. Overview, Projects, AI tools, Large folders and Details are separate
-working views with search. Software findings are grouped by nearest project,
-AI locations by tool, and other protected data in a collapsed secondary section.
-Individual paths and reasons are built lazily when a group is opened. Lists are
-paged, so large reports do not create thousands of initial DOM rows.
-
-Nested directory findings are counted once before grouping. Group bytes are
-recognized artifact/data totals, not complete project sizes or reclaimable
-space. If the retained report was truncated, group sizes are explicitly lower
-bounds. Root scan totals still account for all measured files, independently
-of output-list retention. Whole-computer scanning stops on cancellation, access
-failures for particular subtrees, or OS errors, never because of an item/depth
-budget. Existing link/mount partition rules continue to apply.
-
-## Persistent exclusion settings
-
-Choices are saved in `scan-exclusions.json` in Tauri's per-user app configuration
-folder (`dev.roomit.desktop`), independently of the temporary scan index. Saving
-uses an atomic same-directory replacement. Disconnected/missing paths stay saved.
-Unreadable/corrupt settings block scanning instead of silently ignoring choices.
-Only Roomit's own settings and temporary result metadata are written; scanned
-files are untouched. Changes apply to subsequent scans; editing is locked while
-scanning. Windows registry locations are read-only and refreshed each scan.
-
-System/install rules intentionally preserve project directories and AI user data
-outside protected installation trees. Files stored inside an excluded installation
-remain excluded even if they look like project/AI data. On macOS, APFS Data user
-paths remain eligible; system subtrees and their Data aliases are protected.
-
-## Saved results and freshness
-
-The report and complete SQLite index are stored together in one versioned local
-generation. A small `current.json` pointer changes atomically only after the data
-commits. New scans do not overwrite the old generation in place. Startup reads
-only the saved report/schema; result rows are still loaded in 50-row pages.
-Corrupt/missing/unsupported records show a recovery message and are preserved.
-No saved result means the normal empty screen; nothing is scanned automatically.
-
-Snapshots contain paths, classifications and sizes, not scanned file contents.
-Their timestamp is the scan's start time. While the app is open, native filesystem
-notifications detect included changes and latch a stale warning until a new scan.
-Notifications do not update sizes or results. Offline changes are still unknown;
-restored results retain a separate possible-change notice. **Rescan** uses the saved scope and
-current exclusions; a missing disk prompts for a target instead of scanning all
-disks. Existing reveal actions validate the path against the live filesystem.
-An older exe's in-memory results cannot be recovered after that exe closes; the
-new persistence begins with scans performed using this build.
-
-## Change monitoring
-
-Windows uses overlapped ReadDirectoryChangesW with one recursive handle per scan
-root plus non-recursive parent watches to detect root rename/replacement. macOS
-uses notify's FSEvents backend. No periodic file enumeration or content hashing
-is used. The UI reads the small monitoring status every two seconds and changes
-only the notice, preserving open filters/pages. This is best-effort monitoring:
-permissions, disconnected roots or dropped event batches produce an explicit
-uncertainty warning instead of a claim that results are current.
-
-Watchers arm before a new scan, so included mutations during the scan can also
-invalidate the resulting report. Failed replacement scans keep the previous
-monitor. New saved reports retain their exclusion policy; older saved reports
-remain readable and use the current policy as a compatibility fallback. The
-app-owned settings/index trees, standard system/install exclusions and app-bundle
-rules are filtered before invalidation. Windows access-only activity is ignored.
-Monitoring is session-only: no background service or observation while closed,
-and observed-change flags are not a durable filesystem journal.
-
-The targeted AI action measures known tool data; histories, settings and models
-are not automatically classified as disposable temporary files. A dedicated
-AI temporary-file classifier remains incomplete. System/install exclusions,
-progress/cancel, persisted results and live change warnings also apply in AI scope.
+[MIT](LICENSE). Tool names and logos identify their respective products; Roomit
+is not affiliated with those vendors. See the [tool artwork notices](src/assets/tools/LICENSE).
