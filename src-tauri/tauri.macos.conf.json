@@ -2,7 +2,7 @@
   "app": {
     "windows": [{
       "label": "main",
-      "title": "Roomit 0.4.1",
+      "title": "Roomit",
       "theme": "Dark",
       "backgroundColor": "#181b20",
       "decorations": true,
@@ -13,5 +13,16 @@
       "minWidth": 720,
       "minHeight": 600
     }]
+  },
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://raw.githubusercontent.com/tolgacetinkaya/roomit/macos-updates/latest-macos.json"]
+    }
   }
 }
