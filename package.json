@@ -1,0 +1,24 @@
+{
+  "name": "roomit",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "tsc && vite build",
+    "test:core": "cargo test -p roomit-core --locked",
+    "check:rust": "cargo check --workspace --locked",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "vite": "^8.0.16",
+    "typescript": "~6.0.3"
+  }
+}

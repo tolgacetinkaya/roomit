@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Roomit — Çalışma alanını tanı</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <a class="brand" href="#main" aria-label="Roomit ana ekran"><span class="brand-mark" aria-hidden="true">r.</span>Roomit</a>
+        <span class="local-badge"><span aria-hidden="true">●</span> Yerel · Salt okunur</span>
+      </header>
+      <main id="main">
+        <section class="intro" aria-labelledby="title">
+          <p class="eyebrow">ÇALIŞMA ALANINI TANI</p>
+          <h1 id="title">Neyin yer kapladığını<br />anlamakla başla.</h1>
+          <p class="lead">Geliştirme ve AI araçlarının bıraktığı dosyaları tanı.<br />Neyin kalacağına sen karar ver.</p>
+        </section>
+        <section class="inspection panel" aria-labelledby="inspect-title">
+          <div class="section-heading"><div><p class="eyebrow">01 / GELİŞTİRME & AI</p><h2 id="inspect-title">Proje klasörünü incele</h2></div><span class="tag">İlk temel</span></div>
+          <p class="muted">Bu sürüm yalnızca seçtiğin klasörün doğrudan öğelerini inceler. Alt klasörler taranmaz, dosya içerikleri okunmaz ve boyut hesaplanmaz.</p>
+          <form id="inspect-form">
+            <label for="root">Projenin tam klasör yolu</label>
+            <div class="input-row"><input id="root" name="root" type="text" placeholder="G:\projeler\uygulamam veya /Users/ad/projeler/uygulamam" autocomplete="off" spellcheck="false" required /><button id="inspect-button" type="submit">Klasörü incele <span aria-hidden="true">↗</span></button></div>
+            <p id="runtime-note" class="hint">İnceleme yalnızca Roomit masaüstü uygulamasında kullanılabilir.</p>
+          </form>
+          <p id="status" role="status" aria-live="polite">Henüz inceleme yapılmadı.</p>
+          <div id="results" aria-busy="false"></div>
+        </section>
+        <div class="bottom-grid">
+          <section class="panel detail" aria-labelledby="protect-title"><span class="detail-symbol" aria-hidden="true">◇</span><h2 id="protect-title">Önce anlamak, sonra karar vermek.</h2><p>AI geçmişleri, proje talimatları ve ortam ayarları korunacak veri olarak işaretlenir. Bulunan geliştirme çıktıları inceleme gerektirir. Bu sürümde silme işlemi yoktur.</p></section>
+          <section class="panel detail upcoming" aria-labelledby="next-title"><p class="eyebrow">02 / SONRAKİ AŞAMA</p><h2 id="next-title">Büyük dosyalar, açık bir görünüm.</h2><p>Belirleyeceğin GB eşiğinin üzerindeki dosya ve klasörleri bul. Hariç tut, Finder veya Explorer’da incele, seçtiklerini çöp kutusuna taşı.</p><span class="tag">Planlandı</span></section>
+        </div>
+      </main>
+      <footer>Roomit <span>0.1.0 · Yerel geliştirme sürümü</span></footer>
+    </div>
+  </body>
+</html>
