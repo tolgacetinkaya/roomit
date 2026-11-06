@@ -1,3 +1,30 @@
+# AI-first interface refresh — 2026-11-05
+
+- **92 automated tests passed**: 33 core, 30 native, 29 frontend; one existing
+  interactive reveal smoke ignored. Full check passed before final presentation
+  refinements; frontend tests, TypeScript/Vite and the Windows debug/no-bundle
+  build passed again afterward. Rust source did not change in this refresh.
+- New sorting tests cover exact byte order beyond JavaScript's safe integer
+  range, natural Turkish name order, stable ties and preserving the source list.
+- Browser mocked-IPC checks cover the AI-first empty screen, targeted scan,
+  progress/cancel/partial results, search/name sorting, reveal path selection,
+  folder/disk selection, exclusion saving and stale warnings without auto-rescan.
+  Opening/closing scan setup preserves search and the later size-results page;
+  the size browser still renders at most 50 files and 50 directories per page.
+- A settings-load/last-result-restore race discovered during UI checks was fixed:
+  the failed exclusions panel and retry remain visible, with scan start disabled.
+  Setup opens with focus on the selected scope and closes back to New scan.
+- Responsive checks: 720 x 600 has no horizontal overflow, 1120 x 820 (native
+  default size) shows both AI cards and reveal controls, and wider windows use
+  two columns. Primary button text contrast is 4.81:1 (4.59:1 on hover); this is
+  not a claim of a full accessibility audit. Final preview console had no errors.
+- Current-run before/after screenshots are ignored local artifacts under
+  `artifacts/qa/ui-before-*`, `ui-after-*` and `ui-default-window.jpg`. They are
+  explicitly labeled sample data, not measurements from the user's disks.
+- Native UI acceptance and macOS build/device testing remain pending. Existing
+  scan/watch/storage tests verify their own native paths separately. No deletion,
+  actual user-data reset, automatic scan or publication was added in this refresh.
+
 # Retained AI view and targeted scan — 2026-11-05
 
 - **90 automated tests passed**: 33 core, 30 native, 27 frontend; one existing

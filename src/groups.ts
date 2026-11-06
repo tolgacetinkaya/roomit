@@ -83,3 +83,8 @@ export function filterGroups(groups: ResultGroup[], query: string): ResultGroup[
   return groups.filter((group) => [group.title, group.location, ...group.tools, ...group.items.map((item) => item.path)]
     .some((text) => text.toLocaleLowerCase("tr").includes(key)));
 }
+export type GroupSort = "size" | "name";
+export function sortGroups(groups: ResultGroup[], sort: GroupSort): ResultGroup[] {
+  const collator = new Intl.Collator("tr", { numeric: true, sensitivity: "base" });
+  return [...groups].sort((a, b) => (sort === "name" ? collator.compare(a.title, b.title) : compareBytes(a.logicalBytes, b.logicalBytes)) || a.id.localeCompare(b.id));
+}

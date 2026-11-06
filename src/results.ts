@@ -1,6 +1,7 @@
 import { categoryLabels, formatCount, scanSummary, sizeLabel } from "./report";
 import type { Finding, InspectionReport } from "./report";
-import { filterGroups, pathName } from "./groups";
+import { filterGroups, pathName, sortGroups } from "./groups";
+import type { GroupSort } from "./groups";
 import type { GroupedReport, ResultGroup } from "./groups";
 import { icon } from "./icons";
 import { revealActions, revealShortcut } from "./reveal";
@@ -58,15 +59,27 @@ function findingRow(item: Finding): HTMLElement {
   attachReveal(row, [item.path], true);
   return row;
 }
-function groupCard(group: ResultGroup): HTMLElement {
+function groupCard(group: ResultGroup, listedBytes?: bigint): HTMLElement {
   const location = group.location ? group.location.replace(/\\/g, "/").split("/").slice(-2).join("/") + " · " : "";
-  const context = `${location}${group.tools.join(" · ")} · ${formatCount(group.items.length)} konum`;
+  const context = group.kind === "ai" ? `AI kullanıcı verileri · ${formatCount(group.items.length)} konum` : `${location}${group.tools.join(" · ")} · ${formatCount(group.items.length)} konum`;
   const card = expandable(group.title, context, sizeLabel(group.logicalBytes, group.sizeComplete), () => {
     const body = node("div", "", "group-content");
     if (group.location) body.append(node("p", group.location, "report-path"));
     body.append(paged(group.items, findingRow, 20)); return body;
   }, group.location ? [group.location] : group.items.map((item) => item.path));
   card.title = group.location || group.title;
+  if (group.kind === "ai") {
+    card.classList.add("ai-result");
+    const info = node("div", "", "tool-detail-strip");
+    info.append(node("span", "AI verileri", "data-type-badge"), node("span", group.items.length === 1 ? group.items[0]!.path : `${group.items.length} farklı konum`, "tool-location-preview"));
+    card.insertBefore(info, card.querySelector(".reveal-actions"));
+    if (listedBytes && listedBytes > 0n) {
+      const share = Number(BigInt(group.logicalBytes) * 1000n / listedBytes) / 10;
+      const meter = document.createElement("meter"); meter.min = 0; meter.max = 100; meter.value = share;
+      meter.setAttribute("aria-label", `${group.title}: listelenen AI verileri içinde %${share}`);
+      const usage = node("div", "", "tool-usage"); usage.append(meter); card.append(usage);
+    }
+  }
   card.querySelector(".group-row")?.prepend(icon(group.kind === "ai" ? "ai" : group.kind === "project" ? "project" : "shield", "ui-icon group-icon"));
   return card;
 }
@@ -82,8 +95,18 @@ function section(title: string, count: number, action?: () => void, unit = "grup
 const empty = (text: string): HTMLElement => node("div", text, "empty-note");
 
 export function renderResults(report: InspectionReport, grouped: GroupedReport, view: ResultView, query: string,
-  navigate: (view: ResultView) => void, minimumBytes = 0n): HTMLElement {
+  navigate: (view: ResultView) => void, minimumBytes = 0n, sort: GroupSort = "size"): HTMLElement {
   const container = node("div", "", "report-view");
+  const aiBytes = grouped.ai.reduce((sum, group) => sum + BigInt(group.logicalBytes), 0n);
+  if (view === "ai") {
+    const metrics = node("div", "", "metrics ai-metrics");
+    for (const [label, value, hint] of [
+      ["Toplam AI verisi", sizeLabel(aiBytes.toString(), report.totalSizeComplete && !report.resultsTruncated), "Bu taramada tanınan gruplar"],
+      ["Tanınan araç", formatCount(grouped.ai.length), "Bu taramada bulunan araç grupları"],
+      ["İncelenen dosya", formatCount(report.stats.filesScanned), "Seçilen tarama kapsamının tamamında"],
+    ]) { const card = node("div", "", "metric"); card.append(node("span", label), node("strong", value), node("small", hint)); metrics.append(card); }
+    container.append(metrics);
+  }
   if (view === "overview") {
     const metrics = node("div", "", "metrics");
     for (const [label, value, hint] of [
@@ -100,23 +123,27 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
     const details = document.createElement("button"); details.type = "button"; details.className = "text-button"; details.textContent = "Ayrıntıları gör";
     details.addEventListener("click", () => navigate("details")); notice.append(details); container.append(notice);
   }
-  const projects = filterGroups(grouped.projects, query);
-  const ai = filterGroups(grouped.ai, query);
+  const projects = sortGroups(filterGroups(grouped.projects, query), sort);
+  const ai = sortGroups(filterGroups(grouped.ai, query), sort);
   const protectedGroups = filterGroups(grouped.protected, query);
   if (view === "overview" || view === "projects") {
     container.append(section("Yazılım projeleri", projects.length, view === "overview" && projects.length > 6 ? () => navigate("projects") : undefined));
     container.append(node("p", "Proje kartları, tanınan çıktı ve bağımlılıkların toplamını gösterir.", "hint"));
-    container.append(projects.length ? paged(view === "overview" ? projects.slice(0, 6) : projects, groupCard) : empty(query ? "Aramana uygun proje bulunamadı." : "Bu taramada sınıflandırılan yazılım çıktısı bulunamadı."));
+    container.append(projects.length ? paged(view === "overview" ? projects.slice(0, 6) : projects, group => groupCard(group)) : empty(query ? "Aramana uygun proje bulunamadı." : "Bu taramada sınıflandırılan yazılım çıktısı bulunamadı."));
   }
   if (view === "overview" || view === "ai") {
-    container.append(section("AI araçları", ai.length));
-    container.append(ai.length ? paged(ai, groupCard) : empty(query ? "Aramana uygun AI aracı bulunamadı." : "Bu kapsamda tanınan AI verisi bulunamadı."));
+    container.append(section(view === "ai" ? "Bulunan araçlar" : "AI araçları", ai.length));
+    if (ai.length) {
+      const list = paged(ai, group => groupCard(group, aiBytes));
+      if (view === "ai") list.classList.add("ai-tool-list");
+      container.append(list);
+    } else container.append(empty(query ? "Aramana uygun AI aracı bulunamadı." : "Bu kapsamda tanınan AI verisi bulunamadı. Özel konumlar için Yeni tarama üzerinden bir klasör seçebilirsin."));
   }
   if (view === "overview" && protectedGroups.length) {
     const details = document.createElement("details"); details.className = "additional-details";
     details.append(node("summary", `Diğer korunan veriler · ${formatCount(protectedGroups.length)} grup`));
     let built = false;
-    details.addEventListener("toggle", () => { if (details.open && !built) { details.append(paged(protectedGroups, groupCard)); built = true; } });
+    details.addEventListener("toggle", () => { if (details.open && !built) { details.append(paged(protectedGroups, group => groupCard(group))); built = true; } });
     container.append(details);
   }
   if (view === "largest") container.append(renderSizeBrowser(report.sizeIndexId, minimumBytes, query));
@@ -134,7 +161,7 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
     container.append(node("p", "Masaüstü taramalarında öğe ve derinlik sınırı yoktur. Büyük öğeler listesindeki tüm ölçülen sonuçlar sayfa sayfa açılır; yazılım/AI grup özeti ve uyarı sayısı sınırlı tutulur.", "hint"));
     for (const warning of report.warnings) container.append(node("p", warning, "warning"));
     if (report.warningsOmitted) container.append(node("p", `${formatCount(report.warningsOmitted)} ek uyarı listelenmedi.`, "hint"));
-    if (protectedGroups.length) container.append(section("Korunan veriler", protectedGroups.length), paged(protectedGroups, groupCard));
+    if (protectedGroups.length) container.append(section("Korunan veriler", protectedGroups.length), paged(protectedGroups, group => groupCard(group)));
   }
   return container;
 }

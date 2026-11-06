@@ -190,3 +190,22 @@ scan. Ordinary filesystem mutations/permission errors still yield partial result
 4. User exclusions still apply. Custom AI directories on other disks/project roots
    require a folder scan. Missing supported directories must not start a broader
    scan. Histories, settings and models must not be called temporary by default.
+
+## AI-first interface refresh
+
+1. Without a saved result, AI tools opens first with **AI klasörlerini tara**.
+   **Klasör veya disk seç** opens scope settings. Selecting a folder/disk alone
+   must not start a scan or erase the current report.
+2. During a scan, elapsed time, current path and cancellation stay visible.
+   Cancelled results remain partial and preserve the selected navigation view.
+3. Compare AI totals and tool cards; sort by size/name and search a path/tool.
+   Inspect details and **Klasörde göster**, including multi-location choices and
+   Ctrl+Enter (Windows) / Cmd+Enter (Mac).
+4. Open **Yeni tarama**, change scope, then **Kapat**. Existing search, expanded
+   tool details, GB filter and later size-results page should remain intact.
+   Keyboard focus returns to **Yeni tarama**.
+5. Check at the default 1120 x 820 window and a narrow 720 x 600 window. Controls
+   must stay reachable by scrolling, with no horizontal overflow. Check both
+   empty and saved-result states, including stale/partial/error notices.
+6. Browser sample-data previews verify layout/flow only. Repeat actual picker,
+   scan, cancel and file-manager behavior in the native application on each OS.

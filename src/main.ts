@@ -2,8 +2,8 @@ import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { formatBytes, formatCount, scanSummary } from "./report";
 import type { InspectionReport, ScanProgress } from "./report";
-import { groupReport } from "./groups";
-import type { GroupedReport } from "./groups";
+import { groupReport, filterGroups } from "./groups";
+import type { GroupedReport, GroupSort } from "./groups";
 import { renderResults } from "./results";
 import type { ResultView } from "./results";
 import { scanTarget, usedPercent } from "./scan";
@@ -24,6 +24,7 @@ function element<T extends HTMLElement>(selector: string): T {
   return result;
 }
 const form = element<HTMLFormElement>("#inspect-form");
+const scanPanel = element<HTMLElement>(".scan-panel");
 const input = element<HTMLInputElement>("#root");
 const button = element<HTMLButtonElement>("#inspect-button");
 const cancelButton = element<HTMLButtonElement>("#cancel-button");
@@ -55,6 +56,8 @@ let pickingFolder = false;
 let rootsLoading = false;
 let restoring = isTauri();
 let preparingRescan = false;
+let lastScanError = false;
+let scanStartedAt = 0;
 let disks: LocalDisk[] = [];
 let diskRequest = 0;
 let exclusions: ReturnType<typeof installExclusions> | undefined;
@@ -80,6 +83,8 @@ function updateControls(): void {
   element<HTMLButtonElement>("#retry-last-scan").disabled = !native || busy;
   element<HTMLButtonElement>("#rescan-snapshot").disabled = !native || busy || !exclusions?.ready;
   element<HTMLButtonElement>("#scan-ai").disabled = !native || busy || !exclusions?.ready;
+  element<HTMLButtonElement>("#new-scan").disabled = busy;
+  element<HTMLButtonElement>("#configure-scan").disabled = busy;
   element("#runtime-note").textContent = !native ? "Tarayıcı önizlemesi · Tarama masaüstü uygulamasında kullanılabilir."
     : mode === "ai" ? "Yalnızca bilinen AI veri konumları · Özel disk/klasör konumları kapsam dışı"
     : mode === "folder" ? "Seçim taramayı başlatmaz. Alt klasörler de incelenir."
@@ -128,7 +133,7 @@ async function loadComputerRoots(): Promise<void> {
       status.className = "warning"; status.textContent = rootsLabel.textContent;
     }
   } finally {
-    if (request === diskRequest) { rootsLoading = false; updateControls(); }
+    if (request === diskRequest) { rootsLoading = false; updateControls(); renderScanLayout(); }
   }
 }
 
@@ -141,33 +146,38 @@ chooseFolder.addEventListener("click", async () => {
       canCreateDirectories: false, fileAccessMode: "scoped" });
     if (folder !== null) {
       input.value = folder;
-      clearReport();
+      lastScanError = false;
       status.className = "";
       status.textContent = "Klasör seçildi. Hazır olduğunda taramayı başlat.";
     }
   } catch (error: unknown) {
+    lastScanError = true;
     status.className = "warning";
     status.textContent = `Klasör seçici açılamadı: ${String(error)}`;
-  } finally { pickingFolder = false; updateControls(); }
+  } finally { pickingFolder = false; updateControls(); renderScanLayout(); }
 });
 for (const radio of modeInputs) radio.addEventListener("change", () => {
   diskRequest += 1; rootsLoading = false;
-  clearReport(); status.className = "";
+  lastScanError = false; status.className = "";
   status.textContent = "Tarama kapsamı seçildi. Hazır olduğunda taramayı başlat.";
   updateControls();
+  renderScanLayout();
   if (["disk", "computer"].includes(scanMode()) && isTauri()) void loadComputerRoots();
 });
 refreshRoots.addEventListener("click", () => {
-  if (!activeScan && !rootsLoading && isTauri()) { clearReport(); void loadComputerRoots(); }
+  if (!activeScan && !rootsLoading && isTauri()) void loadComputerRoots();
 });
 diskSelect.addEventListener("change", () => {
-  clearReport(); renderDisks(); updateControls(); status.className = "";
+  lastScanError = false; renderDisks(); updateControls(); renderScanLayout(); status.className = "";
   status.textContent = diskSelect.value ? "Disk seçildi. Hazır olduğunda taramayı başlat." : "Taranacak diski seç.";
 });
 
 const search = element<HTMLInputElement>("#result-search");
 const caption = element<HTMLParagraphElement>("#result-caption");
 const sizeForm = element<HTMLFormElement>("#size-filter-form");
+const sortSelect = element<HTMLSelectElement>("#result-sort");
+let groupSort: GroupSort = "size";
+sortSelect.addEventListener("change", () => { groupSort = sortSelect.value as GroupSort; renderCurrent(); });
 const minimumInput = element<HTMLInputElement>("#minimum-gb");
 const sizeError = element<HTMLParagraphElement>("#size-filter-error");
 let minimumBytes = 0n;
@@ -186,16 +196,48 @@ element("#clear-size-filter").addEventListener("click", () => {
 const viewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#result-tabs button"));
 let lastReport: InspectionReport | null = null;
 let grouped: GroupedReport | null = null;
-let currentView: ResultView = "overview";
+let currentView: ResultView = "ai";
 let settingsExpanded = false;
 let restoredReport = false;
 let navigationRevision = 0;
-toggleScan.addEventListener("click", () => { settingsExpanded = !settingsExpanded; renderCurrent(); });
+toggleScan.addEventListener("click", () => {
+  settingsExpanded = !settingsExpanded; renderScanLayout();
+  if (!settingsExpanded) element<HTMLButtonElement>("#new-scan").focus({ preventScroll: true });
+});
+function openScanSetup(folder = false): void {
+  if (activeScan || restoring || preparingRescan || pickingFolder) return;
+  if (folder) { for (const radio of modeInputs) radio.checked = radio.value === "folder"; }
+  settingsExpanded = true; renderScanLayout(); updateControls();
+  scanPanel.scrollIntoView({ block: "start" });
+  if (folder) chooseFolder.focus({ preventScroll: true });
+  else modeInputs.find(radio => radio.checked)?.focus({ preventScroll: true });
+}
+element("#configure-scan").addEventListener("click", () => openScanSetup(true));
+element("#new-scan").addEventListener("click", () => openScanSetup());
+function renderScanLayout(): void {
+  const running = Boolean(activeScan);
+  const needsExclusionSetup = Boolean(isTauri() && exclusions && !exclusions.busy && !exclusions.ready);
+  const expanded = settingsExpanded || needsExclusionSetup;
+  element("#ai-scan-panel").hidden = currentView !== "ai" || Boolean(lastReport) || running || expanded;
+  scanPanel.hidden = !expanded && !running && !lastScanError;
+  form.hidden = !expanded || running;
+  scanPanel.classList.toggle("scan-running", running);
+  element(".scan-state").hidden = !running && !lastScanError;
+  element(".scan-scope-note").hidden = !expanded || running;
+  toggleScan.hidden = !expanded || running || needsExclusionSetup;
+  toggleScan.textContent = "Kapat";
+  toggleScan.setAttribute("aria-expanded", String(!form.hidden));
+  element("#inspect-title").textContent = running ? (scanMode() === "ai" ? "AI klasörleri taranıyor" : "Tarama sürüyor") : "Tarama alanını seç";
+  element("#scan-caption").textContent = scanMode() === "ai" ? "Bilinen AI kullanıcı klasörleri · Diğer diskler taranmıyor"
+    : scanMode() === "computer" ? "Bağlı tüm yerel diskler" : scanMode() === "disk" ? `Tek disk · ${diskSelect.value || "Disk seç"}` : input.value || "Alt klasörleriyle birlikte incelenecek bir klasör seç.";
+  element("#scan-elapsed").hidden = !running;
+  element(".report-panel").hidden = !lastReport && (currentView === "ai" || running || expanded);
+}
 function navigate(view: ResultView): void { navigationRevision++; currentView = view; renderCurrent(); }
 function renderCurrent(): void {
   clearTimeout(searchTimer);
   disposeSizeBrowser();
-  element("#ai-scan-panel").hidden = currentView !== "ai";
+  renderScanLayout();
   element("#snapshot-banner").hidden = !lastReport;
   freshness.set(lastReport?.sizeIndexId || null);
   if (lastReport) {
@@ -207,31 +249,27 @@ function renderCurrent(): void {
       ? `Bu tarama kaydedilemedi; yalnızca uygulama açıkken kullanılabilir. Önceki kayıt korundu. ${lastReport.persistenceError}` : "";
   }
   sizeForm.hidden = currentView !== "largest";
-  form.hidden = Boolean(lastReport) && !settingsExpanded;
-  toggleScan.hidden = !lastReport;
-  toggleScan.textContent = settingsExpanded ? "Gizle" : "Alanı değiştir";
-  toggleScan.setAttribute("aria-expanded", String(!form.hidden));
-  element("#inspect-title").textContent = lastReport ? "Tarama alanı" : "Nereye bakalım?";
-  element("#scan-caption").textContent = lastReport
-    ? `${lastReport.scope === "ai" ? "AI konumları" : lastReport.scope === "disk" ? "Tek disk" : lastReport.scope === "computer" ? "Bütün bilgisayar" : "Bir klasör"} · ${lastReport.root}`
-    : "Bir alan seç. Roomit içindekileri anlamlandırır.";
   for (const tab of viewButtons) tab.setAttribute("aria-pressed", String(tab.dataset.view === currentView));
   search.disabled = !lastReport;
   element("#reveal-hint").hidden = !lastReport;
   element("#reveal-hint").textContent = `Konumu açmak için öğeye odaklanıp ${revealShortcut} tuşlarına basabilirsin.`;
   const titles: Record<ResultView, string> = { overview: "Genel bakış", projects: "Projeler", ai: "AI araçları", largest: "Büyük öğeler", details: "Tarama ayrıntıları" };
+  const descriptions: Record<ResultView, string> = { overview: "Son taramanın tamamına bir bakış.", projects: "Bağımlılıklar ve derleme çıktıları, ait oldukları projede.", ai: "AI araçlarının bıraktığı verileri tek yerde gör.", largest: "Boyutlarına göre dosya ve klasörleri keşfet.", details: "Nerelerin tarandığını ve atlanan alanları incele." };
   element("#page-title").textContent = titles[currentView];
-  element("#results-title").textContent = currentView === "overview" ? "Alanının hikâyesi" : titles[currentView];
+  element("#page-description").textContent = descriptions[currentView];
+  element("#results-title").textContent = currentView === "overview" ? "Tarama özeti" : currentView === "ai" ? "AI depolama alanın" : titles[currentView];
+  element("#result-sort-label").hidden = currentView !== "ai" && currentView !== "projects";
   element("#project-count").textContent = grouped ? formatCount(grouped.projects.length) : "—";
   element("#ai-count").textContent = grouped ? formatCount(grouped.ai.length) : "—";
   if (lastReport && grouped) {
-    results.replaceChildren(renderResults(lastReport, grouped, currentView, search.value, navigate, minimumBytes));
+    results.replaceChildren(renderResults(lastReport, grouped, currentView, search.value, navigate, minimumBytes, groupSort));
     caption.textContent = currentView === "largest" ? "Dosya ve klasör boyutlarını filtrele. Yeniden tarama gerekmez."
+      : currentView === "ai" ? `${formatCount(filterGroups(grouped.ai, search.value).length)} / ${formatCount(grouped.ai.length)} araç grubu · Boyutları karşılaştır, konumlarını incele.`
       : `Listelenen: ${formatCount(grouped.projects.length)} proje grubu · ${formatCount(grouped.ai.length)} AI aracı`;
   } else {
     const empty = document.createElement("div"); empty.className = "empty-state";
     const intro = document.createElement("div"); intro.className = "empty-intro";
-    const title = document.createElement("h3"); title.textContent = activeScan ? "Alanını keşfediyoruz…" : "Dijital alanında neler var?";
+    const title = document.createElement("h3"); title.textContent = activeScan ? "Sonuçlar hazırlanıyor…" : "Henüz bir tarama yok";
     const message = document.createElement("p"); message.textContent = activeScan
       ? "Dosyaların boyutları ölçülüyor, proje ve araç grupları hazırlanıyor. İlerlemeyi yukarıdan takip edebilir, istediğinde iptal edebilirsin."
       : "Biriken bağımlılıkları, AI modellerini ve büyük klasörleri tek bir görünümde keşfet. Yukarıdan bir alan seçerek başla.";
@@ -252,6 +290,11 @@ function renderCurrent(): void {
     caption.textContent = activeScan ? "Dosyalar inceleniyor; sonuçlar hazırlanacak." : "Tarama tamamlandığında özet burada görünecek.";
   }
 }
+setInterval(() => {
+  if (!activeScan || !scanStartedAt) return;
+  const seconds = Math.floor((Date.now() - scanStartedAt) / 1000);
+  element("#scan-elapsed").textContent = `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+}, 1000);
 function clearReport(): void {
   lastReport = null; grouped = null; search.value = ""; renderCurrent();
 }
@@ -317,7 +360,10 @@ if (isTauri()) {
   button.disabled = true; input.disabled = true;
   status.textContent = "Tarayıcı önizlemesi: Gerçek tarama için Roomit’i masaüstünde aç.";
 }
-exclusions = installExclusions(updateControls, () => {
+exclusions = installExclusions(() => {
+  updateControls();
+  if (exclusions && !exclusions.busy && !exclusions.ready) { settingsExpanded = true; renderCurrent(); }
+}, () => {
   status.className = "";
   status.textContent = lastReport ? "Hariç tutma seçimin kaydedildi. Ekrandaki sonuçlar önceki taramaya ait; yeni seçim için tekrar tara." : "Hariç tutma seçimin kaydedildi.";
 });
@@ -350,7 +396,8 @@ form.addEventListener("submit", async (event) => {
   const { root, mode } = selection;
   const scanId = crypto.randomUUID();
   const previousReport = lastReport; const previouslyRestored = restoredReport;
-  activeScan = scanId; cancelRequested = false;
+  activeScan = scanId; cancelRequested = false; lastScanError = false; scanStartedAt = Date.now();
+  element("#scan-elapsed").textContent = "00:00";
   updateControls();
   button.disabled = true; input.disabled = true;
   cancelButton.hidden = false; cancelButton.disabled = true;
@@ -359,9 +406,14 @@ form.addEventListener("submit", async (event) => {
   status.className = ""; status.textContent = "Tarama başlatılıyor…";
   currentPath.textContent = mode === "computer" ? "Yerel diskler hazırlanıyor…" : root;
   const onProgress = new Channel<ScanProgress>();
+  let focusCancel = true;
   onProgress.onmessage = (progress) => {
     if (activeScan !== scanId) return;
     cancelButton.disabled = progress.finished || cancelRequested;
+    if (focusCancel && !cancelButton.disabled) {
+      focusCancel = false;
+      if (document.activeElement === document.body) cancelButton.focus({ preventScroll: true });
+    }
     currentPath.textContent = progress.currentPath; currentPath.title = progress.currentPath;
     const disk = mode === "computer" ? ` · Disk ${progress.rootIndex}/${progress.rootCount}` : "";
     if (!cancelRequested) status.textContent = `${progress.finished ? "Sonuçlar hazırlanıyor" : "Taranıyor"}${disk} · ${formatCount(progress.stats.filesScanned)} dosya · ${formatCount(progress.stats.directoriesScanned)} klasör · ${formatBytes(progress.stats.totalLogicalBytes)}`;
@@ -374,6 +426,8 @@ form.addEventListener("submit", async (event) => {
     status.className = report.totalSizeComplete && report.status === "completed" ? "" : "warning";
   } catch (error: unknown) {
     if (previousReport) showReport(previousReport, previouslyRestored);
+    else settingsExpanded = true;
+    lastScanError = true;
     status.className = "warning";
     status.textContent = `Tarama tamamlanamadı: ${String(error)}`;
   } finally {
@@ -383,5 +437,6 @@ form.addEventListener("submit", async (event) => {
     currentPath.textContent = "";
     button.disabled = false; input.disabled = false;
     updateControls();
+    renderScanLayout();
   }
 });
