@@ -1,0 +1,11 @@
+{
+  "version": "0.4.4",
+  "notes": "Apple Silicon Mac test build. Install in Applications. Updates require confirmation. GPU measurement is unavailable on macOS. This test app is ad-hoc signed and not Apple notarized.",
+  "pub_date": "2026-11-06T23:11:12.444Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZ2VoNys4V0gvdllEajB5OGdBanVTZEFPZmlPcWIzQkZqSG03U2dCM0xrLzk5YUk5T0dsMEllNXFDbjZLbXZCZTdhbUJCY1pMUkJCWlBzbW9Ta2FPWlVXNGZKMTlGb2d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MDA2NjcxCWZpbGU6Um9vbWl0LTAuNC40LW1hY29zLWFybTY0LmFwcC50YXIuZ3oJdmVyc2lvbjowLjQuNApmNmkvYVNkRkFoV2JUQTBCbEZIUWpualFpdDVoWk1nWEZMTFIreTkrc1N3T1U0d0RiUlVsZU8wZjB5ZW9mdHBySmZ6bXdROVlMTmtjdFlxT0JneDlCZz09Cg==",
+      "url": "https://github.com/tolgacetinkaya/roomit/releases/download/v0.4.4-macos-test.1/Roomit-0.4.4-macos-arm64.app.tar.gz"
+    }
+  }
+}
