@@ -3,21 +3,46 @@
 Know what is there. Choose what stays.
 
 Roomit is a local-first Windows/macOS desktop project for understanding files
-left by development and AI tools. The reusable Rust core is independent of the
-Tauri 2 + TypeScript interface.
+left by development and AI tools. Its Rust library is independent of the
+Tauri 2 + TypeScript interface. The repository is local; no remote or publishing
+is configured. MIT licensed.
 
-## Current foundation
+## Current capabilities
 
-- Local Git repository; no GitHub remote or publishing configured.
-- Read-only inspection of **one selected directory's direct children**.
-- Initial .NET / Node.js / Python project and artifact recognition.
-- AI directories/instructions and selected sensitive paths marked as protected.
-- Reasons and warnings displayed through real TypeScript -> Tauri -> Rust IPC.
-- Fixture-based core tests, including Windows junction handling.
+- Recursively scan an explicitly selected directory, without opening file contents.
+- Compute individual file lengths and directory totals in one iterative traversal.
+- Discover nested .NET, Node.js, Python, Rust and Java/Gradle projects from markers.
+- Identify development outputs/dependencies with reasons and review-required status.
+- Identify Codex, Claude Code, Cursor and Ollama directories; protect AI data,
+  instructions, recognized settings/model stores, Git data and environment files.
+- Live progress, cancellation and clearly labeled partial results.
+- Filter findings, inspect detected projects and view the largest 100 files/folders.
+- Skip symlinks/reparse points; bound work and report memory; keep totals independent
+  of paginated or capped result lists.
 
-This is not a full recursive disk scanner or cleaner yet. It does not calculate
-sizes, inspect AI-cache contents, reveal paths, exclude paths, move to trash or
-permanently delete. There are no demo size totals or automatic scans.
+There is **no deletion, move-to-trash, native reveal, exclusion UI, age filter,
+telemetry, or cloud/LLM call**. Custom AI storage locations and arbitrary tool
+versions are not automatically discovered outside the selected directory.
+
+## Size semantics and limits
+
+Sizes are **logical bytes**, not allocated disk space or reclaimable space.
+Hardlinked files count once per encountered path. Sparse/compressed files and
+filesystem clones may occupy different physical space. Directory totals overlap
+child rows; use the report root total, not a sum of displayed rows. Recognized
+space counts nested findings only once.
+
+Skipped links, inaccessible entries, cancelled scans and depth/entry limits make
+sizes partial lower bounds. The filesystem may change during a scan; this is
+not a snapshot or a proof that an item can safely be removed.
+
+Defaults: 1,000,000 observed entries, 128 directory levels below the root,
+10,000 retained findings/projects each, 100 largest entries and 100 retained
+warnings. Hitting a result-list cap does not stop size accounting. Progress is
+throttled to about 100 ms. Only one desktop scan can run at once.
+
+Byte counts are u64 in Rust and decimal strings in JSON/IPC to preserve precision
+in JavaScript. The UI uses decimal units: 1 GB = 1,000,000,000 bytes.
 
 ## Product order
 
@@ -25,12 +50,14 @@ permanently delete. There are no demo size totals or automatic scans.
 2. Files/directories at or above a user-entered GB threshold. No age filter.
 3. Shared review, exclusions, Finder/Explorer reveal and OS trash actions.
 
-See [architecture](docs/ARCHITECTURE.md) and [validation](docs/VALIDATION.md).
+See [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and
+[manual screen checks](docs/MANUAL_TEST.md).
 
 ## Prerequisites
 
-- Node.js supported by the locked Vite release, and npm.
-- Rust stable. Use the current stable toolchain for the desktop dependencies.
+- Node.js supported by the locked Vite release, and npm. Frontend logic tests use
+  Node's native TypeScript support (Node 22.18+ or a newer supported release).
+- Rust stable; use a current stable toolchain for desktop dependencies.
 - Windows: Visual Studio C++ build tools, Windows SDK and WebView2.
 - macOS: Xcode Command Line Tools.
 
@@ -38,49 +65,45 @@ Official setup: https://v2.tauri.app/start/prerequisites/
 
 ## Run locally
 
-From the repository root:
-
 ```sh
 npm ci
 npm run tauri -- dev
 ```
 
-On Windows, if an installed stable Rust toolchain is missing from PATH, the helper
-uses it for the current PowerShell process without changing system settings:
+Windows helper (also handles the existing user toolchain missing from PATH,
+without changing system settings):
 
 ```powershell
 .\scripts\dev.ps1
 ```
 
-Frontend-only preview: `npm run dev`. Inspection is disabled in an ordinary
-browser because it requires the native Rust bridge.
+Frontend-only preview: `npm run dev`. Native scanning is disabled in a browser.
 
 ## Checks
 
 ```sh
 npm run build
+npm test
 cargo test -p roomit-core --locked
 cargo check --workspace --locked
+cargo test -p roomit --lib --locked
 ```
 
-Windows combined check: `.\scripts\check.ps1`.
-The Windows helper keeps its Cargo dependency cache in ignored `.local/cargo`.
+Windows combined check: `.\scripts\check.ps1`. Link/junction fixture tests require
+normal OS permissions; the agent sandbox may block their creation. The Windows
+helper keeps its Cargo cache in ignored `.local/cargo`.
 
-Core-only JSON inspection (use an absolute path):
+Core-only recursive JSON report (absolute directory required):
 
 ```sh
 cargo run -p roomit-core --example inspect -- /absolute/project/path
 ```
 
-Native executable build, without an installer or publishing:
+Build a local executable without an installer or publishing:
 
 ```sh
 npm run tauri -- build --debug --no-bundle
 ```
 
-A build for macOS must be performed and tested on macOS. Windows results do not
-establish macOS runtime behavior. This foundation has no speed benchmark claim.
-
-## License
-
-MIT. Packages remain unpublished (`private: true` / `publish = false`).
+Windows output: `target/debug/roomit.exe`. macOS builds and runtime checks require
+a Mac. This implementation has no Windows-versus-Mac speed benchmark claim.

@@ -20,18 +20,20 @@
           <p class="lead">Geliştirme ve AI araçlarının bıraktığı dosyaları tanı.<br />Neyin kalacağına sen karar ver.</p>
         </section>
         <section class="inspection panel" aria-labelledby="inspect-title">
-          <div class="section-heading"><div><p class="eyebrow">01 / GELİŞTİRME & AI</p><h2 id="inspect-title">Proje klasörünü incele</h2></div><span class="tag">İlk temel</span></div>
-          <p class="muted">Bu sürüm yalnızca seçtiğin klasörün doğrudan öğelerini inceler. Alt klasörler taranmaz, dosya içerikleri okunmaz ve boyut hesaplanmaz.</p>
+          <div class="section-heading"><div><p class="eyebrow">01 / GELİŞTİRME & AI</p><h2 id="inspect-title">Yazılım ve AI dosyalarını tara</h2></div><span class="tag">Alt klasörler dahil</span></div>
+          <p class="muted">Seçtiğin klasörün altındaki projeler, yazılım çıktıları ve AI verileri tanınır; dosya ve klasör boyutları hesaplanır. Dosya içerikleri açılmaz.</p>
           <form id="inspect-form">
             <label for="root">Projenin tam klasör yolu</label>
-            <div class="input-row"><input id="root" name="root" type="text" placeholder="G:\projeler\uygulamam veya /Users/ad/projeler/uygulamam" autocomplete="off" spellcheck="false" required /><button id="inspect-button" type="submit">Klasörü incele <span aria-hidden="true">↗</span></button></div>
-            <p id="runtime-note" class="hint">İnceleme yalnızca Roomit masaüstü uygulamasında kullanılabilir.</p>
+            <div class="input-row"><input id="root" name="root" type="text" placeholder="G:\projeler veya /Users/ad/projeler" autocomplete="off" spellcheck="false" required /><button id="inspect-button" type="submit">Taramayı başlat <span aria-hidden="true">↗</span></button><button id="cancel-button" type="button" class="secondary" hidden>İptal et</button></div>
+            <p id="runtime-note" class="hint">Tarama yalnızca Roomit masaüstü uygulamasında kullanılabilir.</p>
           </form>
-          <p id="status" role="status" aria-live="polite">Henüz inceleme yapılmadı.</p>
+          <progress id="scan-progress" aria-label="Klasör taraması sürüyor" hidden></progress>
+          <p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p>
+          <p id="current-path" class="report-path" aria-live="off"></p>
           <div id="results" aria-busy="false"></div>
         </section>
         <div class="bottom-grid">
-          <section class="panel detail" aria-labelledby="protect-title"><span class="detail-symbol" aria-hidden="true">◇</span><h2 id="protect-title">Önce anlamak, sonra karar vermek.</h2><p>AI geçmişleri, proje talimatları ve ortam ayarları korunacak veri olarak işaretlenir. Bulunan geliştirme çıktıları inceleme gerektirir. Bu sürümde silme işlemi yoktur.</p></section>
+          <section class="panel detail" aria-labelledby="protect-title"><span class="detail-symbol" aria-hidden="true">◇</span><h2 id="protect-title">Önce anlamak, sonra karar vermek.</h2><p>AI geçmişleri, modeller, proje talimatları ve ortam ayarları korunacak veri olarak işaretlenir. Geliştirme çıktıları inceleme gerektirir. Bu sürümde silme işlemi yoktur.</p></section>
           <section class="panel detail upcoming" aria-labelledby="next-title"><p class="eyebrow">02 / SONRAKİ AŞAMA</p><h2 id="next-title">Büyük dosyalar, açık bir görünüm.</h2><p>Belirleyeceğin GB eşiğinin üzerindeki dosya ve klasörleri bul. Hariç tut, Finder veya Explorer’da incele, seçtiklerini çöp kutusuna taşı.</p><span class="tag">Planlandı</span></section>
         </div>
       </main>

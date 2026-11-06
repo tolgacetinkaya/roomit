@@ -2,68 +2,97 @@
 
 ## Product boundaries
 
-1. Primary: recognize development and AI-tool data, explain ownership and impact.
-2. Secondary: find files and directories at or above a user-entered GB threshold.
-   Age and last-access time are not requirements.
-3. Shared future actions: exclude, reveal in Finder/Explorer, move selected items
-   to the OS trash. Never fall back to permanent deletion.
+Development and AI-tool recognition is primary. Size-threshold search is phase 2
+and has no date/age requirement. Runtime work is local and read-only. There is no
+LLM service, hosted API, telemetry, account, publishing, or deletion capability.
 
-The product runs locally on Windows and macOS. No hosted API, telemetry, account,
-or LLM service is required. Fetching development dependencies requires internet.
+## Layers
 
-## Structure
+- `crates/roomit-core/src/model.rs`: typed reports, progress and size semantics.
+- `crates/roomit-core/src/rules.rs`: marker evidence and metadata-only rules.
+- `crates/roomit-core/src/scanner.rs`: iterative traversal and bottom-up totals.
+- `src-tauri/src/lib.rs`: one active worker, ordered progress channel, scan IDs,
+  cooperative cancellation, and a lease that releases state on error/panic.
+- `src/report.ts`: shared frontend contract, exact byte formatting, filtering,
+  and honest completion/partial-result messages.
+- `src/main.ts`: native IPC, paginated report rendering and scan controls.
 
-- `crates/roomit-core`: reusable Rust library, no Tauri dependency. Contains
-  inspection models and a first direct-child, metadata-only classifier.
-- `src-tauri`: Tauri 2 shell. The `inspect_workspace` command runs filesystem work
-  on a blocking worker, outside the UI thread.
-- `src`: TypeScript UI and local CSS. Rust is invoked through Tauri IPC.
-  Paths, reasons and errors are rendered as text, not HTML.
-- `docs`: decisions, scope, limitations, and local validation evidence.
+The core has no Tauri/UI dependency. Filesystem work runs on a blocking worker
+outside the UI thread. One scan per desktop process avoids unbounded worker
+creation. A disconnected progress channel requests cancellation. Matching scan
+IDs prevent stale cancel requests affecting another scan.
 
-The initial frontend uses vanilla TypeScript and Vite to keep the foundation
-small. No frontend framework is required by the core. OS-specific adapters will
-be added when native reveal/trash behavior is implemented and tested.
+## Traversal and accounting
 
-## First working slice
+An explicit absolute root is validated and canonicalized. Frames form an
+iterative DFS stack, avoiding recursive call-stack growth. Each directory is
+listed once: file metadata is accounted immediately; child directories are
+queued after local project evidence is known. Completed child totals propagate
+to their parent. No file contents, hashes or AI transcripts are opened.
 
-An explicit absolute directory is inspected. Only its direct children are
-enumerated. No file contents are read. No child directories are traversed.
+File entries are not retained as a full inventory. A bounded min-heap keeps the
+largest 100 files/directories; up to 10,000 findings and 10,000 projects are
+retained. Directory queues are bounded by the global 1,000,000-entry limit.
+Depth is capped at 128. Warnings are capped at 100 with an omitted counter.
+Files are not deterministically ordered by the filesystem; completed reports
+are sorted, while partial selection can depend on enumeration order.
 
-Project evidence:
+`logical_bytes` sums regular file lengths. It does not measure allocation,
+physical uniqueness, or recoverable space. Hardlinks count per path. Folder
+rows overlap children. `recognized_logical_bytes` is the union of matched
+subtrees/files even if the retained finding list is capped. Byte counters are
+serialized as decimal strings to avoid JavaScript u64 precision loss.
 
-- .NET: a direct `.csproj`, `.fsproj`, or `.vbproj` file -> `bin` / `obj`.
-- Node.js: direct `package.json` -> `node_modules`.
-- Python: direct `pyproject.toml`, `requirements.txt`, `setup.py`, or `Pipfile`
-  -> `__pycache__`.
+Links/reparse points and special files are skipped. Root links are rejected;
+queued directories are checked again before opening. Nested failures are
+reported and scanning continues with siblings. Skips, errors and stopped scans
+mark ancestor sizes incomplete. Entry/depth limits and cancellation are explicit
+statuses. These metadata checks reduce link exposure but do not provide
+race-free traversal or a consistent filesystem snapshot.
 
-These are review findings, not proof of regenerability or safe removal.
-AI directories `.codex`, `.claude`, `.cursor` and instruction files `AGENTS.md`,
-`CLAUDE.md`, `.cursorrules` are protected findings. They are not cache rules.
-`.git`, `.ssh`, `.env`, and `.env.*` are also protected when encountered.
-This is a starter set, not an exhaustive inventory of protected data.
+## Classification
 
-The report includes root, scope, detected ecosystems, findings, reasons, and
-warnings. Ordering is deterministic. Symlinks and Windows reparse points are
-skipped; a linked root is rejected. Checks are best-effort metadata checks;
-there is no claim of race-safe filesystem traversal. No report authorizes writes.
+Project markers are regular files, not directory names or symlinks:
 
-## Planned next slices
+| Context | Recognized entries |
+| --- | --- |
+| .NET `.csproj` / `.fsproj` / `.vbproj` | Direct `bin`, `obj` |
+| Node.js `package.json` | Direct `node_modules` |
+| Python `pyproject.toml` / `requirements.txt` / `setup.py` / `Pipfile` | Direct `.venv`, `venv`; `__pycache__` in the project subtree |
+| Rust `Cargo.toml` | Direct `target` |
+| Gradle `build.gradle` / `build.gradle.kts`, Maven `pom.xml` | Direct `build`, `target` |
 
-- Recursive discovery inside explicitly selected roots; exclusions, cancellation,
-  progress, bounded work queues and real directory size accounting.
-- Versioned tool rules and fixtures before recognizing any AI cache as removable.
-- Benchmarks on real Windows and macOS devices before speed claims or choosing
-  a parallel walker. Account for hardlinks, sparse files and inaccessible paths.
-- Separate operation eligibility from risk; approved plan snapshots and target
-  identity revalidation before any future move-to-trash operation.
-- Native reveal and trash adapters, with partial-failure reporting and no
-  permanent-delete fallback. Trash size is not immediate disk space reclaimed.
-- Phase 2 size-threshold search, reusing the same traversal engine.
+These are review-required findings, never deletion permits or guarantees of
+regenerability. Dependencies/output, AI-data and protected trees are still sized
+but their internal sample projects are not rediscovered as user projects.
 
-## Distribution status
+AI directories `.codex`, `.claude`, `.cursor`, `.ollama` are protected boundaries.
+Known `.cursor/rules`, `.claude/settings.json` / `settings.local.json`, and
+`.ollama/models` receive more specific protected classifications. An explicitly
+selected AI-directory root is recognized too. AI instructions `AGENTS.md`,
+`CLAUDE.md`, `GEMINI.md`, `.cursorrules`, and `.github/copilot-instructions.md`
+are protected, as are Git/SSH directories, Git worktree reference files and
+`.env` / `.env.*`. This is a starter rule set, not exhaustive tool support.
+Names establish evidence, not file-format or installed-tool verification.
+Custom locations and environment-variable overrides are not auto-discovered.
 
-Local repository only. Cargo packages have `publish = false`, npm is private,
-and no remote, update endpoint, release pipeline or publishing workflow is set.
-The starter license is MIT. Names/icons/signing/installer acceptance remain
-release work. Initial native icons are generated from `src/assets/roomit.svg`.
+Sources checked for the new path associations:
+
+- Claude settings: https://code.claude.com/docs/en/settings
+- Cursor rules: https://prod.cursor.com/help/customization/rules
+- Ollama model store: https://docs.ollama.com/faq#where-are-models-stored
+- Copilot instructions: https://docs.github.com/en/copilot/concepts/prompting/response-customization
+- Tauri progress channels: https://v2.tauri.app/develop/calling-frontend/#channels
+
+## Next slices
+
+Exclusions, additional versioned tool rules, real-device performance measurement,
+then size-threshold search. Any future action layer needs separate eligibility,
+approved-plan snapshots, OS adapters and identity revalidation. Moving to trash
+must never silently fall back to permanent deletion. Trash size is not space freed.
+
+## Distribution
+
+Local repository only. npm is private and Cargo packages use `publish = false`.
+No remote, release pipeline or update endpoint exists. MIT licensed. Native
+icons derive from `src/assets/roomit.svg`; signing/installers remain release work.

@@ -1,3 +1,44 @@
+# Recursive scanning validation — 2026-11-03
+
+## Current change
+
+- 17 Rust core integration tests passed: nested file/folder totals, empty folders,
+  multiple ecosystems, protected AI data/settings/models, union accounting,
+  dependency-tree suppression, cancellation, entry/depth bounds, capped output,
+  exact byte serialization, logical hardlink semantics, disappearing queued
+  directories, invalid roots and Windows junction/cycle skipping.
+- 2 Tauri state tests passed: one active scan, scan-ID cancellation, and release
+  of the registry after worker panic.
+- 5 frontend report tests passed: decimal units, exact u64 byte handling,
+  partial-size labels, software/AI/protected filters and completion messages.
+- TypeScript/Vite production build and Rust workspace check passed.
+- Native build passed: `npm run tauri -- build --debug --no-bundle` produced
+  `target/debug/roomit.exe`. A matching user-test copy is `artifacts/Roomit.exe`.
+  Its hash and source commit are recorded in ignored `artifacts/Roomit-build.json`.
+- Total: 24 automated tests passed. No screen automation was performed for this
+  change; updated native UI/IPC behavior and visual acceptance await the user.
+
+Core tests were repeated after the final progress-boundary change and all 17
+passed. The existing combined check helper now includes frontend report tests
+and Tauri state tests. Normal Windows permissions were used for junction and
+hardlink fixtures, which a restricted sandbox may prevent.
+
+## User handoff
+
+See `MANUAL_TEST.md` for the screen checklist. Test a modest parent directory
+with nested projects, verify findings/sizes, inspect AI/protected filtering, and
+try cancellation and missing-path errors. The full UI/IPC flow recorded below
+belongs to the old foundation commit, not this updated implementation.
+
+No deletion, trash action, network service, GitHub publish or installer was added.
+macOS compilation/runtime checks and real-disk speed benchmarks remain unverified.
+Logical bytes are not allocated space or reclaimable space. Skipped/limited/cancelled
+subtrees explicitly yield lower bounds, and displayed folder rows overlap children.
+
+---
+
+## Historical baseline: initial foundation (`ae63d9d`)
+
 # Foundation validation — 2026-11-03
 
 ## Story verified
