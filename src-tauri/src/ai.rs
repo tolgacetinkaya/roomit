@@ -8,14 +8,18 @@ pub(crate) fn roots() -> Result<Vec<PathBuf>, String> {
     Ok(roots)
 }
 fn known_roots(home: &Path) -> Vec<PathBuf> {
-    [".codex", ".claude", ".cursor", ".ollama"].into_iter().map(|name| home.join(name))
+    let mut candidates: Vec<_> = crate::inventory::catalog().iter().flat_map(|tool| crate::inventory::data_candidates(tool, home)).collect();
+    candidates.sort(); candidates.dedup();
+    let mut roots: Vec<PathBuf> = candidates.into_iter()
         .filter(|path| std::fs::symlink_metadata(path).is_ok_and(|m| {
             #[cfg(windows)]
             let link = { use std::os::windows::fs::MetadataExt; m.file_attributes() & 0x400 != 0 };
             #[cfg(not(windows))]
             let link = m.is_symlink();
             m.is_dir() && !link
-        })).collect()
+        })).collect();
+    let all = roots.clone(); roots.retain(|path| !all.iter().any(|parent| path != parent && path.starts_with(parent)));
+    roots
 }
 
 #[cfg(test)]
@@ -39,6 +43,20 @@ mod tests {
         assert!(report.findings.iter().any(|f| f.tool == "Codex"));
         assert!(report.findings.iter().any(|f| f.tool == "Ollama"));
         assert!(report.largest_entries.iter().all(|e| !e.path.contains("unrelated")));
+    }
+    #[test]
+    fn extended_ai_roots_are_protected_and_nested_roots_are_not_counted_twice() {
+        let home = tempfile::tempdir().unwrap();
+        for path in [".local/share/opencode", ".config/opencode", ".gemini/antigravity", ".lmstudio"] {
+            fs::create_dir_all(home.path().join(path)).unwrap(); fs::write(home.path().join(path).join("data"),b"123").unwrap();
+        }
+        let roots = known_roots(home.path());
+        assert!(!roots.iter().any(|p| p.ends_with("antigravity")));
+        let report = roomit_core::scan_locations(&roots, roomit_core::ScanOptions::computer(None), &AtomicBool::new(false), |_| {}).unwrap();
+        assert_eq!(report.stats.total_logical_bytes,12);
+        for tool in ["OpenCode", "Gemini CLI", "LM Studio"] {
+            assert!(report.findings.iter().any(|f| f.tool==tool && f.disposition==roomit_core::Disposition::Protected));
+        }
     }
     #[test]
     fn missing_ai_roots_never_fall_back_to_home_or_all_drives() {

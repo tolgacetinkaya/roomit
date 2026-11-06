@@ -11,10 +11,10 @@ pub(crate) struct Rule {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) enum AiTool { Codex, Claude, Cursor, Ollama }
+pub(crate) enum AiTool { Codex, Claude, Cursor, Ollama, Other(&'static str) }
 impl AiTool {
     fn name(self) -> &'static str {
-        match self { Self::Codex => "Codex", Self::Claude => "Claude Code", Self::Cursor => "Cursor", Self::Ollama => "Ollama" }
+        match self { Self::Codex => "Codex", Self::Claude => "Claude Code", Self::Cursor => "Cursor", Self::Ollama => "Ollama", Self::Other(name) => name }
     }
 }
 
@@ -76,7 +76,20 @@ pub(crate) fn directory_rule(path: &Path, context: Context, evidence: &Evidence)
         Context::Workspace { python } => {
             let ai_tool = match name {
                 ".codex" => Some(AiTool::Codex), ".claude" => Some(AiTool::Claude),
-                ".cursor" => Some(AiTool::Cursor), ".ollama" => Some(AiTool::Ollama), _ => None,
+                ".cursor" | "Cursor" => Some(AiTool::Cursor), ".ollama" => Some(AiTool::Ollama),
+                "opencode" => Some(AiTool::Other("OpenCode")),
+                ".gemini" => Some(AiTool::Other("Gemini CLI")),
+                ".lmstudio" | "LM Studio" => Some(AiTool::Other("LM Studio")),
+                ".jan" | "Jan" => Some(AiTool::Other("Jan")),
+                ".copilot" => Some(AiTool::Other("GitHub Copilot")),
+                "windsurf" | "Windsurf" => Some(AiTool::Other("Windsurf")),
+                "Claude" => Some(AiTool::Other("Claude")),
+                "anythingllm-desktop" | "AnythingLLM" => Some(AiTool::Other("AnythingLLM")),
+                "Antigravity" => Some(AiTool::Other("Antigravity")),
+                ".trae" | "Trae" => Some(AiTool::Other("Trae")),
+                ".zcode" | "ZCode" | "@zcodedesktop" => Some(AiTool::Other("ZCode")),
+                ".qwen" | "Qwen" => Some(AiTool::Other("Qwen")),
+                ".kimi" | ".kimi-code" | "Kimi" => Some(AiTool::Other("Kimi")), _ => None,
             };
             if let Some(tool) = ai_tool {
                 return (Context::Ai { tool, level: 0 }, Some(protected(Category::AiUserData, tool.name(),

@@ -123,6 +123,7 @@ fn registered_installations(paths: &mut Vec<PathBuf>, notes: &mut Vec<String>) {
         for view in [KEY_WOW64_32KEY, KEY_WOW64_64KEY] {
             for (branch, value, executable) in [
                 (r"Software\Microsoft\Windows\CurrentVersion\Uninstall", "InstallLocation", false),
+                (r"Software\Microsoft\Windows\CurrentVersion\Uninstall", "DisplayIcon", true),
                 (r"Software\Microsoft\Windows\CurrentVersion\App Paths", "", true),
             ] {
                 let key = match hive.open_subkey_with_flags(branch, KEY_READ | view) {
@@ -134,7 +135,8 @@ fn registered_installations(paths: &mut Vec<PathBuf>, notes: &mut Vec<String>) {
                     let Ok(app) = key.open_subkey_with_flags(name, KEY_READ | view) else { continue };
                     let Ok(location) = app.get_value::<String, _>(value) else { continue };
                     let candidate = PathBuf::from(location.trim().trim_matches('"'));
-                    let candidate = if executable { candidate.parent().map(Path::to_path_buf) } else { Some(candidate) };
+                    let candidate = if value == "DisplayIcon" { app.get_value::<String,_>("DisplayName").ok().and_then(|display|crate::inventory::icon_install_directory(&display,&location)) }
+                        else if executable { candidate.parent().map(Path::to_path_buf) } else { Some(candidate) };
                     if let Some(candidate) = candidate.filter(|p| p.is_absolute() && p.parent().is_some() && p.file_name().is_some()) {
                         // Empty/drive-root registrations must not hide a whole disk.
                         paths.push(candidate);

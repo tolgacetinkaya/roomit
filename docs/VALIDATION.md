@@ -1,3 +1,39 @@
+# AI control center, discovery and interactive map — 2026-11-05
+
+- **107 automated tests passed**: 33 core, 41 native, 33 frontend; one existing
+  interactive reveal smoke ignored. Windows debug/no-bundle build passed.
+  Final automated results and Windows executable identity are recorded in
+  `artifacts/Roomit-build.json`. Full checks cover frontend tests/build, core
+  fixtures, workspace compilation and native scan/store/watch/monitor tests.
+- New coverage: exact map partition/remainder math, u64 byte totals, 50-row
+  process paging/filtering, safe literal CLI probes, versioned registration and
+  DisplayIcon paths with spaces/commas, no broad Desktop exclusion from a shared
+  icon, scoped AI roots, indexed 80-child queries, old-index read-only recovery,
+  CPU warmup/cache, network baselines/resets and conservative helper attribution.
+- A real read-only discovery probe on this Windows machine reports 14 catalog
+  matches: 10 with installation evidence and 4 data-only. Specifically ZCode,
+  Qwen, Kimi and LM Studio all have installation evidence. LM Studio's registered
+  executable is on a custom drive; no whole-disk walk was used to find it.
+- Browser mocked-IPC checks: tool → location → children navigation, remainder,
+  Back/Escape/Enter, search Chrome/Docker, AI-only filtering, process paging,
+  adapter selection, pause/resume, data-only explanation, refreshed evidence
+  expansion retained, stale notice without auto-scan, and setup preserving map
+  selection. AI scan completion/cancel retains the selected control-center view.
+- 720 x 600 had scrollWidth 705 with reachable scrolling navigation. Native-size
+  1120 x 820 had scrollWidth 1105. All six sample brand images loaded and the final
+  fresh preview console was clean. Reference/product screenshots were compared
+  together; this is an AI-focused synthesis, not a pixel-identical clone.
+- The native Windows app was launched and observed restoring the user's existing
+  cancelled/stale report, detecting tools and showing real CPU/RAM/adapter values
+  without a console window. This exposed overly broad descendant ownership;
+  it was fixed and regression-tested afterward. Computer Use was stopped by the
+  user with Escape, so that final fix and expanded 19-tool catalog were validated
+  by automated/native read-only tests and build, not a second GUI acceptance run.
+- User approved phased delivery. GPU/app-network, LAN/internet separation,
+  container/tab internals and long-term unused-file inference remain future work.
+  macOS native build/device acceptance remains pending. No deletion, automatic
+  rescan, settings reset, user-file modification or remote publication added.
+
 # Windows console window fix — 2026-11-05
 
 - The delivered debug executable used PE subsystem 3 (console), because the

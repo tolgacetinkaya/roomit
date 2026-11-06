@@ -6,7 +6,7 @@ use std::{collections::HashMap, io, path::PathBuf,
 use tempfile::TempDir;
 
 const PAGE_SIZE: usize = 50;
-const INSERT: &str = "INSERT OR REPLACE INTO entries(kind,sort_key,path,search_key,complete) VALUES(?1,?2,?3,?4,?5)";
+const INSERT: &str = "INSERT OR REPLACE INTO entries(kind,sort_key,path,search_key,complete,parent_key) VALUES(?1,?2,?3,?4,?5,?6)";
 const FILTER: &str = "kind=?1 AND sort_key<=?2 AND instr(search_key,?3)>0";
 
 fn kind_number(kind: &str) -> Result<i64, String> {
@@ -14,6 +14,10 @@ fn kind_number(kind: &str) -> Result<i64, String> {
 }
 fn search_key(text: &str) -> String { text.replace('I', "ı").replace('İ', "i").to_lowercase() }
 fn size_key(bytes: u64) -> String { format!("{:020}", u64::MAX - bytes) }
+fn map_key(path: &str) -> String {
+    let path = path.replace('\\', "/");
+    if path.as_bytes().get(1) == Some(&b':') { path.trim_end_matches('/').to_lowercase() } else { path.trim_end_matches('/').to_string() }
+}
 
 /// This writer owns an app-created temporary database, never a scanned file.
 /// Each insert updates the disk B-tree; there is no final all-results sort.
@@ -52,8 +56,9 @@ impl IndexWriter {
         connection.execute_batch("PRAGMA journal_mode=DELETE; PRAGMA synchronous=NORMAL;
             PRAGMA cache_size=-4096; PRAGMA temp_store=FILE; PRAGMA mmap_size=0;
             CREATE TABLE entries(kind INTEGER NOT NULL, sort_key TEXT NOT NULL, path TEXT NOT NULL,
-                search_key TEXT NOT NULL, complete INTEGER NOT NULL,
+                search_key TEXT NOT NULL, complete INTEGER NOT NULL, parent_key TEXT NOT NULL,
                 PRIMARY KEY(kind,sort_key,path)) WITHOUT ROWID;
+            CREATE INDEX map_children ON entries(parent_key,sort_key,path);
             BEGIN IMMEDIATE;").map_err(|e| e.to_string())?;
         Ok(Self { connection, directory, rows_in_batch: 0 })
     }
@@ -70,7 +75,8 @@ impl SizeSink for IndexWriter {
         let result = (|| -> rusqlite::Result<()> {
             let kind = if entry.kind == EntryKind::File { 0 } else { 1 };
             self.connection.prepare_cached(INSERT)?.execute(params![kind, size_key(entry.logical_bytes),
-                entry.path, search_key(&entry.path), entry.size_complete])?;
+                entry.path, search_key(&entry.path), entry.size_complete,
+                map_key(&std::path::Path::new(&entry.path).parent().unwrap_or(std::path::Path::new("")).to_string_lossy())])?;
             self.rows_in_batch += 1;
             if self.rows_in_batch >= 1000 {
                 self.connection.execute_batch("COMMIT; BEGIN IMMEDIATE;")?;
@@ -147,6 +153,17 @@ pub(crate) struct SizePage {
 }
 
 impl IndexSnapshot {
+    pub fn map_children(&self, path: &str) -> Result<Vec<SizedEntry>, String> {
+        if path.len() > 131_072 { return Err("Geçersiz klasör yolu.".into()); }
+        let connection = Connection::open_with_flags(&self.database, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| e.to_string())?;
+        let mut statement = connection.prepare("SELECT kind,sort_key,path,complete FROM entries WHERE parent_key=?1 ORDER BY sort_key,path LIMIT 80")
+            .map_err(|_| "Bu eski taramada alt klasör haritası yok. Yeniden tarama ile etkinleştirebilirsin.".to_string())?;
+        let entries = statement.query_map([map_key(path)], |row| {
+            let key: String = row.get(1)?;
+            Ok(SizedEntry { kind: if row.get::<_,i64>(0)? == 0 { EntryKind::File } else { EntryKind::Directory }, logical_bytes: u64::MAX - key.parse::<u64>().map_err(|_| rusqlite::Error::InvalidQuery)?, path: row.get(2)?, size_complete: row.get(3)? })
+        }).map_err(|e| e.to_string())?.collect::<rusqlite::Result<_>>().map_err(|e| e.to_string())?;
+        Ok(entries)
+    }
     pub fn query(&self, request: &PageRequest, cancel: Arc<AtomicBool>) -> Result<SizePage, String> {
         if cancel.load(Ordering::Relaxed) { return Err("Sonuç yükleme iptal edildi.".into()); }
         let kind = kind_number(&request.kind)?;
@@ -248,6 +265,29 @@ mod tests {
         index.query(request, Arc::new(AtomicBool::new(false))).unwrap()
     }
 
+    #[test]
+    fn map_reads_only_direct_children_in_exact_size_order_with_a_bounded_index_query() {
+        let fixture = tempfile::tempdir().unwrap(); let root = fixture.path().join(".ollama");
+        let mut writer = IndexWriter::new().unwrap();
+        for n in 0..90 { writer.record(&entry(root.join(format!("model-{n}.bin")).to_string_lossy().into_owned(), n, EntryKind::File)).unwrap(); }
+        writer.record(&entry(root.join("models/nested.bin").to_string_lossy().into_owned(), u64::MAX, EntryKind::File)).unwrap();
+        writer.record(&entry(root.with_file_name(".ollama-other").join("sibling").to_string_lossy().into_owned(), u64::MAX, EntryKind::File)).unwrap();
+        let index = writer.finish("map".into()).unwrap(); let children = index.map_children(&root.to_string_lossy()).unwrap();
+        assert_eq!(children.len(), 80); assert_eq!(children[0].logical_bytes, 89); assert_eq!(children.last().unwrap().logical_bytes, 10);
+        let db = Connection::open(&index.database).unwrap();
+        let plan: String = db.query_row("EXPLAIN QUERY PLAN SELECT kind,sort_key,path,complete FROM entries WHERE parent_key=?1 ORDER BY sort_key,path LIMIT 80", [""], |row| row.get(3)).unwrap();
+        assert!(plan.contains("map_children"));
+        assert_eq!(index.map_children(&root.join("models").to_string_lossy()).unwrap()[0].logical_bytes, u64::MAX);
+    }
+    #[test]
+    fn old_saved_index_without_parent_metadata_requests_rescan_without_writing_it() {
+        let index = IndexWriter::new().unwrap().finish("old".into()).unwrap();
+        let db = Connection::open(&index.database).unwrap();
+        db.execute_batch("DROP INDEX map_children; ALTER TABLE entries DROP COLUMN parent_key;").unwrap(); drop(db);
+        let before = std::fs::read(&index.database).unwrap();
+        assert!(index.map_children("/models").unwrap_err().contains("Yeniden tarama"));
+        assert_eq!(std::fs::read(&index.database).unwrap(),before);
+    }
     #[test]
     fn every_match_beyond_ten_thousand_is_reachable_for_both_kinds_with_stable_ties() {
         let mut writer = IndexWriter::new().unwrap();

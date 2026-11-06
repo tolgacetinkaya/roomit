@@ -1,6 +1,6 @@
 # Roomit
 
-Know what is there. Choose what stays.
+Your local AI workspace: tools, resources, and the data they leave behind.
 
 Roomit is a local-first Windows/macOS desktop project for understanding files
 left by development and AI tools. Its Rust library is independent of the
@@ -9,12 +9,30 @@ is configured. MIT licensed.
 
 ## Current capabilities
 
-- Open **AI araçları → AI klasörlerini tara** to scan this user's existing
-  `.codex`, `.claude`, `.cursor` and `.ollama` directories without walking every
+- **AI kontrol merkezi** combines live resource panels, detected AI tools with
+  local brand logos, and an interactive AI storage map. **Araçlarım** shows all
+  discoveries and their evidence; the control center's list scrolls without
+  dropping tools after the first six.
+- Discovery supports 19 catalog entries: desktop apps and CLI files on PATH,
+  common user binary directories, Windows uninstall/app-package registrations
+  and macOS app locations. This is not universal discovery of all AI software.
+  ZCode, Qwen, Kimi and LM Studio are included. Data-only traces are labeled
+  separately from installation evidence. No discovered program is executed.
+- Open **AI verilerini tara** to scan existing supported AI user-data roots
+  (including `.codex`, `.claude`, `.cursor`, `.ollama` and OpenCode) without walking every
   disk. Missing locations never fall back to a home/disk/computer scan. Custom
   locations and project-local AI data still require selecting a folder.
 - Keep the selected result view when starting, completing or cancelling a scan.
-  Reopening an AI-scope saved scan opens **AI araçları** without scanning again.
+  Startup opens the AI control center and restores results without scanning again.
+- Select a measured map sector to navigate tool → data location → direct children;
+  use **Bir üst düzey** / Escape to go back. New indexes return the largest 80
+  children and an explicit remainder; every measured item remains available in
+  **Büyük öğeler**. Old saved indexes require a manual rescan for deep navigation.
+- **Canlı kaynaklar** samples native CPU/RAM per accessible process and network
+  rates per adapter while its workspace is visible, roughly every two seconds.
+  Search Chrome/Docker/PID, filter AI processes, sort and page 50 rows at a time.
+  Pause/resume is available; leaving the workspace pauses polling. Network rates
+  need two samples and reset/disconnected counters never become fabricated traffic.
 - Pick a folder using the native Windows/macOS dialog; its path stays visible.
 - Scan one folder, one selected local disk, or all detected local disks, without opening file contents.
 - Add multiple folders to **Hariç tutulanlar** using the native picker; choices persist
@@ -27,7 +45,7 @@ is configured. MIT licensed.
 - Compute individual file lengths and directory totals in one iterative traversal.
 - Discover nested .NET, Node.js, Python, Rust and Java/Gradle projects from markers.
 - Identify development outputs/dependencies with reasons and review-required status.
-- Identify Codex, Claude Code, Cursor and Ollama directories; protect AI data,
+- Identify supported AI user-data directories; protect AI data,
   instructions, recognized settings/model stores, Git data and environment files.
 - Live progress, cancellation and clearly labeled partial results.
 - Restore the last saved scan on startup, including grouped results and the entire
@@ -53,6 +71,13 @@ is configured. MIT licensed.
 There is **no deletion, move-to-trash, age filter,
 telemetry, or cloud/LLM call**. Custom AI storage locations and arbitrary tool
 versions are not automatically discovered outside the selected directory.
+
+Per-app GPU/network attribution, LAN-versus-internet separation, container internals,
+browser tabs, and long-term use/unused-file determination are **not implemented**.
+The UI reports those limits explicitly. CPU is normalized to total device capacity;
+process RAM may include shared pages. Only recognized process identities and known
+helpers in the same installation are attributed to an AI tool; launching another
+application does not make that application part of the parent's usage.
 
 ## Size semantics and limits
 

@@ -209,3 +209,28 @@ scan. Ordinary filesystem mutations/permission errors still yield partial result
    empty and saved-result states, including stale/partial/error notices.
 6. Browser sample-data previews verify layout/flow only. Repeat actual picker,
    scan, cancel and file-manager behavior in the native application on each OS.
+
+## AI control center and 19-tool discovery
+
+1. Open **AI kontrol merkezi**. Existing results restore with date/partial/stale
+   caveats; no automatic disk scan starts. **AI verilerini tara** retains the
+   chosen view on completion/cancellation. Missing roots do not broaden the scope.
+2. Open **Araçlarım → Araçları yeniden bul**. Check desktop and CLI evidence,
+   installation paths and local logos. Verify ZCode, Qwen, Kimi and LM Studio.
+   A registered custom-drive DisplayIcon path should be shown; a data folder by
+   itself must say **Yalnızca veri**. The overview list must not stop after six.
+3. Select tool/map sectors with mouse or Enter, then directory children, Back and
+   Escape. Select a file and reveal it. Exact logical totals and partial flags
+   must stay visible. Old indexes request a new scan for deep map navigation.
+4. In **Canlı kaynaklar**, compare CPU/RAM against the OS monitor using comparable
+   intervals and normalization. Helpers from another installation, Chrome/Docker,
+   compiler/task descendants and shell siblings must not be charged to an AI tool
+   merely because it launched them. Resource reads must not start disk scans.
+5. Search Chrome/Docker/PID; filter AI; change sort/page and adapter. Polling must
+   preserve input/focus. Pause and wait: sample time stops; resume warms up again
+   after a long gap. Leaving the workspace stops resource IPC polling.
+6. Disconnect/reconnect an adapter: first sample is unknown, not lifetime traffic.
+   CPU/adapter data after a long pause is unknown until a new interval exists.
+   GPU/app traffic remain explicitly unavailable; no zero-usage inference.
+7. Confirm no terminal appears when launching the delivery exe. macOS needs its
+   own build, picker/Finder, process and network-device acceptance run.

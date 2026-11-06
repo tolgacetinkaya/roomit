@@ -17,6 +17,8 @@ import { installExclusions } from "./exclusions";
 import { snapshotTitle, snapshotDate } from "./snapshot";
 import { installFreshness } from "./freshness";
 import "./styles.css";
+import "./workspace.css";
+import { installWorkspace } from "./workspace";
 
 function element<T extends HTMLElement>(selector: string): T {
   const result = document.querySelector<T>(selector);
@@ -46,7 +48,7 @@ const toggleScan = element<HTMLButtonElement>("#toggle-scan");
 const rootsLabel = element<HTMLParagraphElement>("#computer-roots");
 const modeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="scan-mode"]'));
 for (const radio of modeInputs) radio.parentElement?.prepend(icon(radio.value as IconName));
-const navIcons: Record<string, IconName> = { overview: "overview", projects: "project", ai: "ai", largest: "folder", details: "details" };
+const navIcons: Record<string, IconName> = { control: "overview", tools: "ai", activity: "computer", overview: "disk", projects: "project", ai: "ai", largest: "folder", details: "details" };
 for (const nav of document.querySelectorAll<HTMLButtonElement>("#result-tabs button")) nav.prepend(icon(navIcons[nav.dataset.view || "overview"]));
 chooseFolder.prepend(icon("folder")); button.append(icon("arrow"));
 element(".local-badge").prepend(icon("shield"));
@@ -83,6 +85,7 @@ function updateControls(): void {
   element<HTMLButtonElement>("#retry-last-scan").disabled = !native || busy;
   element<HTMLButtonElement>("#rescan-snapshot").disabled = !native || busy || !exclusions?.ready;
   element<HTMLButtonElement>("#scan-ai").disabled = !native || busy || !exclusions?.ready;
+  element<HTMLButtonElement>("#quick-ai-scan").disabled = !native || busy || !exclusions?.ready;
   element<HTMLButtonElement>("#new-scan").disabled = busy;
   element<HTMLButtonElement>("#configure-scan").disabled = busy;
   element("#runtime-note").textContent = !native ? "Tarayıcı önizlemesi · Tarama masaüstü uygulamasında kullanılabilir."
@@ -196,7 +199,8 @@ element("#clear-size-filter").addEventListener("click", () => {
 const viewButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("#result-tabs button"));
 let lastReport: InspectionReport | null = null;
 let grouped: GroupedReport | null = null;
-let currentView: ResultView = "ai";
+let currentView: ResultView = "control";
+const workspace = installWorkspace(element("#workspace-panel"), navigate);
 let settingsExpanded = false;
 let restoredReport = false;
 let navigationRevision = 0;
@@ -214,11 +218,13 @@ function openScanSetup(folder = false): void {
 }
 element("#configure-scan").addEventListener("click", () => openScanSetup(true));
 element("#new-scan").addEventListener("click", () => openScanSetup());
+element("#quick-ai-scan").addEventListener("click", () => element<HTMLButtonElement>("#scan-ai").click());
 function renderScanLayout(): void {
   const running = Boolean(activeScan);
   const needsExclusionSetup = Boolean(isTauri() && exclusions && !exclusions.busy && !exclusions.ready);
   const expanded = settingsExpanded || needsExclusionSetup;
-  element("#ai-scan-panel").hidden = currentView !== "ai" || Boolean(lastReport) || running || expanded;
+  element("#ai-scan-panel").hidden = currentView !== "control" || Boolean(lastReport) || running || expanded;
+  element("#quick-ai-scan").hidden = !element("#ai-scan-panel").hidden;
   scanPanel.hidden = !expanded && !running && !lastScanError;
   form.hidden = !expanded || running;
   scanPanel.classList.toggle("scan-running", running);
@@ -231,14 +237,15 @@ function renderScanLayout(): void {
   element("#scan-caption").textContent = scanMode() === "ai" ? "Bilinen AI kullanıcı klasörleri · Diğer diskler taranmıyor"
     : scanMode() === "computer" ? "Bağlı tüm yerel diskler" : scanMode() === "disk" ? `Tek disk · ${diskSelect.value || "Disk seç"}` : input.value || "Alt klasörleriyle birlikte incelenecek bir klasör seç.";
   element("#scan-elapsed").hidden = !running;
-  element(".report-panel").hidden = !lastReport && (currentView === "ai" || running || expanded);
+  element(".report-panel").hidden = ["control", "tools", "activity"].includes(currentView) || (!lastReport && (currentView === "ai" || running || expanded));
 }
 function navigate(view: ResultView): void { navigationRevision++; currentView = view; renderCurrent(); }
 function renderCurrent(): void {
   clearTimeout(searchTimer);
   disposeSizeBrowser();
   renderScanLayout();
-  element("#snapshot-banner").hidden = !lastReport;
+  workspace.show(currentView, lastReport, grouped);
+  element("#snapshot-banner").hidden = !lastReport || ["tools", "activity"].includes(currentView);
   freshness.set(lastReport?.sizeIndexId || null);
   if (lastReport) {
     element("#snapshot-title").textContent = snapshotTitle(lastReport, restoredReport);
@@ -253,8 +260,8 @@ function renderCurrent(): void {
   search.disabled = !lastReport;
   element("#reveal-hint").hidden = !lastReport;
   element("#reveal-hint").textContent = `Konumu açmak için öğeye odaklanıp ${revealShortcut} tuşlarına basabilirsin.`;
-  const titles: Record<ResultView, string> = { overview: "Genel bakış", projects: "Projeler", ai: "AI araçları", largest: "Büyük öğeler", details: "Tarama ayrıntıları" };
-  const descriptions: Record<ResultView, string> = { overview: "Son taramanın tamamına bir bakış.", projects: "Bağımlılıklar ve derleme çıktıları, ait oldukları projede.", ai: "AI araçlarının bıraktığı verileri tek yerde gör.", largest: "Boyutlarına göre dosya ve klasörleri keşfet.", details: "Nerelerin tarandığını ve atlanan alanları incele." };
+  const titles: Record<ResultView, string> = { control: "AI çalışma alanın", tools: "AI araçların", activity: "Canlı kaynaklar", overview: "Genel bakış", projects: "Projeler", ai: "AI depolama haritası", largest: "Büyük öğeler", details: "Tarama ayrıntıları" };
+  const descriptions: Record<ResultView, string> = { control: "Araçların, canlı kaynakların ve geride kalan AI verilerin.", tools: "Masaüstü uygulamaları ve CLI araçlarını birlikte keşfet.", activity: "AI araçları, Chrome, Docker ve diğer süreçlerin canlı kullanımı.", overview: "Son taramanın tamamına bir bakış.", projects: "Bağımlılıklar ve derleme çıktıları, ait oldukları projede.", ai: "Modellerin, geçmişin ve AI veri klasörlerinin kapladığı alanı keşfet.", largest: "Boyutlarına göre dosya ve klasörleri keşfet.", details: "Nerelerin tarandığını ve atlanan alanları incele." };
   element("#page-title").textContent = titles[currentView];
   element("#page-description").textContent = descriptions[currentView];
   element("#results-title").textContent = currentView === "overview" ? "Tarama özeti" : currentView === "ai" ? "AI depolama alanın" : titles[currentView];
@@ -314,7 +321,7 @@ async function loadLastScan(): Promise<void> {
       const mode = report.scope === "recursive" ? "folder" : report.scope;
       for (const radio of modeInputs) radio.checked = radio.value === mode;
       if (mode === "folder") input.value = report.root;
-      if (mode === "ai" && requestedAt === navigationRevision) currentView = "ai";
+      if (mode === "ai" && requestedAt === navigationRevision && currentView !== "control") currentView = "ai";
       showReport(report, true);
       status.className = ""; status.textContent = "Son kayıt açıldı. Yeniden tarama yapılmadı.";
       if (mode === "disk" || mode === "computer") {
@@ -349,7 +356,7 @@ element("#scan-ai").addEventListener("click", () => {
   if (!isTauri() || activeScan || restoring || preparingRescan || pickingFolder || !exclusions?.ready) return;
   diskRequest++; rootsLoading = false;
   for (const radio of modeInputs) radio.checked = radio.value === "ai";
-  settingsExpanded = true; navigate("ai"); updateControls(); form.requestSubmit();
+  settingsExpanded = true; renderCurrent(); updateControls(); form.requestSubmit();
 });
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderCurrent, 120); });

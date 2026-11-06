@@ -5,6 +5,8 @@ mod exclusions;
 mod saved_scan;
 mod watch;
 mod ai;
+mod inventory;
+mod monitor;
 
 use std::{
     path::PathBuf,
@@ -213,10 +215,25 @@ fn cancel_size_query(request_id: String, queries: tauri::State<'_, size_index::Q
     queries.cancel(&request_id)
 }
 
+#[tauri::command]
+async fn map_children(index_id: String, path: String, indexes: tauri::State<'_, size_index::ResultIndexes>) -> Result<Vec<roomit_core::SizedEntry>, String> {
+    let index = indexes.get(&index_id)?;
+    tauri::async_runtime::spawn_blocking(move || index.map_children(&path)).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn discover_ai_tools() -> Result<inventory::Inventory, String> {
+    tauri::async_runtime::spawn_blocking(inventory::discover).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn resource_snapshot(state: tauri::State<'_, monitor::Monitor>) -> Result<monitor::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || state.0.lock().map_err(|_| "Canlı ölçüm durumu okunamadı.".to_string()).map(|mut sampler| sampler.sample())).await.map_err(|e| e.to_string())?
+}
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(ScanRegistry::default())
+        .manage(monitor::Monitor::default())
         .manage(size_index::ResultIndexes::default())
         .manage(size_index::QueryRegistry::default())
         .manage(watch::WatchRegistry::default())
@@ -225,7 +242,7 @@ pub fn run() {
             app.manage(saved_scan::SavedScanStore::new(app.path().app_local_data_dir()?.join("last-scan")));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status])
+        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status, discover_ai_tools, resource_snapshot, map_children])
         .run(tauri::generate_context!())
         .expect("Roomit could not start");
 }

@@ -1,0 +1,286 @@
+[
+  {
+    "id": "codex",
+    "name": "Codex",
+    "kind": "CLI + masaüstü",
+    "commands": [
+      "codex",
+      "codex-cli"
+    ],
+    "appNames": [
+      "OpenAI Codex",
+      "Codex"
+    ],
+    "dataPaths": [
+      ".codex"
+    ],
+    "storePrefixes": [
+      "OpenAI.Codex"
+    ]
+  },
+  {
+    "id": "claude-code",
+    "name": "Claude Code",
+    "kind": "CLI",
+    "commands": [
+      "claude"
+    ],
+    "appNames": [],
+    "dataPaths": [
+      ".claude"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "opencode",
+    "name": "OpenCode",
+    "kind": "CLI + masaüstü",
+    "commands": [
+      "opencode"
+    ],
+    "appNames": [
+      "OpenCode"
+    ],
+    "dataPaths": [
+      ".local/share/opencode",
+      ".config/opencode"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "cursor",
+    "name": "Cursor",
+    "kind": "Editör",
+    "commands": [
+      "cursor"
+    ],
+    "appNames": [
+      "Cursor"
+    ],
+    "dataPaths": [
+      ".cursor"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "windsurf",
+    "name": "Windsurf",
+    "kind": "Editör",
+    "commands": [
+      "windsurf"
+    ],
+    "appNames": [
+      "Windsurf"
+    ],
+    "dataPaths": [
+      ".codeium/windsurf"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "ollama",
+    "name": "Ollama",
+    "kind": "Yerel modeller",
+    "commands": [
+      "ollama"
+    ],
+    "appNames": [
+      "Ollama"
+    ],
+    "dataPaths": [
+      ".ollama"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "lmstudio",
+    "name": "LM Studio",
+    "kind": "Yerel modeller",
+    "commands": [
+      "lm-studio",
+      "lmstudio",
+      "lms"
+    ],
+    "appNames": [
+      "LM Studio"
+    ],
+    "dataPaths": [
+      ".lmstudio",
+      ".cache/lm-studio"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "claude",
+    "name": "Claude",
+    "kind": "Masaüstü",
+    "commands": [
+      "claude-desktop"
+    ],
+    "appNames": [
+      "Claude"
+    ],
+    "dataPaths": [],
+    "storePrefixes": [
+      "Claude_"
+    ]
+  },
+  {
+    "id": "chatgpt",
+    "name": "ChatGPT",
+    "kind": "Masaüstü",
+    "commands": [
+      "chatgpt"
+    ],
+    "appNames": [
+      "ChatGPT"
+    ],
+    "dataPaths": [],
+    "storePrefixes": [
+      "OpenAI.ChatGPT"
+    ]
+  },
+  {
+    "id": "gemini",
+    "name": "Gemini CLI",
+    "kind": "CLI",
+    "commands": [
+      "gemini"
+    ],
+    "appNames": [],
+    "dataPaths": [
+      ".gemini"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "aider",
+    "name": "Aider",
+    "kind": "CLI",
+    "commands": [
+      "aider"
+    ],
+    "appNames": [],
+    "dataPaths": [],
+    "storePrefixes": []
+  },
+  {
+    "id": "copilot",
+    "name": "GitHub Copilot",
+    "kind": "CLI",
+    "commands": [
+      "copilot",
+      "github-copilot"
+    ],
+    "appNames": [],
+    "dataPaths": [
+      ".copilot"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "jan",
+    "name": "Jan",
+    "kind": "Yerel modeller",
+    "commands": [
+      "jan"
+    ],
+    "appNames": [
+      "Jan"
+    ],
+    "dataPaths": [
+      ".jan"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "anythingllm",
+    "name": "AnythingLLM",
+    "kind": "Masaüstü",
+    "commands": [
+      "anythingllm"
+    ],
+    "appNames": [
+      "AnythingLLM"
+    ],
+    "dataPaths": [],
+    "storePrefixes": []
+  },
+  {
+    "id": "antigravity",
+    "name": "Antigravity",
+    "kind": "Editör",
+    "commands": [
+      "antigravity"
+    ],
+    "appNames": [
+      "Antigravity"
+    ],
+    "dataPaths": [
+      ".gemini/antigravity"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "trae",
+    "name": "Trae",
+    "kind": "Editör",
+    "commands": [
+      "trae"
+    ],
+    "appNames": [
+      "Trae"
+    ],
+    "dataPaths": [
+      ".trae"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "zcode",
+    "name": "ZCode",
+    "kind": "Masaüstü + CLI",
+    "commands": [
+      "zcode"
+    ],
+    "appNames": [
+      "ZCode"
+    ],
+    "dataPaths": [
+      ".zcode"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "qwen",
+    "name": "Qwen",
+    "kind": "Masaüstü + CLI",
+    "commands": [
+      "qwen"
+    ],
+    "appNames": [
+      "Qwen"
+    ],
+    "dataPaths": [
+      ".qwen"
+    ],
+    "storePrefixes": []
+  },
+  {
+    "id": "kimi",
+    "name": "Kimi",
+    "kind": "Masaüstü + CLI",
+    "commands": [
+      "kimi",
+      "kimi-code"
+    ],
+    "appNames": [
+      "Kimi"
+    ],
+    "dataPaths": [
+      ".kimi",
+      ".kimi-code"
+    ],
+    "storePrefixes": []
+  }
+]

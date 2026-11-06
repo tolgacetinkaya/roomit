@@ -6,8 +6,10 @@ import type { GroupedReport, ResultGroup } from "./groups";
 import { icon } from "./icons";
 import { revealActions, revealShortcut } from "./reveal";
 import { renderSizeBrowser } from "./size-browser";
+import { renderStorageMap } from "./storage-map";
+import { toolLogo, toolId } from "./tool-logos";
 
-export type ResultView = "overview" | "projects" | "ai" | "largest" | "details";
+export type ResultView = "control" | "tools" | "activity" | "overview" | "projects" | "ai" | "largest" | "details";
 const node = (tag: string, text = "", className = ""): HTMLElement => {
   const result = document.createElement(tag); result.textContent = text; result.className = className; return result;
 };
@@ -80,7 +82,7 @@ function groupCard(group: ResultGroup, listedBytes?: bigint): HTMLElement {
       const usage = node("div", "", "tool-usage"); usage.append(meter); card.append(usage);
     }
   }
-  card.querySelector(".group-row")?.prepend(icon(group.kind === "ai" ? "ai" : group.kind === "project" ? "project" : "shield", "ui-icon group-icon"));
+  card.querySelector(".group-row")?.prepend(group.kind === "ai" && toolId(group.title) ? toolLogo(toolId(group.title)!) : icon(group.kind === "ai" ? "ai" : group.kind === "project" ? "project" : "shield", "ui-icon group-icon"));
   return card;
 }
 function section(title: string, count: number, action?: () => void, unit = "grup"): HTMLElement {
@@ -99,6 +101,7 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
   const container = node("div", "", "report-view");
   const aiBytes = grouped.ai.reduce((sum, group) => sum + BigInt(group.logicalBytes), 0n);
   if (view === "ai") {
+    container.append(renderStorageMap(grouped, report.sizeIndexId, !report.totalSizeComplete || report.status !== "completed" || report.resultsTruncated));
     const metrics = node("div", "", "metrics ai-metrics");
     for (const [label, value, hint] of [
       ["Toplam AI verisi", sizeLabel(aiBytes.toString(), report.totalSizeComplete && !report.resultsTruncated), "Bu taramada tanınan gruplar"],
