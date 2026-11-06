@@ -111,7 +111,7 @@ impl Sampler {
             let mut reading=gpu_frame.reading(pids,&stable_pids);
             if gpu_frame.status==crate::gpu::Status::Measured && !pids.is_empty() && pids.iter().all(|pid|process_starts.get(pid)==Some(&0)){
                 reading.percent=None;reading.status=crate::gpu::Status::Unavailable;
-                reading.reason="Süreç başlangıç kimliği doğrulanamadığı için GPU değeri bu sürece bağlanamadı.".into();
+                reading.reason="GPU usage could not be attributed because the process start identity could not be verified.".into();
             }
             reading
         };
@@ -156,7 +156,7 @@ impl Sampler {
             memory_installed:installed_memory().filter(|bytes|*bytes>=self.system.total_memory()).map(|bytes|bytes.to_string()),
             memory_available:self.system.available_memory().to_string(),
             processes, networks, cpu_count, gpu_status: gpu_frame.reason.clone(), gpu_ai, gpu_tools,
-            app_network_status: "Ağ hızı adaptör bazındadır. Uygulama başına trafik ve LAN / internet ayrımı henüz ölçülmüyor.".into() };
+            app_network_status: "Network rates are per adapter. Per-app traffic and LAN / internet separation are not measured yet.".into() };
         self.process_starts=process_starts;self.last = Some(Instant::now()); self.cached = Some(snapshot.clone()); snapshot
     }
 }

@@ -70,7 +70,7 @@ pub(crate) fn directory_rule(path: &Path, context: Context, evidence: &Evidence)
                 _ => None,
             };
             let rule = category.map(|category| protected(category, tool.name(), "ai-known-subdirectory",
-                "AI aracının model veya talimat verisi olarak tanındı; içerik okunmadı, veri korunur."));
+                "Recognized as AI model or instruction data. Contents were not read. Data is protected."));
             (Context::Ai { tool, level: level + 1 }, rule)
         }
         Context::Workspace { python } => {
@@ -93,25 +93,25 @@ pub(crate) fn directory_rule(path: &Path, context: Context, evidence: &Evidence)
             };
             if let Some(tool) = ai_tool {
                 return (Context::Ai { tool, level: 0 }, Some(protected(Category::AiUserData, tool.name(),
-                    "ai-user-directory", "AI aracına ait geçmiş, ayar veya proje verileri içerebilir; cache kabul edilmez.")));
+                    "ai-user-directory", "May contain AI history, settings, or project data. Not classified as cache.")));
             }
             if matches!(name, ".git" | ".ssh") {
-                return (Context::Protected, Some(protected(Category::ProtectedData, "Kullanıcı verisi",
-                    "protected-directory", "Sürüm geçmişi veya erişim verileri korunur.")));
+                return (Context::Protected, Some(protected(Category::ProtectedData, "User data",
+                    "protected-directory", "Version history and access data are protected.")));
             }
             let rule = match name {
                 "bin" | "obj" if evidence.dotnet => Some(review(Category::BuildOutput, ".NET", "dotnet-project-output",
-                    "Üst klasörde .NET proje belirteci bulundu. Yeniden üretilebilirlik doğrulanmadı; inceleme gerekir.")),
+                    "A .NET project marker was found in a parent folder. Reproducibility is unverified. Review required.")),
                 "node_modules" if evidence.node => Some(review(Category::Dependencies, "Node.js", "node-project-dependencies",
-                    "Üst klasörde package.json bulundu. Bağımlılıkların kaldırılması yeniden kurulum gerektirebilir.")),
+                    "A package.json was found in a parent folder. Removing dependencies may require reinstalling them.")),
                 "__pycache__" if python || evidence.python => Some(review(Category::PythonCache, "Python", "python-project-cache",
-                    "Python proje ağacındaki bytecode klasörü olarak tanındı; silme izni verilmez.")),
+                    "Recognized as a bytecode folder in a Python project. This does not authorize deletion.")),
                 ".venv" | "venv" if evidence.python => Some(review(Category::Dependencies, "Python", "python-project-environment",
-                    "Python proje belirteci yanında ortam klasörü bulundu; yalnızca isim ve konumla sınıflandırıldı.")),
+                    "An environment folder was found beside a Python project marker. Classified by name and location only.")),
                 "target" if evidence.rust => Some(review(Category::BuildOutput, "Rust", "rust-project-output",
-                    "Üst klasörde Cargo.toml bulundu. Derleme çıktısı adayı; özel içerik olasılığı dışlanmadı.")),
+                    "A Cargo.toml was found in a parent folder. Potential build output; custom contents cannot be ruled out.")),
                 "build" | "target" if evidence.java => Some(review(Category::BuildOutput, "Java / Gradle", "java-project-output",
-                    "Üst klasörde Gradle veya Maven proje belirteci bulundu; inceleme gerekir.")),
+                    "A Gradle or Maven project marker was found in a parent folder. Review required.")),
                 _ => None,
             };
             let next = if rule.is_some() || matches!(name, "node_modules" | ".venv" | "venv") {
@@ -127,17 +127,17 @@ pub(crate) fn file_rule(path: &Path, context: Context) -> Option<Rule> {
     let parent_name = path.parent().and_then(Path::file_name).and_then(|v| v.to_str()).unwrap_or("");
     match context {
         Context::Workspace { .. } => match name {
-            "AGENTS.md" | "CLAUDE.md" | "GEMINI.md" | ".cursorrules" => Some(protected(Category::AiSettings, "AI proje talimatları",
-                "ai-project-instructions", "AI proje talimatı olarak tanındı; içerik okunmaz ve veri korunur.")),
+            "AGENTS.md" | "CLAUDE.md" | "GEMINI.md" | ".cursorrules" => Some(protected(Category::AiSettings, "AI project instructions",
+                "ai-project-instructions", "Recognized as AI project instructions. Contents are not read. Data is protected.")),
             "copilot-instructions.md" if parent_name == ".github" => Some(protected(Category::AiSettings, "GitHub Copilot",
-                "copilot-project-instructions", "GitHub Copilot proje talimatları korunur.")),
-            ".git" => Some(protected(Category::ProtectedData, "Git", "git-worktree-reference", "Git worktree bağlantı dosyası korunur.")),
-            value if value == ".env" || value.starts_with(".env.") => Some(protected(Category::ProtectedData, "Ortam ayarları",
-                "environment-file", "Kimlik bilgileri içerebilir; içerik okunmaz ve veri korunur.")),
+                "copilot-project-instructions", "GitHub Copilot project instructions are protected.")),
+            ".git" => Some(protected(Category::ProtectedData, "Git", "git-worktree-reference", "Git worktree link files are protected.")),
+            value if value == ".env" || value.starts_with(".env.") => Some(protected(Category::ProtectedData, "Environment settings",
+                "environment-file", "May contain credentials. Contents are not read. Data is protected.")),
             _ => None,
         },
         Context::Ai { tool: AiTool::Claude, level: 0 } if matches!(name, "settings.json" | "settings.local.json") =>
-            Some(protected(Category::AiSettings, "Claude Code", "claude-settings", "Claude Code ayar dosyası; içerik okunmaz ve veri korunur.")),
+            Some(protected(Category::AiSettings, "Claude Code", "claude-settings", "Claude Code settings file. Contents are not read. Data is protected.")),
         _ => None,
     }
 }

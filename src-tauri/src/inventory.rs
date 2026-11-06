@@ -60,7 +60,7 @@ pub(crate) fn data_candidates(tool: &Tool, home: &Path) -> Vec<PathBuf> {
 }
 
 pub(crate) fn discover() -> Result<Inventory, String> {
-    let home = crate::computer::user_home().ok_or("Kullanıcı klasörü bulunamadı.")?;
+    let home = crate::computer::user_home().ok_or("Home folder not found.")?;
     let mut paths: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
     paths.extend([home.join(".local/bin"), home.join(".cargo/bin"), home.join(".bun/bin"), home.join("AppData/Roaming/npm"), home.join(".opencode/bin"), home.join(".lmstudio/bin"), PathBuf::from("/opt/homebrew/bin"), PathBuf::from("/usr/local/bin")]);
     let mut warnings = Vec::new();
@@ -70,16 +70,16 @@ pub(crate) fn discover() -> Result<Inventory, String> {
     let tools = tools.into_iter().filter_map(|tool| {
         let mut installations: BTreeSet<String> = path_commands(&tool, &paths).into_iter().collect();
         let mut evidence = BTreeSet::new();
-        if !installations.is_empty() { evidence.insert("CLI dosyası / PATH".to_string()); }
+        if !installations.is_empty() { evidence.insert("CLI file / PATH".to_string()); }
         for name in &tool.app_names {
             for (display, location) in &registrations {
                 if app_name_matches(display, name) {
-                    evidence.insert(format!("Kurulum kaydı: {display}"));
+                    evidence.insert(format!("Installation record: {display}"));
                     if let Some(path) = location.as_ref().filter(|p| existing(p)) { installations.insert(path.to_string_lossy().into_owned()); }
                 }
             }
             for path in app_candidates(&home, name) {
-                if existing(&path) { installations.insert(path.to_string_lossy().into_owned()); evidence.insert("Uygulama dosyası".into()); }
+                if existing(&path) { installations.insert(path.to_string_lossy().into_owned()); evidence.insert("Application file".into()); }
             }
         }
         for name in &packaged {
@@ -139,7 +139,7 @@ fn registrations(warnings: &mut Vec<String>) -> Vec<(String, Option<PathBuf>)> {
                         }
                     }
                 },
-                Err(error) if error.kind() != std::io::ErrorKind::NotFound => warnings.push("Bazı Windows kurulum kayıtlarına erişilemedi.".into()),
+                Err(error) if error.kind() != std::io::ErrorKind::NotFound => warnings.push("Some Windows installation records were inaccessible.".into()),
                 _ => {},
             }
         }
@@ -153,7 +153,7 @@ fn store_packages(home: &Path, warnings: &mut Vec<String>) -> Vec<String> {
     let _ = home;
     match RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags("Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppModel\\Repository\\Packages", KEY_READ) {
         Ok(key) => key.enum_keys().take(20_000).flatten().collect(),
-        Err(error) if error.kind() != std::io::ErrorKind::NotFound => { warnings.push("Windows uygulama paketleri okunamadı.".into()); Vec::new() },
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => { warnings.push("Could not read Windows app packages.".into()); Vec::new() },
         _ => Vec::new(),
     }
 }

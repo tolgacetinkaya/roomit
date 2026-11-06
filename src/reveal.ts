@@ -16,8 +16,8 @@ export function revealActions(paths: string[]): HTMLElement {
   const addButton = (path: string, label: string, parent: HTMLElement): HTMLButtonElement => {
     const button = document.createElement("button"); button.type = "button";
     button.className = "secondary reveal-button"; button.dataset.revealPath = path;
-    button.title = `${path}\nÜst klasörde seçili göster · ${revealShortcut}`;
-    button.setAttribute("aria-label", `Klasörde göster: ${path}`);
+    button.title = `${path}\nSelect in parent folder · ${revealShortcut}`;
+    button.setAttribute("aria-label", `Show in folder: ${path}`);
     button.setAttribute("aria-keyshortcuts", mac ? "Meta+Enter" : "Control+Enter");
     button.append(icon("folder"), document.createTextNode(label));
     button.disabled = !isTauri();
@@ -27,16 +27,16 @@ export function revealActions(paths: string[]): HTMLElement {
   const show = async (path: string): Promise<void> => {
     if (opening || !isTauri()) return;
     opening = true; for (const button of buttons) button.disabled = true;
-    message.classList.remove("warning"); message.textContent = "Konum açılıyor…";
-    try { await invoke("reveal_path", { path }); message.textContent = mac ? "Finder’a gönderildi." : "Explorer’a gönderildi."; }
+    message.classList.remove("warning"); message.textContent = "Opening location…";
+    try { await invoke("reveal_path", { path }); message.textContent = mac ? "Sent to Finder." : "Sent to Explorer."; }
     catch (error: unknown) { message.classList.add("warning"); message.textContent = String(error); }
     finally { opening = false; for (const button of buttons) button.disabled = !isTauri(); }
   };
-  if (unique.length === 1) addButton(unique[0], "Klasörde göster", actions);
+  if (unique.length === 1) addButton(unique[0], "Show in folder", actions);
   else {
     const menu = document.createElement("details"); menu.className = "reveal-locations";
-    const summary = document.createElement("summary"); summary.textContent = `Klasörde göster · ${unique.length} konum`;
-    summary.title = `Konumu seç · ${revealShortcut}`;
+    const summary = document.createElement("summary"); summary.textContent = `Show in folder · ${unique.length} locations`;
+    summary.title = `Choose location · ${revealShortcut}`;
     menu.append(summary);
     const list = document.createElement("div"); list.className = "reveal-location-list";
     for (const path of unique) addButton(path, path, list);

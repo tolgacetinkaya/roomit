@@ -29,7 +29,7 @@ pub(crate) fn local_disks() -> Result<Vec<LocalDisk>, String> {
 /// never silently scanned as a whole disk (nor replaced by another disk).
 pub(crate) fn selected_root(requested: &str, roots: &[PathBuf]) -> Result<PathBuf, String> {
     roots.iter().find(|root| root.as_os_str() == std::ffi::OsStr::new(requested)).cloned()
-        .ok_or_else(|| "Seçilen disk artık bağlı değil veya taranabilir değil. Disk listesini yenileyin.".into())
+        .ok_or_else(|| "The selected disk is disconnected or unavailable. Refresh the disk list.".into())
 }
 
 /// sysinfo includes fixed/removable local volumes on Windows and browsable
@@ -82,8 +82,8 @@ fn plan_roots(mut roots: Vec<PathBuf>, home: Option<&std::path::Path>) -> Result
     roots.sort();
     roots.dedup();
     roots.sort_by_key(|path| (!home.is_some_and(|home| home.starts_with(path)), path.clone()));
-    if roots.is_empty() { return Err("Taranabilir yerel disk bulunamadı. Klasör seçerek tarayabilirsiniz.".into()); }
-    if roots.len() > 256 { return Err("Disk sayısı tarama sınırını aşıyor; klasör seçerek tarayın.".into()); }
+    if roots.is_empty() { return Err("No scannable local disks found. Select a folder instead.".into()); }
+    if roots.len() > 256 { return Err("The disk count exceeds the scan limit. Select a folder instead.".into()); }
     Ok(roots)
 }
 

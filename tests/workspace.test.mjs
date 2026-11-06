@@ -4,18 +4,18 @@ import {toolUsage,processPage,gpuText,formatMemory,memoryCapacity} from '../src/
 import {formatBytes} from '../src/report.ts';
 test('RAM uses binary units while storage keeps decimal GB',()=>{
  assert.equal(formatMemory('137438953472'),'128 GiB');
- assert.equal(formatMemory('137120000000'),'127,7 GiB');
+ assert.equal(formatMemory('137120000000'),'127.7 GiB');
  assert.equal(formatMemory('1073741824'),'1 GiB');
  assert.equal(formatMemory('1048576'),'1 MiB');
  assert.equal(formatMemory('1024'),'1 KiB');
  assert.equal(formatMemory('0'),'0 B');
  assert.equal(formatMemory('18446744073709551615'),'16 EiB');
  assert.throws(()=>formatMemory('-1'),RangeError);
- assert.equal(formatBytes('137438953472'),'137,44 GB');
+ assert.equal(formatBytes('137438953472'),'137.44 GB');
 });
 test('installed RAM is separate from OS-visible capacity and never guessed',()=>{
- assert.equal(memoryCapacity('137120000000','137438953472'),'128 GiB takılı · 127,7 GiB sistem belleği');
- assert.equal(memoryCapacity('137120000000',null),'127,7 GiB sistem belleği · Takılı RAM okunamadı');
+ assert.equal(memoryCapacity('137120000000','137438953472'),'128 GiB installed · 127.7 GiB system memory');
+ assert.equal(memoryCapacity('137120000000',null),'127.7 GiB system memory · Installed RAM unavailable');
  assert.equal(memoryCapacity('137120000000','0'),memoryCapacity('137120000000'));
  assert.equal(memoryCapacity('137120000000','1073741824'),memoryCapacity('137120000000'));
 });
@@ -27,14 +27,14 @@ test('tool process totals preserve bytes and distinguish unknown CPU from idle',
 });
 test('GPU text distinguishes valid idle, warmup, missing, partial and unsupported readings',()=>{
  const reading=(status,percent=null)=>({status,percent,reason:'coverage',measuredProcesses:1,totalProcesses:1});
- assert.equal(gpuText(reading('measured',0)),'%0');
- for(const status of ['unavailable','unsupported','noCounter'])assert.equal(gpuText(reading(status,0)),'Ölçülemiyor');
- assert.equal(gpuText(undefined),'Ölçülemiyor');
- assert.equal(gpuText(reading('warmingUp',0)),'Ölçüm bekleniyor');
- assert.equal(gpuText(reading('noProcess')),'Çalışan süreç yok');
- assert.match(gpuText(reading('partial',12.5)),/En az %12,5 · kısmi/);
- assert.equal(gpuText(reading('measured',NaN)),'Ölçülemiyor');
- assert.equal(gpuText(reading('measured',101)),'Ölçülemiyor');
+ assert.equal(gpuText(reading('measured',0)),'0%');
+ for(const status of ['unavailable','unsupported','noCounter'])assert.equal(gpuText(reading(status,0)),'Unavailable');
+ assert.equal(gpuText(undefined),'Unavailable');
+ assert.equal(gpuText(reading('warmingUp',0)),'Waiting for measurement');
+ assert.equal(gpuText(reading('noProcess')),'No running processes');
+ assert.equal(gpuText(reading('partial',12.5)),'At least 12.5% · partial');
+ assert.equal(gpuText(reading('measured',NaN)),'Unavailable');
+ assert.equal(gpuText(reading('measured',101)),'Unavailable');
 });
 test('GPU sort keeps unavailable rows below measured zero and preserves input',()=>{
  const base={name:'test',toolId:'codex',cpuPercent:0,memoryBytes:'1'};

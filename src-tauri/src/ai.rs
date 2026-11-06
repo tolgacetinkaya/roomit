@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 
 /// Probe only the supported per-user data roots, never enumerate home or disks.
 pub(crate) fn roots() -> Result<Vec<PathBuf>, String> {
-    let home = crate::computer::user_home().ok_or("Kullanıcı klasörü bulunamadı. Bir klasör seçerek tarayın.")?;
+    let home = crate::computer::user_home().ok_or("Home folder not found. Select a folder to scan.")?;
     let roots = known_roots(&home);
-    if roots.is_empty() { return Err("Bilinen AI veri klasörü bulunamadı. Özel konumlar için Bir klasör seçeneğini kullanın.".into()); }
+    if roots.is_empty() { return Err("No known AI data folders found. Choose a folder to scan a custom location.".into()); }
     Ok(roots)
 }
 fn known_roots(home: &Path) -> Vec<PathBuf> {

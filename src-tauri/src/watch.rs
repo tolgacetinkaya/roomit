@@ -51,8 +51,8 @@ impl WatchSession {
         roots.sort(); roots.dedup();
         let changes = Arc::new(Changes { status: Mutex::new(WatchStatus { index_id: id, stale: false, unavailable: None }), roots,
             excluded, system_attributes: policy.system_attributes });
-        if changes.roots.is_empty() { changes.unavailable("İzlenebilir bir tarama konumu bulunamadı."); }
-        if rejected { changes.unavailable("Bir tarama konumu bağlantıyla değiştirilmiş; bu konum izlenmiyor."); }
+        if changes.roots.is_empty() { changes.unavailable("No scan locations could be monitored."); }
+        if rejected { changes.unavailable("A scan location was replaced by a link and is not monitored."); }
         let native = Native::start(changes.clone());
         Self { changes, _native: native }
     }
@@ -63,7 +63,7 @@ impl WatchSession {
         if !stale {
             for root in &self.changes.roots {
                 if !std::fs::symlink_metadata(root).is_ok_and(|m| m.is_dir() && !link(&m)) {
-                    self.changes.unavailable("Taranan bir konuma erişilemiyor; değişiklikler izlenemiyor.");
+                    self.changes.unavailable("A scanned location is inaccessible. Changes cannot be monitored.");
                     self.changes.changed(root);
                 }
             }
@@ -75,12 +75,12 @@ impl WatchSession {
 pub(crate) struct WatchRegistry(Arc<Mutex<Option<Arc<WatchSession>>>>);
 impl WatchRegistry {
     pub fn publish(&self, session: WatchSession) -> Result<(), String> {
-        let old = self.0.lock().map_err(|_| "İzleme durumu okunamadı.")?.replace(Arc::new(session));
+        let old = self.0.lock().map_err(|_| "Could not read monitoring state.")?.replace(Arc::new(session));
         drop(old); Ok(())
     }
     pub fn status(&self, id: &str) -> Result<WatchStatus, String> {
-        let session = self.0.lock().map_err(|_| "İzleme durumu okunamadı.")?.as_ref().filter(|s| s.changes.status.lock().unwrap().index_id == id).cloned();
-        session.map(|s| s.status()).ok_or_else(|| "Bu sonucun değişiklik izlemesi açık değil.".into())
+        let session = self.0.lock().map_err(|_| "Could not read monitoring state.")?.as_ref().filter(|s| s.changes.status.lock().unwrap().index_id == id).cloned();
+        session.map(|s| s.status()).ok_or_else(|| "Change monitoring is not active for these results.".into())
     }
 }
 
@@ -106,7 +106,7 @@ mod windows_native {
     impl Native {
         pub fn start(changes: Arc<Changes>) -> Self {
             let mut result = Self { stop: None, workers: Vec::new() };
-            let stop = match event() { Ok(stop) => Arc::new(stop), Err(_) => { changes.unavailable("Değişiklik izlemesi başlatılamadı."); return result } };
+            let stop = match event() { Ok(stop) => Arc::new(stop), Err(_) => { changes.unavailable("Could not start change monitoring."); return result } };
             result.stop = Some(stop.clone());
             let mut paths: Vec<_> = changes.roots.iter().cloned().map(|p| (p, true)).collect();
             // A directory handle reports its children. Watch its parent without
@@ -120,10 +120,10 @@ mod windows_native {
                 let (ready, receiver) = mpsc::sync_channel(1);
                 let state = changes.clone(); let stop = stop.clone();
                 match thread::Builder::new().name("roomit-changes".into()).spawn(move || {
-                    if run(&root, recursive, &stop, &state, ready).is_err() { state.unavailable("Bir tarama konumunda değişiklik izlemesi kesildi veya başlatılamadı."); }
+                    if run(&root, recursive, &stop, &state, ready).is_err() { state.unavailable("Change monitoring stopped or could not start at a scan location."); }
                 }) {
-                    Ok(worker) => { result.workers.push(worker); if receiver.recv().is_err() { changes.unavailable("Bir tarama konumunda değişiklik izlemesi başlatılamadı."); } }
-                    Err(_) => changes.unavailable("Değişiklik izlemesi için görev başlatılamadı."),
+                    Ok(worker) => { result.workers.push(worker); if receiver.recv().is_err() { changes.unavailable("Could not start change monitoring at a scan location."); } }
+                    Err(_) => changes.unavailable("Could not start the change monitoring worker."),
                 }
             }
             result
@@ -161,19 +161,19 @@ mod windows_native {
             }
             let mut bytes = 0;
             if unsafe { GetOverlappedResult(directory.0, &*overlapped, &mut bytes, 0) } == 0 {
-                changes.unavailable("Dosya değişikliklerinin tamamı alınamadı. Yeniden taraman önerilir.");
+                changes.unavailable("Some file change events were lost. Rescanning is recommended.");
                 return Err(io::Error::last_os_error());
             }
             if bytes == 0 {
                 // Windows explicitly signals a discarded/overflowed event batch
                 // with zero bytes. Never silently report complete monitoring.
-                changes.unavailable("Çok sayıda değişiklik nedeniyle izlemenin güncelliği doğrulanamıyor. Yeniden taraman önerilir.");
+                changes.unavailable("Too many changes to verify freshness. Rescanning is recommended.");
             } else {
-                if bytes as usize > buffer.len() * 4 { return Err(io::Error::other("Geçersiz değişiklik paketi.")); }
+                if bytes as usize > buffer.len() * 4 { return Err(io::Error::other("Invalid change event packet.")); }
                 let data = unsafe { std::slice::from_raw_parts(buffer.as_ptr().cast::<u8>(), bytes as usize) };
                 match parse_names(data) {
                     Ok(names) => for name in names { changes.changed(&root.join(name)); },
-                    Err(_) => changes.unavailable("Bazı dosya değişiklikleri okunamadı. Yeniden taraman önerilir."),
+                    Err(_) => changes.unavailable("Some file changes could not be read. Rescanning is recommended."),
                 }
             }
         }
@@ -207,24 +207,24 @@ impl Native {
         let state = changes.clone();
         let watcher = notify::RecommendedWatcher::new(move |event: notify::Result<notify::Event>| {
             match event {
-                Ok(event) if event.need_rescan() => state.unavailable("Dosya değişikliklerinin tamamı alınamadı. Yeniden taraman önerilir."),
+                Ok(event) if event.need_rescan() => state.unavailable("Some file change events were lost. Rescanning is recommended."),
                 Ok(event) if !matches!(event.kind, EventKind::Access(_)) => {
-                    if event.paths.is_empty() { state.unavailable("Dosya değişikliğinin konumu belirlenemedi."); }
+                    if event.paths.is_empty() { state.unavailable("The file change location could not be identified."); }
                     for path in event.paths { state.changed(&path); }
                 }
                 Ok(_) => {},
-                Err(_) => state.unavailable("Dosya değişikliklerinin izlenmesi kesildi veya başlatılamadı."),
+                Err(_) => state.unavailable("File change monitoring stopped or could not start."),
             }
         }, Config::default().with_follow_symlinks(false));
-        let mut watcher = match watcher { Ok(watcher) => watcher, Err(_) => { changes.unavailable("Dosya değişikliği izlemesi başlatılamadı."); return Self { _watcher: None } } };
-        for root in &changes.roots { if watcher.watch(root, RecursiveMode::Recursive).is_err() { changes.unavailable("Bir konumda dosya değişiklikleri izlenemiyor."); } }
+        let mut watcher = match watcher { Ok(watcher) => watcher, Err(_) => { changes.unavailable("Could not start file change monitoring."); return Self { _watcher: None } } };
+        for root in &changes.roots { if watcher.watch(root, RecursiveMode::Recursive).is_err() { changes.unavailable("File changes cannot be monitored at a location."); } }
         Self { _watcher: Some(watcher) }
     }
 }
 #[cfg(not(any(windows, target_os = "macos")))]
 struct Native;
 #[cfg(not(any(windows, target_os = "macos")))]
-impl Native { fn start(changes: Arc<Changes>) -> Self { changes.unavailable("Bu sistemde değişiklik izlemesi desteklenmiyor."); Self } }
+impl Native { fn start(changes: Arc<Changes>) -> Self { changes.unavailable("Change monitoring is not supported on this system."); Self } }
 
 #[cfg(test)]
 mod tests {

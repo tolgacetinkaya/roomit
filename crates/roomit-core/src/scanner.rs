@@ -90,7 +90,7 @@ pub fn scan_locations_with_sink<'a, F: FnMut(&ScanProgress)>(
 fn checked_root(root: &Path) -> io::Result<PathBuf> {
     let metadata = fs::symlink_metadata(root)?;
     if is_link(&metadata) || !metadata.is_dir() {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Doğrudan bir klasör seçin; bağlantı veya dosya seçmeyin."));
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Select a folder directly, not a link or file."));
     }
     root.canonicalize()
 }
@@ -100,7 +100,7 @@ fn run_scan<'a, F: FnMut(&ScanProgress)>(
     sink: Option<&'a mut dyn SizeSink>,
 ) -> io::Result<InspectionReport> {
     if roots.is_empty() || roots.len() > 256 || roots.iter().any(|root| !root.is_absolute()) || options.max_entries == Some(0) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "1–256 mutlak klasör yolu ve pozitif tarama sınırı gerekir."));
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Provide 1–256 absolute folder paths and a positive scan limit."));
     }
     let mut plans = Vec::new();
     for root in roots {
@@ -116,9 +116,9 @@ fn run_scan<'a, F: FnMut(&ScanProgress)>(
     if !computer && (exclusions.contains(&plans[0].0) ||
         (options.exclude_system_attributes && plans[0].0.parent().is_some() &&
             fs::symlink_metadata(&plans[0].0).is_ok_and(|m| system_attribute(&m)))) {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Bu klasör hariç tutulan bir konumda. Başka bir klasör seçin veya kullanıcı hariç tutma kuralını kaldırın."));
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "This folder is excluded. Choose another folder or remove the user exclusion."));
     }
-    let root_label = if computer { "Bütün bilgisayar".into() } else { display_path(&plans[0].0) };
+    let root_label = if computer { "Whole computer".into() } else { display_path(&plans[0].0) };
     let mut scanner = Scanner {
         report: InspectionReport {
             root: root_label, scope: if computer { "computer" } else { "recursive" }.into(), status: ScanStatus::Completed,
@@ -165,7 +165,7 @@ fn run_scan<'a, F: FnMut(&ScanProgress)>(
             Err(error) => {
                 scanner.report.stats.errors += 1;
                 scanner.report.total_size_complete = false;
-                scanner.warn(format!("Disk/klasör taranamadı: {}: {error}", display_path(&root)));
+                scanner.warn(format!("Could not scan disk/folder: {}: {error}", display_path(&root)));
                 scanner.report.roots.push(RootReport { path: display_path(&root), status: RootStatus::Failed,
                     logical_bytes: 0, size_complete: false, error: Some(error.to_string()) });
             }
@@ -232,7 +232,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 let (context, rule) = rules::directory_rule(&child, parent.context, &parent.evidence);
                 let frame = if self.options.max_depth.is_some_and(|limit| depth > limit) {
                     self.report.status = ScanStatus::Limited;
-                    self.warn(format!("Derinlik sınırı nedeniyle alt ağaç atlandı: {}", display_path(&child)));
+                    self.warn(format!("Subtree skipped at depth limit: {}", display_path(&child)));
                     Frame::unread(child, depth, context, rule, matched_ancestor)
                 } else {
                     self.open_directory(child.clone(), depth, context, rule, matched_ancestor).unwrap_or_else(|error| {
@@ -270,7 +270,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
         a.checked_add(b).unwrap_or_else(|| {
             self.halted = true;
             self.report.status = ScanStatus::Limited;
-            self.warn("Boyut sayacı sınırına ulaşıldı; tarama tamamlanmadı.".into());
+            self.warn("Size counter limit reached. Scan incomplete.".into());
             u64::MAX
         })
     }
@@ -291,10 +291,10 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
         let metadata = fs::symlink_metadata(&frame.path)?;
         if is_link(&metadata) {
             self.report.stats.skipped_links += 1;
-            self.warn(format!("Değişen bağlantı/reparse point atlandı: {}", display_path(&frame.path)));
+            self.warn(format!("Changed link/reparse point skipped: {}", display_path(&frame.path)));
             return Ok(frame);
         }
-        if !metadata.is_dir() { return Err(io::Error::other("Klasör tarama sırasında değişti.")); }
+        if !metadata.is_dir() { return Err(io::Error::other("Folder changed during scan.")); }
         let iterator = fs::read_dir(&frame.path)?;
         self.report.stats.directories_scanned += 1;
         frame.complete = true;
@@ -304,7 +304,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 self.halted = true;
                 self.report.status = ScanStatus::Limited;
                 frame.complete = false;
-                self.warn(format!("{} öğe sınırına ulaşıldı; sonuçlar kısmi.", self.options.max_entries.unwrap()));
+                self.warn(format!("{} item limit reached. Results are partial.", self.options.max_entries.unwrap()));
                 break;
             }
             self.report.stats.entries_seen += 1;
@@ -313,7 +313,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 Err(error) => {
                     self.report.stats.errors += 1;
                     frame.complete = false;
-                    self.warn(format!("{} içinde bir öğe okunamadı: {error}", display_path(&frame.path)));
+                    self.warn(format!("Could not read an item in {}: {error}", display_path(&frame.path)));
                     continue;
                 }
             };
@@ -329,7 +329,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 Ok(metadata) if is_link(&metadata) => {
                     self.report.stats.skipped_links += 1;
                     frame.complete = false;
-                    self.warn(format!("Bağlantı/reparse point atlandı: {}", display_path(&path)));
+                    self.warn(format!("Link/reparse point skipped: {}", display_path(&path)));
                 }
                 Ok(metadata) if metadata.is_dir() && (
                     self.partition_roots.contains(&path) ||
@@ -337,7 +337,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 ) => {
                     self.report.stats.skipped_mounts += 1;
                     frame.complete = false;
-                    self.warn(format!("Disk sınırı / ayrı tarama kökü atlandı: {}", display_path(&path)));
+                    self.warn(format!("Volume boundary / separate scan root skipped: {}", display_path(&path)));
                 }
                 Ok(metadata) if metadata.is_dir() => frame.children.push(path.clone()),
                 Ok(metadata) if metadata.is_file() => {
@@ -354,7 +354,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 Ok(_) => {
                     self.report.stats.skipped_special += 1;
                     frame.complete = false;
-                    self.warn(format!("Özel dosya türü atlandı: {}", display_path(&path)));
+                    self.warn(format!("Special file type skipped: {}", display_path(&path)));
                 }
                 Err(error) => {
                     self.report.stats.errors += 1;

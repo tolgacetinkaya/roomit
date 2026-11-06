@@ -9,11 +9,15 @@ Tauri 2 + TypeScript interface. The project is open source under the MIT license
 
 ## Current capabilities
 
-**Current development version: 0.4.0 (live resource charts).**
-Build from source using the instructions below. Local EXEs, test screenshots,
-scan indexes and build caches are excluded from Git; this initial source upload
-does not include a packaged release. The application menu and sidebar show its
-version. Windows behavior has been tested; macOS native acceptance is pending.
+**Version: 0.4.0 — English interface and signed release updates.**
+Download the [Windows release](https://github.com/tolgacetinkaya/roomit/releases/tag/v0.4.0)
+or build from source below. Choose the Windows x64 setup for installation and
+future in-app updates, or the standalone EXE to run directly with WebView2
+installed. Roomit checks new published releases and offers **Update and restart**;
+a Git push alone does not trigger an update. Local build caches, scan indexes,
+EXEs and signing keys are excluded from Git. See [releasing](docs/RELEASING.md)
+for signing, portable-update behavior, and verification. Windows binaries do not
+have an Authenticode publisher certificate. macOS native acceptance is pending.
 
 - CPU, RAM and recognized-AI GPU cards include live two-minute charts on a fixed
   0–100% scale. History uses actual sequential samples, stays bounded in memory
@@ -21,7 +25,7 @@ version. Windows behavior has been tested; macOS native acceptance is pending.
   partial GPU coverage is dashed and remains an explicit lower bound.
 - The RAM card separates used, available and OS-visible total memory, retaining
   installed capacity separately. Available RAM includes reusable cache. The
-  **RAM gösterimi** selector chooses GiB/MiB, percent or both, applies to device,
+  **RAM display** selector chooses GiB/MiB, percent or both, applies to device,
   tool and process values, and persists locally. RAM percentages use OS-visible
   total as their denominator. See `docs/LIVE_RESOURCES.md`.
 
@@ -40,8 +44,8 @@ version. Windows behavior has been tested; macOS native acceptance is pending.
   is pending because the Computer Use launch approval timed out. See
   `docs/DESKTOP_SHELL.md` and `design-qa.md` for evidence and limits.
 
-- **AI kontrol merkezi** combines live resource panels, detected AI tools with
-  local brand logos, and an interactive AI storage map. **Araçlarım** shows all
+- **AI control center** combines live resource panels, detected AI tools with
+  local brand logos, and an interactive AI storage map. **My tools** shows all
   discoveries and their evidence; the control center's list scrolls without
   dropping tools after the first six.
 - Discovery supports 19 catalog entries: desktop apps and CLI files on PATH,
@@ -49,17 +53,17 @@ version. Windows behavior has been tested; macOS native acceptance is pending.
   and macOS app locations. This is not universal discovery of all AI software.
   ZCode, Qwen, Kimi and LM Studio are included. Data-only traces are labeled
   separately from installation evidence. No discovered program is executed.
-- Open **AI verilerini tara** to scan existing supported AI user-data roots
+- Open **AI datani tara** to scan existing supported AI user-data roots
   (including `.codex`, `.claude`, `.cursor`, `.ollama` and OpenCode) without walking every
   disk. Missing locations never fall back to a home/disk/computer scan. Custom
   locations and project-local AI data still require selecting a folder.
 - Keep the selected result view when starting, completing or cancelling a scan.
   Startup opens the AI control center and restores results without scanning again.
 - Select a measured map sector to navigate tool → data location → direct children;
-  use **Bir üst düzey** / Escape to go back. New indexes return the largest 80
+  use **Up one level** / Escape to go back. New indexes return the largest 80
   children and an explicit remainder; every measured item remains available in
-  **Büyük öğeler**. Old saved indexes require a manual rescan for deep navigation.
-- **Canlı kaynaklar** samples native CPU/RAM per accessible process and network
+  **Large items**. Old saved indexes require a manual rescan for deep navigation.
+- **Live resources** samples native CPU/RAM per accessible process and network
   rates per adapter while its workspace is visible, roughly every two seconds.
   Search Chrome/Docker/PID, filter AI processes, sort and page 50 rows at a time.
   Pause/resume is available; leaving the workspace pauses polling. Network rates
@@ -67,14 +71,14 @@ version. Windows behavior has been tested; macOS native acceptance is pending.
 - Windows GPU Engine counters now measure local GPU usage in tool cards and the
   process table (including GPU sorting). Processes sharing an engine are summed;
   the busiest engine across adapters is reported, never a sum of every engine.
-  Missing/unsupported counters say **Ölçülemiyor**; new measurements warm up and
-  partially covered tool groups show **En az … · kısmi**. A valid measured zero
+  Missing/unsupported counters say **Unavailable**; new measurements warm up and
+  partially covered tool groups show **En az … · partial**. A valid measured zero
   remains distinct. This measures the local GPU, not cloud inference or VRAM.
 - Pick a folder using the native Windows/macOS dialog; its path stays visible.
 - Scan one folder, one selected local disk, or all detected local disks, without opening file contents.
-- Add multiple folders to **Hariç tutulanlar** using the native picker; choices persist
+- Add multiple folders to **Exclusions** using the native picker; choices persist
   locally across restarts and apply to folder/disk/computer scans. Remove a rule
-  with **Listeden çıkar**; this does not change the folder itself.
+  with **Remove from list**; this does not change the folder itself.
 - Automatically prune standard system/install locations, Windows SYSTEM-attribute
   entries, registered Windows InstallLocation/App Paths and macOS `.app` bundles.
   Automatic rules cannot be disabled. Unknown portable/unregistered installations
@@ -88,17 +92,17 @@ version. Windows behavior has been tested; macOS native acceptance is pending.
 - Restore the last saved scan on startup, including grouped results and the entire
   paged size index. Search and GB filtering work without scanning again.
 - Monitor the last scan's folder/disk/computer scope while Roomit is open.
-  Included file/folder changes show **Sonuçlar güncel değil** without changing
-  results or starting a scan. **Yeniden tara** remains a manual action.
+  Included file/folder changes show **Results are out of date** without changing
+  results or starting a scan. **Rescan** remains a manual action.
 - A visible scan date and separate offline notice explain that edits made while
   Roomit was closed are unknown. Cancelled scans remain explicitly partial.
-  Interrupted/incomplete monitoring shows **Güncellik doğrulanamıyor**.
-- Show result paths in Windows Explorer / macOS Finder with **Klasörde göster**.
+  Interrupted/incomplete monitoring shows **Freshness could not be verified**.
+- Show result paths in Windows Explorer / macOS Finder with **Show in folder**.
   On a focused card/row, use **Ctrl+Enter** (Windows) or **Command+Enter** (Mac).
   Multi-location AI groups ask which location to reveal.
 - Graphite/electric-blue workspace with persistent navigation, grouped results,
   compact completed-scan setup, and per-volume capacity/free-space previews.
-- Inspect grouped development/AI results; use **Büyük öğeler** for separate file/folder lists.
+- Inspect grouped development/AI results; use **Large items** for separate file/folder lists.
 - Enter a minimum GB size (for example 5 or 0,5), apply or clear it without rescanning.
   **All measured matches** are available through Previous/Next pages, with no result-count cutoff.
   The threshold is inclusive, uses exact decimal bytes and combines with path search.
@@ -224,13 +228,13 @@ a Mac. This implementation has no Windows-versus-Mac speed benchmark claim.
 
 ## Folder and computer targets
 
-Use **Klasör seç…** to open the native directory picker. Cancelling keeps the
+Use **Choose folder…** to open the native directory picker. Cancelling keeps the
 previous selection. Selection alone does not start scanning. Manual path typing
 is no longer needed.
 
-**Bütün bilgisayar** previews detected local fixed/removable disk roots. Network
-volumes are not included. The scan starts only when **Taramayı başlat** is pressed;
-roots are refreshed at start. **Diskleri yenile** refreshes the preview.
+**Whole computer** previews detected local fixed/removable disk roots. Network
+volumes are not included. The scan starts only when **Start scan** is pressed;
+roots are refreshed at start. **Refresh disks** refreshes the preview.
 
 Computer scans share one worker, cancellation token, bounded
 largest-item list and cumulative progress across roots. Failed and unscanned
@@ -289,7 +293,7 @@ Snapshots contain paths, classifications and sizes, not scanned file contents.
 Their timestamp is the scan's start time. While the app is open, native filesystem
 notifications detect included changes and latch a stale warning until a new scan.
 Notifications do not update sizes or results. Offline changes are still unknown;
-restored results retain a separate possible-change notice. **Yeniden tara** uses the saved scope and
+restored results retain a separate possible-change notice. **Rescan** uses the saved scope and
 current exclusions; a missing disk prompts for a target instead of scanning all
 disks. Existing reveal actions validate the path against the live filesystem.
 An older exe's in-memory results cannot be recovered after that exe closes; the

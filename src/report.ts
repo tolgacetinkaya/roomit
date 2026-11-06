@@ -56,10 +56,10 @@ export interface InspectionReport {
 }
 export type FindingFilter = "all" | "development" | "ai" | "protected";
 export const categoryLabels: Record<Category, string> = {
-  buildOutput: "Derleme çıktısı", dependencies: "Bağımlılıklar", pythonCache: "Python cache",
-  aiUserData: "AI kullanıcı verisi", aiSettings: "AI ayarları / talimatları", aiModels: "AI modelleri", protectedData: "Korunan veri",
+  buildOutput: "Build output", dependencies: "Dependencies", pythonCache: "Python cache",
+  aiUserData: "AI user data", aiSettings: "AI settings / instructions", aiModels: "AI models", protectedData: "Protected data",
 };
-const number = new Intl.NumberFormat("tr-TR");
+const number = new Intl.NumberFormat("en-US");
 export const formatCount = (count: number): string => number.format(count);
 
 // Decimal GB, not GiB. Integer arithmetic preserves large u64 IPC byte counts.
@@ -73,10 +73,10 @@ export function formatBytes(value: string): string {
   if (unit === 0) return `${number.format(bytes)} B`;
   const rounded = (bytes * 100n + divisor / 2n) / divisor;
   const fraction = (rounded % 100n).toString().padStart(2, "0").replace(/0+$/, "");
-  return `${number.format(rounded / 100n)}${fraction ? `,${fraction}` : ""} ${units[unit]}`;
+  return `${number.format(rounded / 100n)}${fraction ? `.${fraction}` : ""} ${units[unit]}`;
 }
 export function sizeLabel(bytes: string, complete: boolean): string {
-  return complete ? formatBytes(bytes) : `En az ${formatBytes(bytes)} · kısmi`;
+  return complete ? formatBytes(bytes) : `At least ${formatBytes(bytes)} · partial`;
 }
 export function matchesFilter(finding: Finding, filter: FindingFilter): boolean {
   switch (filter) {
@@ -87,11 +87,11 @@ export function matchesFilter(finding: Finding, filter: FindingFilter): boolean 
   }
 }
 export function scanSummary(report: InspectionReport): string {
-  const status = report.status === "cancelled" ? "Tarama iptal edildi; sonuçlar kısmi."
-    : report.status === "limited" ? "Tarama sınırına ulaşıldı; sonuçlar kısmi."
-    : !report.totalSizeComplete ? "Tarama tamamlandı; atlanan öğeler nedeniyle boyutlar kısmi."
-    : "Tarama tamamlandı.";
+  const status = report.status === "cancelled" ? "Scan cancelled. Results are partial."
+    : report.status === "limited" ? "Scan limit reached. Results are partial."
+    : !report.totalSizeComplete ? "Scan completed. Sizes are partial because some items were skipped."
+    : "Scan completed.";
   const roots = report.scope === "computer"
-    ? ` ${report.roots.filter((root) => !["failed", "notScanned", "excluded"].includes(root.status)).length}/${report.roots.length} disk işlendi.` : "";
-  return `${status}${roots} ${formatCount(report.stats.filesScanned)} dosya, ${formatCount(report.stats.directoriesScanned)} klasör. Hiçbir dosya değiştirilmedi.`;
+    ? ` ${report.roots.filter((root) => !["failed", "notScanned", "excluded"].includes(root.status)).length}/${report.roots.length} disks processed.` : "";
+  return `${status}${roots} ${formatCount(report.stats.filesScanned)} files, ${formatCount(report.stats.directoriesScanned)} folders. No files were changed.`;
 }

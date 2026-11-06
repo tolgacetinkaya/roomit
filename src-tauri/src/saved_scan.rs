@@ -13,11 +13,11 @@ impl SavedScanStore {
     /// Summary and full size index share one generation. Publish the pointer only
     /// after both have committed, so failed/interrupted scans keep the old result.
     pub fn save(&self, snapshot: &mut IndexSnapshot, report: &DesktopReport) -> Result<(), String> {
-        let _guard = self.lock.lock().map_err(|_| "Kayıt kilidi alınamadı.")?;
-        let generation = snapshot.database.parent().ok_or("Sonuç klasörü bulunamadı.")?;
-        let name = generation.file_name().and_then(|n| n.to_str()).ok_or("Geçersiz sonuç klasörü.")?;
+        let _guard = self.lock.lock().map_err(|_| "Could not lock saved results.")?;
+        let generation = snapshot.database.parent().ok_or("Result folder not found.")?;
+        let name = generation.file_name().and_then(|n| n.to_str()).ok_or("Invalid result folder.")?;
         if generation.parent() != Some(self.directory.as_path()) || !valid_generation(name) || snapshot.id != report.size_index_id {
-            return Err("Sonuç kaydı uygulamanın veri klasöründe olmalı.".into());
+            return Err("Saved results must be inside the app data folder.".into());
         }
         let connection = Connection::open_with_flags(&snapshot.database, OpenFlags::SQLITE_OPEN_READ_WRITE).map_err(|e| e.to_string())?;
         connection.execute_batch("PRAGMA synchronous=FULL; BEGIN IMMEDIATE;
@@ -37,27 +37,27 @@ impl SavedScanStore {
         Ok(())
     }
     pub fn load(&self) -> Result<Option<(DesktopReport, IndexSnapshot)>, String> {
-        let _guard = self.lock.lock().map_err(|_| "Kayıt kilidi alınamadı.")?;
+        let _guard = self.lock.lock().map_err(|_| "Could not lock saved results.")?;
         let pointer = match fs::read(self.directory.join("current.json")) {
             Ok(bytes) => serde_json::from_slice::<Pointer>(&bytes).map_err(|e| e.to_string())?,
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(e.to_string()),
         };
-        if pointer.format != FORMAT || !valid_generation(&pointer.directory) { return Err("Kayıt biçimi desteklenmiyor veya sonuç yolu geçersiz.".into()); }
+        if pointer.format != FORMAT || !valid_generation(&pointer.directory) { return Err("Unsupported saved format or invalid result path.".into()); }
         let generation = self.directory.join(&pointer.directory);
         for path in [&generation, &generation.join("results.sqlite")] {
             let metadata = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
-            if is_link(&metadata) { return Err("Kayıtlı sonuç konumu bir bağlantı olamaz.".into()); }
+            if is_link(&metadata) { return Err("The saved result location cannot be a link.".into()); }
         }
         let database = generation.join("results.sqlite");
         let connection = Connection::open_with_flags(&database, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|e| e.to_string())?;
         let version: u32 = connection.query_row("PRAGMA user_version", [], |row| row.get(0)).map_err(|e| e.to_string())?;
-        if version != FORMAT { return Err("Kayıtlı tarama sürümü desteklenmiyor.".into()); }
+        if version != FORMAT { return Err("Unsupported saved scan version.".into()); }
         let json: String = connection.query_row("SELECT json FROM saved_report WHERE id=1", [], |row| row.get(0)).map_err(|e| e.to_string())?;
         let report: DesktopReport = serde_json::from_str(&json).map_err(|e| e.to_string())?;
         if report.size_index_id.is_empty() || report.size_index_id.len() > 128 || report.scanned_at_ms == 0 ||
             !["recursive", "disk", "computer", "ai"].contains(&report.report.scope.as_str()) {
-            return Err("Kayıtlı tarama bilgileri geçersiz.".into());
+            return Err("Invalid saved scan metadata.".into());
         }
         connection.prepare("SELECT kind,sort_key,path,search_key,complete FROM entries LIMIT 0").map_err(|e| e.to_string())?;
         let id = report.size_index_id.clone();

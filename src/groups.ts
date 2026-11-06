@@ -78,13 +78,13 @@ export function groupReport(report: InspectionReport): GroupedReport {
 }
 function compareBytes(a: string, b: string): number { return BigInt(a) > BigInt(b) ? -1 : BigInt(a) < BigInt(b) ? 1 : 0; }
 export function filterGroups(groups: ResultGroup[], query: string): ResultGroup[] {
-  const key = query.trim().toLocaleLowerCase("tr");
+  const key = query.trim().toLocaleLowerCase("en");
   if (!key) return groups;
   return groups.filter((group) => [group.title, group.location, ...group.tools, ...group.items.map((item) => item.path)]
-    .some((text) => text.toLocaleLowerCase("tr").includes(key)));
+    .some((text) => text.toLocaleLowerCase("en").includes(key)));
 }
 export type GroupSort = "size" | "name";
 export function sortGroups(groups: ResultGroup[], sort: GroupSort): ResultGroup[] {
-  const collator = new Intl.Collator("tr", { numeric: true, sensitivity: "base" });
+  const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
   return [...groups].sort((a, b) => (sort === "name" ? collator.compare(a.title, b.title) : compareBytes(a.logicalBytes, b.logicalBytes)) || a.id.localeCompare(b.id));
 }

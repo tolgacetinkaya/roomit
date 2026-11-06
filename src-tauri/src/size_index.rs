@@ -10,7 +10,7 @@ const INSERT: &str = "INSERT OR REPLACE INTO entries(kind,sort_key,path,search_k
 const FILTER: &str = "kind=?1 AND sort_key<=?2 AND instr(search_key,?3)>0";
 
 fn kind_number(kind: &str) -> Result<i64, String> {
-    match kind { "file" => Ok(0), "directory" => Ok(1), _ => Err("Geçersiz öğe türü.".into()) }
+    match kind { "file" => Ok(0), "directory" => Ok(1), _ => Err("Invalid item type.".into()) }
 }
 fn search_key(text: &str) -> String { text.replace('I', "ı").replace('İ', "i").to_lowercase() }
 fn size_key(bytes: u64) -> String { format!("{:020}", u64::MAX - bytes) }
@@ -84,7 +84,7 @@ impl SizeSink for IndexWriter {
             }
             Ok(())
         })();
-        result.map_err(|error| io::Error::other(format!("Geçici sonuç dizinine yazılamadı: {error}")))
+        result.map_err(|error| io::Error::other(format!("Could not write to the temporary result directory: {error}")))
     }
 }
 
@@ -107,22 +107,22 @@ pub(crate) struct ResultIndexes(Arc<Mutex<Option<Arc<IndexSnapshot>>>>);
 impl ResultIndexes {
     #[cfg(test)]
     pub fn clear(&self) -> Result<(), String> {
-        let old = self.0.lock().map_err(|_| "Sonuç dizini kilitlenemedi.")?.take();
+        let old = self.0.lock().map_err(|_| "Could not lock result directory.")?.take();
         drop(old); Ok(())
     }
     pub fn publish(&self, snapshot: IndexSnapshot) -> Result<(), String> {
         let database = snapshot.database.clone();
         let persistent = snapshot.persistent_root.is_some();
-        let old = self.0.lock().map_err(|_| "Sonuç dizini kilitlenemedi.")?.replace(Arc::new(snapshot));
+        let old = self.0.lock().map_err(|_| "Could not lock result directory.")?.replace(Arc::new(snapshot));
         if let Some(old) = &old {
             if persistent && old.database != database { old.retired.store(true, Ordering::Relaxed); }
         }
         drop(old); Ok(())
     }
     pub fn get(&self, id: &str) -> Result<Arc<IndexSnapshot>, String> {
-        self.0.lock().map_err(|_| "Sonuç dizini kilitlenemedi.")?.as_ref()
+        self.0.lock().map_err(|_| "Could not lock result directory.")?.as_ref()
             .filter(|snapshot| snapshot.id == id).cloned()
-            .ok_or_else(|| "Bu taramanın sonuçları artık açık değil. Yeniden tarayın.".into())
+            .ok_or_else(|| "These scan results are no longer open. Please rescan.".into())
     }
 }
 
@@ -154,10 +154,10 @@ pub(crate) struct SizePage {
 
 impl IndexSnapshot {
     pub fn map_children(&self, path: &str) -> Result<Vec<SizedEntry>, String> {
-        if path.len() > 131_072 { return Err("Geçersiz klasör yolu.".into()); }
+        if path.len() > 131_072 { return Err("Invalid folder path.".into()); }
         let connection = Connection::open_with_flags(&self.database, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| e.to_string())?;
         let mut statement = connection.prepare("SELECT kind,sort_key,path,complete FROM entries WHERE parent_key=?1 ORDER BY sort_key,path LIMIT 80")
-            .map_err(|_| "Bu eski taramada alt klasör haritası yok. Yeniden tarama ile etkinleştirebilirsin.".to_string())?;
+            .map_err(|_| "This older scan has no subfolder map. Rescan to enable it.".to_string())?;
         let entries = statement.query_map([map_key(path)], |row| {
             let key: String = row.get(1)?;
             Ok(SizedEntry { kind: if row.get::<_,i64>(0)? == 0 { EntryKind::File } else { EntryKind::Directory }, logical_bytes: u64::MAX - key.parse::<u64>().map_err(|_| rusqlite::Error::InvalidQuery)?, path: row.get(2)?, size_complete: row.get(3)? })
@@ -165,14 +165,14 @@ impl IndexSnapshot {
         Ok(entries)
     }
     pub fn query(&self, request: &PageRequest, cancel: Arc<AtomicBool>) -> Result<SizePage, String> {
-        if cancel.load(Ordering::Relaxed) { return Err("Sonuç yükleme iptal edildi.".into()); }
+        if cancel.load(Ordering::Relaxed) { return Err("Result loading cancelled.".into()); }
         let kind = kind_number(&request.kind)?;
-        let minimum = request.minimum_bytes.parse::<u64>().map_err(|_| "Geçersiz boyut filtresi.")?;
-        if request.query.len() > 4096 { return Err("Arama metni çok uzun.".into()); }
-        let previous = match request.direction.as_str() { "next" => false, "previous" => true, _ => return Err("Geçersiz sayfa yönü.".into()) };
+        let minimum = request.minimum_bytes.parse::<u64>().map_err(|_| "Invalid size filter.")?;
+        if request.query.len() > 4096 { return Err("Search text is too long.".into()); }
+        let previous = match request.direction.as_str() { "next" => false, "previous" => true, _ => return Err("Invalid page direction.".into()) };
         if let Some(cursor) = &request.cursor {
             if cursor.sort_key.len() != 20 || cursor.sort_key.parse::<u64>().is_err() || cursor.path.len() > 131_072 {
-                return Err("Geçersiz sonuç sayfası.".into());
+                return Err("Invalid result page.".into());
             }
         }
         let connection = Connection::open_with_flags(&self.database, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)
@@ -213,7 +213,7 @@ impl IndexSnapshot {
             }).collect::<rusqlite::Result<_>>()?;
             Ok(SizePage { entries, total, first, last, has_previous, has_next })
         })();
-        result.map_err(|error| if cancel.load(Ordering::Relaxed) { "Sonuç yükleme iptal edildi.".into() } else { format!("Sonuçlar okunamadı: {error}") })
+        result.map_err(|error| if cancel.load(Ordering::Relaxed) { "Result loading cancelled.".into() } else { format!("Could not read results: {error}") })
     }
 }
 
@@ -224,20 +224,20 @@ pub(crate) struct QueryLease { registry: QueryRegistry, kind: i64, id: String, p
 impl QueryRegistry {
     pub fn begin(&self, request: &PageRequest) -> Result<QueryLease, String> {
         let kind = kind_number(&request.kind)?;
-        if request.request_id.is_empty() || request.request_id.len() > 128 { return Err("Geçersiz sorgu kimliği.".into()); }
-        let mut jobs = self.0.lock().map_err(|_| "Sonuç yükleme durumu okunamadı.")?;
+        if request.request_id.is_empty() || request.request_id.len() > 128 { return Err("Invalid query ID.".into()); }
+        let mut jobs = self.0.lock().map_err(|_| "Could not read result loading state.")?;
         if let Some(old) = jobs.remove(&kind) { old.cancel.store(true, Ordering::Relaxed); }
         let cancel = Arc::new(AtomicBool::new(false));
         jobs.insert(kind, QueryJob { id: request.request_id.clone(), cancel: cancel.clone() });
         Ok(QueryLease { registry: self.clone(), kind, id: request.request_id.clone(), cancel })
     }
     pub fn cancel(&self, id: &str) -> Result<bool, String> {
-        let jobs = self.0.lock().map_err(|_| "Sonuç yükleme durumu okunamadı.")?;
+        let jobs = self.0.lock().map_err(|_| "Could not read result loading state.")?;
         for job in jobs.values().filter(|job| job.id == id) { job.cancel.store(true, Ordering::Relaxed); return Ok(true); }
         Ok(false)
     }
     pub fn cancel_all(&self) -> Result<(), String> {
-        for job in self.0.lock().map_err(|_| "Sonuç yükleme durumu okunamadı.")?.values() { job.cancel.store(true, Ordering::Relaxed); }
+        for job in self.0.lock().map_err(|_| "Could not read result loading state.")?.values() { job.cancel.store(true, Ordering::Relaxed); }
         Ok(())
     }
 }
@@ -285,7 +285,7 @@ mod tests {
         let db = Connection::open(&index.database).unwrap();
         db.execute_batch("DROP INDEX map_children; ALTER TABLE entries DROP COLUMN parent_key;").unwrap(); drop(db);
         let before = std::fs::read(&index.database).unwrap();
-        assert!(index.map_children("/models").unwrap_err().contains("Yeniden tarama"));
+        assert!(index.map_children("/models").unwrap_err().contains("Rescan"));
         assert_eq!(std::fs::read(&index.database).unwrap(),before);
     }
     #[test]
@@ -361,7 +361,7 @@ mod tests {
         assert!(!directory.cancel.load(Ordering::Relaxed));
         registry.cancel_all().unwrap(); assert!(directory.cancel.load(Ordering::Relaxed));
         let index = IndexWriter::new().unwrap().finish("test".into()).unwrap();
-        assert!(index.query(&request("file", 0), Arc::new(AtomicBool::new(true))).unwrap_err().contains("iptal"));
+        assert!(index.query(&request("file", 0), Arc::new(AtomicBool::new(true))).unwrap_err().contains("cancelled"));
     }
 
     #[test]

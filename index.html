@@ -1,108 +1,114 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Roomit 0.4.0 — AI çalışma alanın</title>
+    <title>Roomit 0.4.0 — Your AI workspace</title>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
-    <header class="titlebar" aria-label="Pencere ve çalışma alanı">
+    <header class="titlebar" aria-label="Window and workspace">
       <div class="titlebar-start">
-        <button id="sidebar-toggle" class="chrome-button" type="button" aria-label="Kenar çubuğunu gizle" aria-expanded="true" aria-controls="app-sidebar" title="Kenar çubuğunu gizle (Ctrl+B)"></button>
+        <button id="sidebar-toggle" class="chrome-button" type="button" aria-label="Hide sidebar" aria-expanded="true" aria-controls="app-sidebar" title="Hide sidebar (Ctrl+B)"></button>
         <details id="app-menu" class="app-menu">
           <summary><span>Roomit</span><img src="/node_modules/@phosphor-icons/core/assets/regular/caret-down.svg" class="ui-icon" width="12" height="12" alt="" /></summary>
           <div class="app-menu-content">
-            <p>Çalışma alanı</p>
-            <button type="button" data-shell-view="control">AI kontrol merkezi</button>
-            <button type="button" data-shell-view="tools">AI araçlarım</button>
-            <button type="button" data-shell-view="activity">Canlı kaynaklar</button>
+            <p>Workspace</p>
+            <button type="button" data-shell-view="control">AI control center</button>
+            <button type="button" data-shell-view="tools">My AI tools</button>
+            <button type="button" data-shell-view="activity">Live resources</button>
             <hr />
-            <button type="button" id="menu-new-scan">Yeni tarama…</button>
-            <button type="button" id="menu-sidebar">Kenar çubuğunu gizle</button>
-            <small>Roomit 0.4.0 · Bu bilgisayarda</small>
+            <button type="button" id="menu-new-scan">New scan…</button>
+            <button type="button" id="menu-sidebar">Hide sidebar</button>
+            <hr />
+            <button type="button" id="menu-check-updates">Check for updates</button>
+            <small>Roomit 0.4.0 · On this device</small>
           </div>
         </details>
       </div>
-      <div class="titlebar-context" data-window-drag><span data-window-drag>Bu bilgisayar</span><img src="/node_modules/@phosphor-icons/core/assets/regular/caret-right.svg" class="ui-icon" width="12" height="12" alt="" data-window-drag /><strong id="shell-view-title" data-window-drag>AI çalışma alanın</strong></div>
-      <div class="titlebar-end"><span class="shell-local">Yerel çalışma alanı</span><div class="window-controls" aria-label="Pencere kontrolleri"><button id="window-minimize" class="chrome-button" type="button" aria-label="Pencereyi küçült" title="Küçült"></button><button id="window-maximize" class="chrome-button" type="button" aria-label="Pencereyi büyüt" title="Büyüt"></button><button id="window-close" class="chrome-button" type="button" aria-label="Pencereyi kapat" title="Kapat"></button></div></div>
+      <div class="titlebar-context" data-window-drag><span data-window-drag>This device</span><img src="/node_modules/@phosphor-icons/core/assets/regular/caret-right.svg" class="ui-icon" width="12" height="12" alt="" data-window-drag /><strong id="shell-view-title" data-window-drag>Your AI workspace</strong></div>
+      <div class="titlebar-end"><span class="shell-local">Local workspace</span><div class="window-controls" aria-label="Window controls"><button id="window-minimize" class="chrome-button" type="button" aria-label="Minimize window" title="Minimize"></button><button id="window-maximize" class="chrome-button" type="button" aria-label="Maximize window" title="Maximize"></button><button id="window-close" class="chrome-button" type="button" aria-label="Close window" title="Close"></button></div></div>
     </header>
     <p id="shell-status" class="shell-status" role="status" hidden></p>
     <div class="app">
-      <aside id="app-sidebar" class="sidebar" aria-label="Çalışma alanı menüsü">
-        <a class="brand" href="#main" aria-label="Roomit ana ekran"><img src="/src/assets/roomit.svg" width="32" height="32" alt="" /><span>roomit<small>AI çalışma alanın</small></span></a>
-        <button id="sidebar-new-scan" type="button" class="sidebar-new-scan">Yeni tarama</button>
-        <nav id="result-tabs" class="result-tabs" aria-label="Sonuç görünümleri">
-          <div class="nav-label">AI ÇALIŞMA ALANI</div>
-          <button type="button" data-view="control" aria-pressed="true"><span>AI kontrol merkezi</span></button>
-          <button type="button" data-view="tools" aria-pressed="false"><span>Araçlarım</span><small id="installed-count">—</small></button>
-          <button type="button" data-view="activity" aria-pressed="false"><span>Canlı kaynaklar</span></button>
-          <button type="button" data-view="ai" aria-pressed="false"><span>AI depolama haritası</span><small id="ai-count">—</small></button>
-          <div class="nav-label">DOSYA İNCELEME</div>
-          <button type="button" data-view="overview" aria-pressed="false"><span>Genel bakış</span></button>
-          <button type="button" data-view="projects" aria-pressed="false"><span>Projeler</span><small id="project-count">—</small></button>
-          <button type="button" data-view="largest" aria-pressed="false"><span>Büyük öğeler</span></button>
-          <button type="button" data-view="details" aria-pressed="false"><span>Tarama ayrıntıları</span></button>
+      <aside id="app-sidebar" class="sidebar" aria-label="Workspace navigation">
+        <a class="brand" href="#main" aria-label="Roomit home"><img src="/src/assets/roomit.svg" width="32" height="32" alt="" /><span>roomit<small>Your AI workspace</small></span></a>
+        <button id="sidebar-new-scan" type="button" class="sidebar-new-scan">New scan</button>
+        <nav id="result-tabs" class="result-tabs" aria-label="Result views">
+          <div class="nav-label">AI WORKSPACE</div>
+          <button type="button" data-view="control" aria-pressed="true"><span>AI control center</span></button>
+          <button type="button" data-view="tools" aria-pressed="false"><span>My tools</span><small id="installed-count">—</small></button>
+          <button type="button" data-view="activity" aria-pressed="false"><span>Live resources</span></button>
+          <button type="button" data-view="ai" aria-pressed="false"><span>AI storage map</span><small id="ai-count">—</small></button>
+          <div class="nav-label">FILE INSPECTION</div>
+          <button type="button" data-view="overview" aria-pressed="false"><span>Overview</span></button>
+          <button type="button" data-view="projects" aria-pressed="false"><span>Projects</span><small id="project-count">—</small></button>
+          <button type="button" data-view="largest" aria-pressed="false"><span>Large items</span></button>
+          <button type="button" data-view="details" aria-pressed="false"><span>Scan details</span></button>
         </nav>
-        <div class="sidebar-bottom"><div class="local-badge">Bu bilgisayar</div><p>Verilerin burada kalır.<br />Dosyaların değiştirilmez.</p><span class="build-label">ROOMIT 0.4.0 · GELİŞTİRME</span></div>
+        <div class="sidebar-bottom"><div class="local-badge">This device</div><p>Your data stays here.<br />Your files stay unchanged.</p><span class="build-label">ROOMIT 0.4.0 · RELEASE</span></div>
       </aside>
       <main id="main" tabindex="-1">
-        <header class="page-heading"><div><p class="eyebrow">YEREL AI KONTROL MERKEZİN</p><h1 id="page-title">AI çalışma alanın</h1><p id="page-description">Araçların, canlı kaynakların ve geride kalan AI verilerin.</p></div><div class="heading-actions"><span class="read-only">Salt okunur</span><button id="quick-ai-scan" type="button">AI verilerini tara</button><button id="new-scan" type="button" class="secondary">Yeni tarama</button></div></header>
+        <section id="update-banner" class="update-banner" aria-label="App updates" hidden>
+          <div><strong id="update-message" role="status" aria-live="polite"></strong><p id="update-notes"></p><progress id="update-progress" aria-label="Update download progress" hidden></progress></div>
+          <div class="update-banner-actions"><button id="install-update" type="button" hidden>Update and restart</button><button id="dismiss-update" type="button" class="secondary" aria-label="Dismiss update notice">Later</button></div>
+        </section>
+        <header class="page-heading"><div><p class="eyebrow">YOUR LOCAL AI CONTROL CENTER</p><h1 id="page-title">Your AI workspace</h1><p id="page-description">Your tools, live resources, and the AI data they leave behind.</p></div><div class="heading-actions"><span class="read-only">Read-only</span><button id="quick-ai-scan" type="button">Scan AI data</button><button id="new-scan" type="button" class="secondary">New scan</button></div></header>
         <section id="ai-scan-panel" class="ai-scan-panel" aria-labelledby="ai-start-title">
-          <div class="ai-start-copy"><p class="eyebrow">AI ODAKLI TARAMA</p><h2 id="ai-start-title">AI araçların. Kaynakların.<br />Hepsi tek bir yerde.</h2><p class="ai-start-description">Roomit, bilgisayarındaki AI araçlarını ve bıraktıkları verileri anlaman için tasarlandı. Modelleri, geçmişi ve büyük veri klasörlerini keşfet.</p><div class="ai-start-actions"><button id="scan-ai" type="button">AI klasörlerini tara</button><button id="configure-scan" type="button" class="secondary">Klasör veya disk seç</button></div><p class="hint ai-start-trust">Tüm diskler taranmaz. Dosyaların değiştirilmez.</p></div>
-          <div class="ai-tool-preview" hidden><p class="eyebrow">BAKACAĞIMIZ KONUMLAR</p><div class="supported-tools"><span>Codex<small>Kullanıcı verileri</small></span><span>Claude Code<small>Kullanıcı verileri</small></span><span>Cursor<small>Kullanıcı verileri</small></span><span>Ollama<small>Veriler ve modeller</small></span></div><p class="hint">Geçmiş, ayarlar ve modeller de bulunabilir. Her öğe geçici dosya değildir.</p></div>
+          <div class="ai-start-copy"><p class="eyebrow">AI-FOCUSED SCANNING</p><h2 id="ai-start-title">Your AI tools. Your resources.<br />All in one place.</h2><p class="ai-start-description">Roomit helps you understand the AI tools on your computer and the data they leave behind. Explore models, history, and large data folders.</p><div class="ai-start-actions"><button id="scan-ai" type="button">Scan AI folders</button><button id="configure-scan" type="button" class="secondary">Choose folder or disk</button></div><p class="hint ai-start-trust">Other disks are not scanned. Your files stay unchanged.</p></div>
+          <div class="ai-tool-preview" hidden><p class="eyebrow">LOCATIONS TO EXPLORE</p><div class="supported-tools"><span>Codex<small>User data</small></span><span>Claude Code<small>User data</small></span><span>Cursor<small>User data</small></span><span>Ollama<small>Data and models</small></span></div><p class="hint">May include history, settings, and models. Not every item is a temporary file.</p></div>
         </section>
         <section class="scan-panel" aria-labelledby="inspect-title">
-          <div class="scan-heading"><div><h2 id="inspect-title">Nereye bakalım?</h2><p id="scan-caption" class="muted">Bir alan seç. Roomit içindekileri anlamlandırır.</p></div><div class="scan-header-actions"><span id="scan-elapsed" class="scan-elapsed" hidden></span><button id="cancel-button" type="button" class="secondary" hidden>İptal et</button><button id="toggle-scan" type="button" class="secondary" aria-expanded="false" aria-controls="inspect-form" hidden>Alanı değiştir</button></div></div>
+          <div class="scan-heading"><div><h2 id="inspect-title">Where should we look?</h2><p id="scan-caption" class="muted">Choose a scope. Roomit helps you understand what is inside.</p></div><div class="scan-header-actions"><span id="scan-elapsed" class="scan-elapsed" hidden></span><button id="cancel-button" type="button" class="secondary" hidden>Cancel</button><button id="toggle-scan" type="button" class="secondary" aria-expanded="false" aria-controls="inspect-form" hidden>Change scope</button></div></div>
           <form id="inspect-form">
             <fieldset class="scan-modes">
-              <legend class="sr-only">Tarama kapsamı</legend>
-              <label><input type="radio" name="scan-mode" value="ai" checked /><span><strong>AI konumları</strong><small>Bilinen kullanıcı klasörleri</small></span></label>
-              <label><input type="radio" name="scan-mode" value="folder" /><span><strong>Bir klasör</strong><small>Alt klasörleriyle birlikte</small></span></label>
-              <label><input type="radio" name="scan-mode" value="disk" /><span><strong>Tek disk</strong><small>Seçtiğin diskin tamamı</small></span></label>
-              <label><input type="radio" name="scan-mode" value="computer" /><span><strong>Bütün bilgisayar</strong><small>Bağlı tüm yerel diskler</small></span></label>
+              <legend class="sr-only">Scan scope</legend>
+              <label><input type="radio" name="scan-mode" value="ai" checked /><span><strong>AI locations</strong><small>Known user folders</small></span></label>
+              <label><input type="radio" name="scan-mode" value="folder" /><span><strong>One folder</strong><small>Including subfolders</small></span></label>
+              <label><input type="radio" name="scan-mode" value="disk" /><span><strong>One disk</strong><small>The entire selected disk</small></span></label>
+              <label><input type="radio" name="scan-mode" value="computer" /><span><strong>Whole computer</strong><small>All connected local disks</small></span></label>
             </fieldset>
             <div class="target-row">
-              <div id="ai-target" class="target-control" hidden><p class="scope-list">Codex · Claude Code · OpenCode · Cursor · Ollama ve desteklenen diğer araçlar<br /><span class="hint">Kullanıcı klasöründeki bilinen konumlar · Tüm diskler taranmaz</span></p></div>
-              <div id="folder-target" class="target-control"><label for="root" class="sr-only">Seçilen klasör</label><input id="root" name="root" type="text" placeholder="Taramak istediğin klasörü seç" readonly /><button id="choose-folder" type="button" class="secondary">Klasör seç…</button></div>
-              <div id="disk-target" class="target-control" hidden><label for="disk-select" class="sr-only">Taranacak disk</label><select id="disk-select"><option value="">Diskler yükleniyor…</option></select></div>
-              <div id="computer-target" class="target-control" hidden><p id="computer-roots" class="scope-list" role="status">Yerel diskler bulunuyor…</p></div>
-              <div class="scan-actions"><button id="inspect-button" type="submit" disabled>Taramayı başlat</button></div>
+              <div id="ai-target" class="target-control" hidden><p class="scope-list">Codex · Claude Code · OpenCode · Cursor · Ollama and other supported tools<br /><span class="hint">Known locations in your home folder · Other disks are not scanned</span></p></div>
+              <div id="folder-target" class="target-control"><label for="root" class="sr-only">Selected folder</label><input id="root" name="root" type="text" placeholder="Select a folder to scan" readonly /><button id="choose-folder" type="button" class="secondary">Choose folder…</button></div>
+              <div id="disk-target" class="target-control" hidden><label for="disk-select" class="sr-only">Disk to scan</label><select id="disk-select"><option value="">Loading disks…</option></select></div>
+              <div id="computer-target" class="target-control" hidden><p id="computer-roots" class="scope-list" role="status">Finding local disks…</p></div>
+              <div class="scan-actions"><button id="inspect-button" type="submit" disabled>Start scan</button></div>
             </div>
-            <div class="target-foot"><p id="runtime-note" class="hint">Tarama masaüstü uygulamasında kullanılabilir.</p><button id="refresh-roots" type="button" class="text-button" hidden>Diskleri yenile</button></div>
+            <div class="target-foot"><p id="runtime-note" class="hint">Scanning is available in the desktop app.</p><button id="refresh-roots" type="button" class="text-button" hidden>Refresh disks</button></div>
             <div id="disk-info" class="disk-info" hidden></div>
             <details id="exclusion-settings" class="exclusion-settings">
-              <summary>Hariç tutulanlar <span id="exclusion-count">· Yükleniyor…</span></summary>
+              <summary>Exclusions <span id="exclusion-count">· Loading…</span></summary>
               <div class="exclusion-body">
-                <div class="exclusion-heading"><div><strong>Senin seçtiklerin</strong><p class="hint">Tüm tarama türlerinde geçerli. Uygulamayı kapatınca da saklanır.</p></div><button id="add-exclusion" type="button" class="secondary" disabled>Klasör ekle…</button></div>
-                <ul id="exclusion-list" class="exclusion-list" aria-label="Hariç tutulan klasörler"></ul>
-                <p id="exclusion-status" class="hint" role="status" aria-live="polite">Hariç tutma ayarları yükleniyor…</p>
-                <button id="retry-exclusions" type="button" class="text-button" hidden>Yeniden yükle</button>
-                <div class="automatic-exclusions"><strong>Otomatik koruma · Her zaman açık</strong><p class="hint">Sistem konumları ve tanınan uygulama kurulumları taranmaz. Projeler, bağımlılıklar ve AI kullanıcı verileri incelenebilir. Kayıtsız / taşınabilir uygulamaları listeye ayrıca ekle.</p><details><summary>Otomatik hariç tutulan konumlar</summary><ul id="automatic-exclusion-list" class="exclusion-list"></ul><p id="automatic-exclusion-note" class="hint"></p></details></div>
+                <div class="exclusion-heading"><div><strong>Your exclusions</strong><p class="hint">Applies to every scan mode. Saved across app restarts.</p></div><button id="add-exclusion" type="button" class="secondary" disabled>Add folders…</button></div>
+                <ul id="exclusion-list" class="exclusion-list" aria-label="Excluded folders"></ul>
+                <p id="exclusion-status" class="hint" role="status" aria-live="polite">Loading exclusions…</p>
+                <button id="retry-exclusions" type="button" class="text-button" hidden>Reload</button>
+                <div class="automatic-exclusions"><strong>Automatic protection · Always on</strong><p class="hint">System locations and recognized app installations are excluded. Projects, dependencies, and AI user data can be inspected. Add unregistered or portable apps to your exclusions.</p><details><summary>Automatically excluded locations</summary><ul id="automatic-exclusion-list" class="exclusion-list"></ul><p id="automatic-exclusion-note" class="hint"></p></details></div>
               </div>
             </details>
           </form>
-          <p class="hint scan-scope-note">Sistem ve tanınan uygulama kurulumları kapsam dışında. Boyutlar yalnızca taramaya dahil edilen dosyaları gösterir.</p>
-          <div class="scan-state"><progress id="scan-progress" aria-label="Tarama sürüyor" hidden></progress><p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p><p id="current-path" class="current-path" aria-live="off"></p></div>
+          <p class="hint scan-scope-note">System and recognized app installations are excluded. Sizes cover only included files.</p>
+          <div class="scan-state"><progress id="scan-progress" aria-label="Scan in progress" hidden></progress><p id="status" role="status" aria-live="polite">No scans yet.</p><p id="current-path" class="current-path" aria-live="off"></p></div>
         </section>
-        <section id="snapshot-banner" class="snapshot-banner" aria-label="Son taramanın güncelliği" hidden>
-          <div><strong id="snapshot-title"></strong><p id="snapshot-date" class="hint"></p><p id="snapshot-watch-state" role="status" aria-live="polite"></p><p id="snapshot-freshness" class="hint">Değişiklik izlemesi hazırlanıyor…</p><p id="snapshot-offline" class="hint" hidden>Uygulama kapalıyken oluşan değişiklikler kontrol edilmedi; kayıtlı sonuçlar değişmiş olabilir.</p><p id="snapshot-save-error" class="warning" hidden></p></div>
-          <button id="rescan-snapshot" type="button" class="secondary">Yeniden tara</button>
+        <section id="snapshot-banner" class="snapshot-banner" aria-label="Latest scan freshness" hidden>
+          <div><strong id="snapshot-title"></strong><p id="snapshot-date" class="hint"></p><p id="snapshot-watch-state" role="status" aria-live="polite"></p><p id="snapshot-freshness" class="hint">Preparing change monitoring…</p><p id="snapshot-offline" class="hint" hidden>Changes made while Roomit was closed were not monitored. Saved results may be out of date.</p><p id="snapshot-save-error" class="warning" hidden></p></div>
+          <button id="rescan-snapshot" type="button" class="secondary">Rescan</button>
         </section>
-        <section id="workspace-panel" aria-label="AI çalışma alanı"></section>
-        <div id="restore-state" class="restore-state" hidden><p id="restore-message" role="status"></p><button id="retry-last-scan" type="button" class="secondary">Kaydı yeniden aç</button></div>
+        <section id="workspace-panel" aria-label="AI workspace"></section>
+        <div id="restore-state" class="restore-state" hidden><p id="restore-message" role="status"></p><button id="retry-last-scan" type="button" class="secondary">Reopen saved scan</button></div>
         <section class="report-panel" aria-labelledby="results-title">
-          <div class="results-header"><div><p class="eyebrow">TARAMA SONUÇLARI</p><h2 id="results-title">Bulunan araçlar</h2><p id="result-caption" class="muted">İlk taramanla başlayalım.</p></div><div class="result-tools"><div class="search-row"><label for="result-search" class="sr-only">Sonuçlarda ara</label><input id="result-search" type="search" placeholder="Araç veya klasör ara…" disabled /></div><label id="result-sort-label" class="sort-control"><span class="sr-only">Sonuç sıralaması</span><select id="result-sort" aria-label="Sonuç sıralaması"><option value="size">Boyut: büyükten küçüğe</option><option value="name">Ad: A–Z</option></select></label></div></div>
+          <div class="results-header"><div><p class="eyebrow">SCAN RESULTS</p><h2 id="results-title">Discovered tools</h2><p id="result-caption" class="muted">Start with your first scan.</p></div><div class="result-tools"><div class="search-row"><label for="result-search" class="sr-only">Search results</label><input id="result-search" type="search" placeholder="Search tools or folders…" disabled /></div><label id="result-sort-label" class="sort-control"><span class="sr-only">Result sort order</span><select id="result-sort" aria-label="Result sort order"><option value="size">Size: largest first</option><option value="name">Name: A–Z</option></select></label></div></div>
           <form id="size-filter-form" class="size-filter-form" hidden>
-            <div><label for="minimum-gb">Minimum boyut</label><p id="minimum-help" class="hint">GB ve üzeri · Örnek: 5 veya 0,5 · Boş / 0: tümü</p></div>
-            <div class="size-filter-controls"><div class="gb-field"><input id="minimum-gb" type="text" inputmode="decimal" maxlength="30" placeholder="Örn. 5" aria-describedby="minimum-help size-filter-error" /><span>GB</span></div><button type="submit">Uygula</button><button id="clear-size-filter" type="button" class="secondary">Temizle</button></div>
+            <div><label for="minimum-gb">Minimum size</label><p id="minimum-help" class="hint">GB and above · Example: 5 or 0.5 · Empty / 0: all</p></div>
+            <div class="size-filter-controls"><div class="gb-field"><input id="minimum-gb" type="text" inputmode="decimal" maxlength="30" placeholder="e.g. 5" aria-describedby="minimum-help size-filter-error" /><span>GB</span></div><button type="submit">Apply</button><button id="clear-size-filter" type="button" class="secondary">Clear</button></div>
             <p id="size-filter-error" class="warning" role="status" aria-live="polite" hidden></p>
           </form>
           <p id="reveal-hint" class="hint" hidden></p>
           <div id="results" aria-busy="false"></div>
         </section>
-        <footer><span>AI araçların için görünürlük. Tüm veriler bu cihazda.</span><span>ROOMIT</span></footer>
+        <footer><span>Visibility into your AI tools. Your data stays on this device.</span><span>ROOMIT</span></footer>
       </main>
     </div>
   </body>

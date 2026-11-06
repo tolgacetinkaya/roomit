@@ -11,18 +11,18 @@ impl ExclusionStore {
     pub fn new(directory: PathBuf) -> Self { Self { file: directory.join("scan-exclusions.json"), lock: Arc::new(Mutex::new(())) } }
     fn load(&self) -> Result<Settings, String> {
         match fs::read(&self.file) {
-            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| format!("Hariç tutma ayarları okunamadı: {e}. Dosya korunuyor.")),
+            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| format!("Could not read exclusions: {e}. The file was preserved.")),
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Settings::default()),
-            Err(e) => Err(format!("Hariç tutma ayarları okunamadı: {e}")),
+            Err(e) => Err(format!("Could not read exclusions: {e}")),
         }
     }
     pub fn paths(&self) -> Result<Vec<String>, String> {
-        let _guard = self.lock.lock().map_err(|_| "Ayarlar kilidi alınamadı.")?;
+        let _guard = self.lock.lock().map_err(|_| "Could not lock settings.")?;
         Ok(self.load()?.excluded_paths)
     }
     pub fn directory(&self) -> PathBuf { self.file.parent().unwrap().to_path_buf() }
     pub fn change(&self, add: Vec<String>, remove: Option<String>) -> Result<Vec<String>, String> {
-        let _guard = self.lock.lock().map_err(|_| "Ayarlar kilidi alınamadı.")?;
+        let _guard = self.lock.lock().map_err(|_| "Could not lock settings.")?;
         let mut settings = self.load()?;
         // Validate the entire addition before writing anything. Existing missing
         // paths (e.g. an unplugged disk) remain saved until explicitly removed.
@@ -32,12 +32,12 @@ impl ExclusionStore {
             if !settings.excluded_paths.iter().any(|s| same_path(s, &path)) { settings.excluded_paths.push(path); }
         }
         let parent = self.file.parent().unwrap();
-        fs::create_dir_all(parent).map_err(|e| format!("Ayar klasörü oluşturulamadı: {e}"))?;
+        fs::create_dir_all(parent).map_err(|e| format!("Could not create settings folder: {e}"))?;
         let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
         serde_json::to_writer_pretty(temporary.as_file_mut(), &settings).map_err(|e| e.to_string())?;
         temporary.flush().map_err(|e| e.to_string())?;
         temporary.as_file().sync_all().map_err(|e| e.to_string())?;
-        temporary.persist(&self.file).map_err(|e| format!("Hariç tutma ayarları kaydedilemedi: {e}"))?;
+        temporary.persist(&self.file).map_err(|e| format!("Could not save exclusions: {e}"))?;
         Ok(settings.excluded_paths)
     }
 }
@@ -46,13 +46,13 @@ fn same_path(a: &str, b: &str) -> bool {
 }
 fn checked_directory(value: &str) -> Result<String, String> {
     let path = Path::new(value);
-    if !path.is_absolute() { return Err("Mutlak bir klasör yolu seçin.".into()); }
-    let metadata = fs::symlink_metadata(path).map_err(|e| format!("Klasör doğrulanamadı: {e}"))?;
+    if !path.is_absolute() { return Err("Select an absolute folder path.".into()); }
+    let metadata = fs::symlink_metadata(path).map_err(|e| format!("Could not validate folder: {e}"))?;
     #[cfg(windows)]
     let link = { use std::os::windows::fs::MetadataExt; metadata.file_attributes() & 0x400 != 0 };
     #[cfg(not(windows))]
     let link = metadata.is_symlink();
-    if !metadata.is_dir() || link { return Err("Bağlantı yerine doğrudan bir klasör seçin.".into()); }
+    if !metadata.is_dir() || link { return Err("Select a folder directly instead of a link.".into()); }
     let path = path.canonicalize().map_err(|e| e.to_string())?;
     let text = path.to_string_lossy();
     #[cfg(windows)]
@@ -110,7 +110,7 @@ pub fn automatic_paths() -> (Vec<PathBuf>, Vec<String>) {
             for name in [".Spotlight-V100", ".fseventsd", ".Trashes", ".DocumentRevisions-V100"] { paths.push(disk.mount_point().join(name)); }
         }
         if let Some(home) = std::env::var_os("HOME") { paths.push(PathBuf::from(home).join("Applications")); }
-        notes.push("Uygulama paketleri (.app), içlerinden bir alt klasör seçilse de taranmaz.".into());
+        notes.push("Application bundles (.app) are excluded, even when a subfolder is selected.".into());
     }
     paths.retain(|p| p.is_absolute()); paths.sort(); paths.dedup();
     (paths, notes)
@@ -129,7 +129,7 @@ fn registered_installations(paths: &mut Vec<PathBuf>, notes: &mut Vec<String>) {
                 let key = match hive.open_subkey_with_flags(branch, KEY_READ | view) {
                     Ok(key) => key,
                     Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
-                    Err(_) => { notes.push("Bazı uygulama kayıtları okunamadı; standart sistem ve kurulum konumları yine hariç tutulur.".into()); continue; }
+                    Err(_) => { notes.push("Some application records could not be read. Standard system and installation locations remain excluded.".into()); continue; }
                 };
                 for name in key.enum_keys().flatten() {
                     let Ok(app) = key.open_subkey_with_flags(name, KEY_READ | view) else { continue };

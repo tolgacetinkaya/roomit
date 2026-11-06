@@ -8,6 +8,7 @@ mod ai;
 mod inventory;
 mod monitor;
 mod gpu;
+mod updates;
 
 use std::{
     path::PathBuf,
@@ -32,15 +33,15 @@ struct DesktopReport {
 
 impl ScanRegistry {
     fn begin(&self, id: String) -> Result<ScanLease, String> {
-        if id.is_empty() || id.len() > 128 { return Err("Geçersiz tarama kimliği.".into()); }
-        let mut active = self.0.lock().map_err(|_| "Tarama durumu okunamadı.")?;
-        if active.is_some() { return Err("Bir tarama zaten sürüyor. Tamamlanmasını veya iptalini bekleyin.".into()); }
+        if id.is_empty() || id.len() > 128 { return Err("Invalid scan ID.".into()); }
+        let mut active = self.0.lock().map_err(|_| "Could not read scan state.")?;
+        if active.is_some() { return Err("A scan is already running. Wait for it to finish or cancel it.".into()); }
         let cancel = Arc::new(AtomicBool::new(false));
         *active = Some(ActiveScan { id: id.clone(), cancel: cancel.clone() });
         Ok(ScanLease { registry: self.clone(), id, cancel })
     }
     fn cancel(&self, id: &str) -> Result<bool, String> {
-        let active = self.0.lock().map_err(|_| "Tarama durumu okunamadı.")?;
+        let active = self.0.lock().map_err(|_| "Could not read scan state.")?;
         if let Some(active) = active.as_ref().filter(|scan| scan.id == id) {
             active.cancel.store(true, Ordering::Relaxed);
             Ok(true)
@@ -68,7 +69,7 @@ async fn inspect_workspace(
     saved: tauri::State<'_, saved_scan::SavedScanStore>,
     watches: tauri::State<'_, watch::WatchRegistry>,
 ) -> Result<DesktopReport, String> {
-    if !["folder", "computer", "disk", "ai"].contains(&mode.as_str()) { return Err("Geçersiz tarama kapsamı.".into()); }
+    if !["folder", "computer", "disk", "ai"].contains(&mode.as_str()) { return Err("Invalid scan scope.".into()); }
     let lease = state.begin(scan_id)?;
     let scanned_at_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
     let saved = saved.inner().clone();
@@ -84,7 +85,7 @@ async fn inspect_workspace(
     tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease; // Releases registry even on scan errors or worker panic.
         // Keep the previous snapshot available until the replacement succeeds.
-        let mut writer = size_index::IndexWriter::new_in(&saved.directory).map_err(|e| format!("Sonuç dizini oluşturulamadı: {e}"))?;
+        let mut writer = size_index::IndexWriter::new_in(&saved.directory).map_err(|e| format!("Could not create result directory: {e}"))?;
         excluded_paths.extend(writer.directories_to_exclude());
         let roots = if mode == "ai" { ai::roots()? } else if mode == "folder" { vec![PathBuf::from(&root)] } else {
             let roots = computer::computer_roots()?;
@@ -107,7 +108,7 @@ async fn inspect_workspace(
             let mut report = roomit_core::scan_locations_with_sink(&roots, options, &_lease.cancel, &mut progress, &mut writer)
                 .map_err(|error| error.to_string())?;
             if mode == "disk" { report.scope = "disk".into(); report.root = root; }
-            if mode == "ai" { report.scope = "ai".into(); report.root = "Bilinen AI veri konumları".into(); }
+            if mode == "ai" { report.scope = "ai".into(); report.root = "Known AI data locations".into(); }
             Ok(report)
         } else {
             let options = roomit_core::ScanOptions { max_entries: None, max_depth: None,
@@ -124,14 +125,14 @@ async fn inspect_workspace(
         Ok(report)
     })
     .await
-    .map_err(|error| format!("Tarama görevi tamamlanamadı: {error}"))?
+    .map_err(|error| format!("Scan task could not be completed: {error}"))?
 }
 
 #[tauri::command]
 async fn computer_scan_roots() -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(|| {
         computer::computer_roots().map(|roots| roots.into_iter().map(|path| path.to_string_lossy().into_owned()).collect())
-    }).await.map_err(|error| format!("Disk listesi alınamadı: {error}"))?
+    }).await.map_err(|error| format!("Could not load disks: {error}"))?
 }
 
 #[tauri::command]
@@ -140,8 +141,8 @@ async fn load_last_scan(saved: tauri::State<'_, saved_scan::SavedScanStore>, ind
     let saved = saved.inner().clone(); let indexes = indexes.inner().clone(); let scans = scans.inner().clone();
     let exclusions = exclusions.inner().clone(); let watches = watches.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let active = scans.0.lock().map_err(|_| "Tarama durumu okunamadı.")?;
-        if active.is_some() { return Err("Tarama sürerken kayıtlı sonuç yüklenemez.".into()); }
+        let active = scans.0.lock().map_err(|_| "Could not read scan state.")?;
+        if active.is_some() { return Err("Saved results cannot be loaded while scanning.".into()); }
         let Some((report, snapshot)) = saved.load()? else { return Ok(None) };
         let policy = match &report.watch_policy { Some(policy) => policy.clone(), None => {
             let mut excluded_paths: Vec<PathBuf> = exclusions.paths()?.into_iter().map(PathBuf::from).collect();
@@ -175,8 +176,8 @@ async fn change_exclusions(add: Vec<String>, remove: Option<String>, store: taur
     // Keep edits and scan-start mutually exclusive; each report has one policy.
     let scans = scans.inner().clone(); let store = store.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let active = scans.0.lock().map_err(|_| "Tarama durumu okunamadı.")?;
-        if active.is_some() { return Err("Hariç tutma listesini değiştirmek için taramanın bitmesini bekleyin.".into()); }
+        let active = scans.0.lock().map_err(|_| "Could not read scan state.")?;
+        if active.is_some() { return Err("Wait for the scan to finish before changing exclusions.".into()); }
         store.change(add, remove)
     }).await.map_err(|e| e.to_string())?
 }
@@ -184,7 +185,7 @@ async fn change_exclusions(add: Vec<String>, remove: Option<String>, store: taur
 #[tauri::command]
 async fn local_disks() -> Result<Vec<computer::LocalDisk>, String> {
     tauri::async_runtime::spawn_blocking(computer::local_disks).await
-        .map_err(|error| format!("Disk listesi alınamadı: {error}"))?
+        .map_err(|error| format!("Could not load disks: {error}"))?
 }
 
 #[tauri::command]
@@ -195,7 +196,7 @@ fn cancel_scan(scan_id: String, state: tauri::State<'_, ScanRegistry>) -> Result
 #[tauri::command]
 async fn reveal_path(path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || reveal::reveal(&path)).await
-        .map_err(|error| format!("Konum gösterilemedi: {error}"))?
+        .map_err(|error| format!("Could not reveal location: {error}"))?
 }
 
 #[tauri::command]
@@ -208,7 +209,7 @@ async fn query_size_entries(request: size_index::PageRequest,
         let _lease = lease;
         index.query(&request, _lease.cancel.clone())
     })
-        .await.map_err(|error| format!("Sonuç yükleme görevi tamamlanamadı: {error}"))?
+        .await.map_err(|error| format!("Result loading task failed: {error}"))?
 }
 
 #[tauri::command]
@@ -228,11 +229,13 @@ async fn discover_ai_tools() -> Result<inventory::Inventory, String> {
 #[tauri::command]
 async fn resource_snapshot(state: tauri::State<'_, monitor::Monitor>) -> Result<monitor::Snapshot, String> {
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || state.0.lock().map_err(|_| "Canlı ölçüm durumu okunamadı.".to_string()).map(|mut sampler| sampler.sample())).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || state.0.lock().map_err(|_| "Could not read live monitoring state.".to_string()).map(|mut sampler| sampler.sample())).await.map_err(|e| e.to_string())?
 }
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::Updates::default())
         .manage(ScanRegistry::default())
         .manage(monitor::Monitor::default())
         .manage(size_index::ResultIndexes::default())
@@ -243,7 +246,7 @@ pub fn run() {
             app.manage(saved_scan::SavedScanStore::new(app.path().app_local_data_dir()?.join("last-scan")));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status, discover_ai_tools, resource_snapshot, map_children])
+        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status, discover_ai_tools, resource_snapshot, map_children, updates::check_for_update, updates::install_release])
         .run(tauri::generate_context!())
         .expect("Roomit could not start");
 }

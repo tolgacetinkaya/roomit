@@ -18,8 +18,8 @@ interface Inventory {tools:InstalledTool[];supportedCount:number;warnings:string
 interface NetworkRow {name:string;receivedPerSecond:number|null;sentPerSecond:number|null}
 interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;memoryAvailable?:string;memoryInstalled?:string|null;processes:ProcessRow[];networks:NetworkRow[];gpuStatus:string;gpuAi?:GpuReading;gpuTools?:{toolId:string;reading:GpuReading}[];appNetworkStatus:string}
 const el=(tag:string,text="",cls=""):HTMLElement=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
-const percent=(n:number|null)=>n===null?"Ölçülüyor…":`%${n.toLocaleString("tr-TR",{maximumFractionDigits:1})}`;
-const rate=(n:number|null)=>n===null?"Ölçülüyor…":`${formatBytes(Math.max(0,Math.round(n)).toString())}/sn`;
+const percent=(n:number|null)=>n===null?"Measuring…":`${n.toLocaleString("en-US",{maximumFractionDigits:1})}%`;
+const rate=(n:number|null)=>n===null?"Measuring…":`${formatBytes(Math.max(0,Math.round(n)).toString())}/s`;
 export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tools"|"activity")=>void):{show:(view:string,report:InspectionReport|null,groups:GroupedReport|null)=>void}{
   let current:string="",report:InspectionReport|null=null,groups:GroupedReport|null=null;
   let inventory:Inventory|null=null,snapshot:Snapshot|null=null,inventoryError="",monitorError="",inventoryBusy=false,monitorBusy=false,paused=false;
@@ -56,18 +56,18 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(!available.some(n=>n.name===networkName))networkName=[...available].sort((a,b)=>(b.receivedPerSecond||0)+(b.sentPerSecond||0)-(a.receivedPerSecond||0)-(a.sentPerSecond||0))[0]?.name||"";
       const network=monitorError?undefined:available.find(n=>n.name===networkName);
       metrics.replaceChildren(renderResourceCards(snapshot,history,displayMode,monitorError,running));
-      if(networkSummary)networkSummary.textContent=network?`Ağ · ${network.name} · İndirme ${rate(network.receivedPerSecond)} · Gönderme ${rate(network.sentPerSecond)}`:"Ağ ölçümü alınamadı";
+      if(networkSummary)networkSummary.textContent=network?`Network · ${network.name} · Download ${rate(network.receivedPerSecond)} · Upload ${rate(network.sentPerSecond)}`:"Network measurement unavailable";
     }
-    if(sampleLabel)sampleLabel.textContent=monitorError?`Ölçüm alınamadı: ${monitorError}`:paused?"Canlı ölçüm duraklatıldı.":snapshot?`Son ölçüm ${new Date(snapshot.sampledAtMs).toLocaleTimeString("tr-TR")} · 2 sn aralıkla` : "İlk ölçüm alınıyor…";
+    if(sampleLabel)sampleLabel.textContent=monitorError?`Measurement unavailable: ${monitorError}`:paused?"Live monitoring paused.":snapshot?`Latest sample ${new Date(snapshot.sampledAtMs).toLocaleTimeString("en-US")} · Every 2 seconds` : "Collecting first sample…";
     for(const card of container.querySelectorAll<HTMLElement>("[data-tool-usage]")){
       const id=card.dataset.toolUsage!, usage=toolUsage(snapshot?.processes||[],id);
-      card.textContent=monitorError?"Canlı ölçüm alınamadı":snapshot?usage.processes?`${usage.processes} süreç · CPU ${percent(usage.cpu)} · RAM ${memoryText(usage.memory,snapshot.memoryTotal,displayMode)}`:"Şu anda çalışan süreç görülmedi":"Canlı ölçüm bekleniyor…";
+      card.textContent=monitorError?"Live measurement unavailable":snapshot?usage.processes?`${usage.processes} processes · CPU ${percent(usage.cpu)} · RAM ${memoryText(usage.memory,snapshot.memoryTotal,displayMode)}`:"No running processes detected":"Waiting for live measurement…";
     }
     for(const card of container.querySelectorAll<HTMLElement>("[data-tool-gpu]")){
       const id=card.dataset.toolGpu!, usage=toolUsage(snapshot?.processes||[],id);
       const gpu=monitorError?undefined:snapshot?.gpuTools?.find(t=>t.toolId===id)?.reading;
-      card.textContent=`GPU · ${snapshot?(usage.processes?gpuText(gpu):"Çalışan süreç yok"):"Ölçüm bekleniyor"}`;
-      card.title=monitorError?`Canlı ölçüm alınamadı: ${monitorError}`:gpu?.reason||(snapshot&&!usage.processes?"Şu anda bu araç için çalışan süreç görülmedi.":"Bu araç için GPU değeri alınamadı; sıfır kullanım anlamına gelmez.");
+      card.textContent=`GPU · ${snapshot?(usage.processes?gpuText(gpu):"No running processes"):"Waiting for measurement"}`;
+      card.title=monitorError?`Live measurement unavailable: ${monitorError}`:gpu?.reason||(snapshot&&!usage.processes?"No running processes detected for this tool.":"GPU usage is unavailable for this tool. This does not mean zero usage.");
     }
     if(processes)renderProcesses(true);
   }
@@ -75,26 +75,26 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     if(!toolsList)return;
     const opened=new Set(Array.from(toolsList.querySelectorAll<HTMLElement>("article[data-tool-id]")).filter(card=>card.querySelector<HTMLDetailsElement>("details")?.open).map(card=>card.dataset.toolId));
     toolsList.replaceChildren();toolsList.setAttribute("aria-busy",String(inventoryBusy));
-    if(inventoryError){toolsList.append(el("p",`Araç keşfi başarısız: ${inventoryError}`,"warning"));return;}
-    if(!inventory){toolsList.append(el("p",isTauri()?"Kurulu AI araçları aranıyor…":"Araç keşfi masaüstü uygulamasında çalışır.","hint"));return;}
+    if(inventoryError){toolsList.append(el("p",`Tool discovery failed: ${inventoryError}`,"warning"));return;}
+    if(!inventory){toolsList.append(el("p",isTauri()?"Discovering installed AI tools…":"Tool discovery is available in the desktop app.","hint"));return;}
     const detected=new Map(inventory.tools.map(t=>[t.id,t]));
     for(const id of new Set(snapshot?.processes.filter(p=>p.toolId).map(p=>p.toolId!)||[])){
-      if(!detected.has(id)){const tool=catalog.find(t=>t.id===id);if(tool)detected.set(id,{id,name:tool.name,kind:tool.kind,installations:[],dataPaths:[],evidence:["Çalışan süreç"]});}
+      if(!detected.has(id)){const tool=catalog.find(t=>t.id===id);if(tool)detected.set(id,{id,name:tool.name,kind:tool.kind,installations:[],dataPaths:[],evidence:["Running processes"]});}
     }
-    const tools=[...detected.values()].sort((a,b)=>Number(Boolean(b.evidence.length))-Number(Boolean(a.evidence.length))||a.name.localeCompare(b.name,"tr"));
+    const tools=[...detected.values()].sort((a,b)=>Number(Boolean(b.evidence.length))-Number(Boolean(a.evidence.length))||a.name.localeCompare(b.name,"en"));
     const display=tools;
-    if(!tools.length)toolsList.append(el("p","Desteklenen katalogda bir kurulum veya veri klasörü bulunamadı. Özel / taşınabilir kurulumlar tespit edilemeyebilir.","hint"));
+    if(!tools.length)toolsList.append(el("p","No installations or data folders matched the supported catalog. Custom or portable installations may not be detected.","hint"));
     for(const tool of display){
       const card=el("article","","installed-tool");card.dataset.toolId=tool.id;const heading=el("div","","installed-tool-heading"),copy=el("div");copy.append(el("h3",tool.name),el("p",tool.kind,"hint"));
-      const badge=el("span",tool.evidence.length||tool.installations.length?"Tespit edildi":"Yalnızca veri",tool.evidence.length?"tool-state":"tool-state data-only");heading.append(toolLogo(tool.id),copy,badge);
+      const badge=el("span",tool.evidence.length||tool.installations.length?"Detected":"Data only",tool.evidence.length?"tool-state":"tool-state data-only");heading.append(toolLogo(tool.id),copy,badge);
       const usage=el("p","","tool-live");usage.dataset.toolUsage=tool.id;
-      const gpu=el("p","GPU · Ölçüm bekleniyor","tool-gpu");gpu.dataset.toolGpu=tool.id;
+      const gpu=el("p","GPU · Waiting for measurement","tool-gpu");gpu.dataset.toolGpu=tool.id;
       const measured=groups?.ai.filter(g=>toolId(g.title)===tool.id)||[];
       const storage=measured.reduce((s,g)=>s+BigInt(g.logicalBytes),0n);
-      const bytes=el("div","","tool-storage");bytes.append(el("span","Taranan veri"),el("strong",measured.length?sizeLabel(storage.toString(),Boolean(report?.totalSizeComplete)&&!report?.resultsTruncated&&measured.every(g=>g.sizeComplete)):"Henüz ölçülmedi"));
-      const details=document.createElement("details");details.className="tool-evidence";details.open=opened.has(tool.id);const summary=document.createElement("summary");summary.textContent="Tespit kanıtı ve konumlar";details.append(summary);
+      const bytes=el("div","","tool-storage");bytes.append(el("span","Scanned data"),el("strong",measured.length?sizeLabel(storage.toString(),Boolean(report?.totalSizeComplete)&&!report?.resultsTruncated&&measured.every(g=>g.sizeComplete)):"Not measured yet"));
+      const details=document.createElement("details");details.className="tool-evidence";details.open=opened.has(tool.id);const summary=document.createElement("summary");summary.textContent="Discovery evidence and locations";details.append(summary);
       for(const evidence of tool.evidence)details.append(el("p",evidence,"hint"));
-      if(!tool.evidence.length&&!tool.installations.length)details.append(el("p","Veri klasörü kurulum kanıtı değildir; eski bir kurulumdan kalmış olabilir.","hint"));
+      if(!tool.evidence.length&&!tool.installations.length)details.append(el("p","A data folder is not proof of installation. It may remain from a previous installation.","hint"));
       const paths=[...new Set([...tool.installations,...tool.dataPaths])];
       for(const path of paths)details.append(el("p",path,"report-path"));
       details.append(revealActions(paths));card.append(heading,usage,gpu,bytes,details);toolsList.append(card);
@@ -107,71 +107,71 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       const rows=new Map(snapshot?.processes.map(row=>[row.pid,row]));
       for(const cell of processes.querySelectorAll<HTMLElement>(".process-cpu[data-pid],.process-memory[data-pid]")){
         const row=rows.get(Number(cell.dataset.pid));
-        cell.textContent=monitorError||!row?"Ölçülemiyor":cell.classList.contains("process-cpu")?percent(row.cpuPercent):memoryText(row.memoryBytes,snapshot!.memoryTotal,displayMode);
+        cell.textContent=monitorError||!row?"Unavailable":cell.classList.contains("process-cpu")?percent(row.cpuPercent):memoryText(row.memoryBytes,snapshot!.memoryTotal,displayMode);
       }
       for(const cell of processes.querySelectorAll<HTMLElement>(".process-gpu[data-pid]")){
         const row=snapshot?.processes.find(p=>p.pid===Number(cell.dataset.pid));
         cell.textContent=gpuText(monitorError?undefined:row?.gpu);
-        cell.title=monitorError?`Canlı ölçüm alınamadı: ${monitorError}`:row?.gpu?.reason||"Bu süreç için güncel GPU ölçümü yok.";
+        cell.title=monitorError?`Live measurement unavailable: ${monitorError}`:row?.gpu?.reason||"No current GPU measurement for this process.";
       }
       const note=processes.querySelector(".gpu-status-note");if(note)note.textContent=gpuNote();return;
     }
     processes.replaceChildren();
-    if(!snapshot){processes.append(el("p",monitorError||"Süreç ölçümleri bekleniyor…","hint"));return;}
+    if(!snapshot){processes.append(el("p",monitorError||"Waiting for process measurements…","hint"));return;}
     processes.append(el("p",gpuNote(),"gpu-status-note"));
     const all=snapshot.processes;let page=processPage(all,processQuery,aiOnly,processSort,processIndex);
     while(!page.length&&processIndex>0){processIndex--;page=processPage(all,processQuery,aiOnly,processSort,processIndex);}
     const table=document.createElement("table");table.className="process-table";
-    const head=document.createElement("thead"),tr=document.createElement("tr");for(const label of ["Süreç / uygulama","PID","CPU","RAM","GPU"]){const th=document.createElement("th");th.scope="col";th.textContent=label;tr.append(th);}head.append(tr);table.append(head);
+    const head=document.createElement("thead"),tr=document.createElement("tr");for(const label of ["Process / app","PID","CPU","RAM","GPU"]){const th=document.createElement("th");th.scope="col";th.textContent=label;tr.append(th);}head.append(tr);table.append(head);
     const tbody=document.createElement("tbody");
     for(const p of page){const row=document.createElement("tr"),name=document.createElement("td");const title=el("span",p.name,"process-name");
       if(p.toolId){name.append(toolLogo(p.toolId,20));title.append(el("small",catalog.find(t=>t.id===p.toolId)?.name||p.toolId));}
       else if(p.name.toLowerCase().includes("chrome"))name.append(toolLogo("chrome",20));
       else if(p.name.toLowerCase().includes("docker"))name.append(toolLogo("docker",20));
       name.append(title);row.append(name);
-      for(const [cls,value]of [["",String(p.pid)],["process-cpu",monitorError?"Ölçülemiyor":percent(p.cpuPercent)],["process-memory",monitorError?"Ölçülemiyor":memoryText(p.memoryBytes,snapshot.memoryTotal,displayMode)]]){const td=document.createElement("td");td.className=cls;td.dataset.pid=String(p.pid);td.textContent=value;row.append(td);}
-      const gpuCell=document.createElement("td");gpuCell.className="process-gpu";gpuCell.dataset.pid=String(p.pid);gpuCell.textContent=gpuText(monitorError?undefined:p.gpu);gpuCell.title=monitorError?`Canlı ölçüm alınamadı: ${monitorError}`:p.gpu?.reason||"Bu süreç için GPU değeri alınamadı; sıfır kullanım anlamına gelmez.";row.append(gpuCell);tbody.append(row);}
+      for(const [cls,value]of [["",String(p.pid)],["process-cpu",monitorError?"Unavailable":percent(p.cpuPercent)],["process-memory",monitorError?"Unavailable":memoryText(p.memoryBytes,snapshot.memoryTotal,displayMode)]]){const td=document.createElement("td");td.className=cls;td.dataset.pid=String(p.pid);td.textContent=value;row.append(td);}
+      const gpuCell=document.createElement("td");gpuCell.className="process-gpu";gpuCell.dataset.pid=String(p.pid);gpuCell.textContent=gpuText(monitorError?undefined:p.gpu);gpuCell.title=monitorError?`Live measurement unavailable: ${monitorError}`:p.gpu?.reason||"GPU usage is unavailable for this process. This does not mean zero usage.";row.append(gpuCell);tbody.append(row);}
     table.append(tbody);processes.append(table);
-    if(!page.length)processes.append(el("p","Aramana uyan süreç yok.","hint"));
+    if(!page.length)processes.append(el("p","No processes match your search.","hint"));
     const pager=el("div","","process-pager");
-    const previous=document.createElement("button"),next=document.createElement("button");previous.type=next.type="button";previous.className=next.className="secondary";previous.textContent="Önceki";next.textContent="Sonraki";previous.disabled=processIndex===0;next.disabled=processPage(all,processQuery,aiOnly,processSort,processIndex+1).length===0;
-    previous.onclick=()=>{processIndex--;renderProcesses();};next.onclick=()=>{processIndex++;renderProcesses();};pager.append(previous,el("span",`Sayfa ${processIndex+1} · ${formatCount(all.length)} erişilebilir süreç`),next);processes.append(pager);
-    const networks=el("div","","network-list");const label=document.createElement("label");label.textContent="Ağ adaptörü ";const select=document.createElement("select");select.setAttribute("aria-label","Ağ adaptörü");
+    const previous=document.createElement("button"),next=document.createElement("button");previous.type=next.type="button";previous.className=next.className="secondary";previous.textContent="Previous";next.textContent="Next";previous.disabled=processIndex===0;next.disabled=processPage(all,processQuery,aiOnly,processSort,processIndex+1).length===0;
+    previous.onclick=()=>{processIndex--;renderProcesses();};next.onclick=()=>{processIndex++;renderProcesses();};pager.append(previous,el("span",`Page ${processIndex+1} · ${formatCount(all.length)} accessible processes`),next);processes.append(pager);
+    const networks=el("div","","network-list");const label=document.createElement("label");label.textContent="Network adapter ";const select=document.createElement("select");select.setAttribute("aria-label","Network adapter");
     for(const n of snapshot.networks)select.add(new Option(n.name,n.name));select.value=networkName;select.onchange=()=>{networkName=select.value;updateLive();};label.append(select);networks.append(label);
-    const network=snapshot.networks.find(n=>n.name===networkName);networks.append(el("p",network?`İndirme ${rate(network.receivedPerSecond)} · Gönderme ${rate(network.sentPerSecond)}`:"Ağ adaptörü bulunamadı.","hint"));
-    networks.append(el("p",snapshot.appNetworkStatus,"hint"),el("p",`GPU: ${snapshot.gpuStatus}. Süreçlerde en yoğun motor gösterilir; GPU'lar/motorlar toplanmaz. Eksik sayaçlar sıfır sayılmaz; kısmi değerler alt sınırdır. VRAM ölçülmüyor.`,"hint"));processes.append(networks);
+    const network=snapshot.networks.find(n=>n.name===networkName);networks.append(el("p",network?`Download ${rate(network.receivedPerSecond)} · Upload ${rate(network.sentPerSecond)}`:"No network adapters found.","hint"));
+    networks.append(el("p",snapshot.appNetworkStatus,"hint"),el("p",`GPU: ${snapshot.gpuStatus}. Processes show the busiest engine; GPUs and engines are not added together. Missing counters do not mean zero. Partial values are lower bounds. VRAM is not measured.`,"hint"));processes.append(networks);
   }
   function gpuNote():string{
-    return monitorError?`GPU ölçülemiyor: canlı ölçüm alınamadı. ${monitorError}`:`GPU · ${(snapshot?.gpuStatus||"Ölçüm bekleniyor").replace(/\.+$/,"")}. Bu cihazın GPU kullanımıdır; buluttaki model sunucusunu ölçmez. Eksik değerler sıfır değildir; kısmi yüzdeler ölçülebilen alt sınırı gösterir.`;
+    return monitorError?`GPU unavailable: no live measurement. ${monitorError}`:`GPU · ${(snapshot?.gpuStatus||"Waiting for measurement").replace(/\.+$/,"")}. GPU usage is measured on this device, not on cloud model servers. Missing values do not mean zero. Partial percentages are measured lower bounds.`;
   }
   function render():void{
     container.replaceChildren();metrics=null;toolsList=null;processes=null;sampleLabel=null;networkSummary=null;
     container.classList.toggle("control-workspace",current==="control");
     if(!["control","tools","activity"].includes(current))return;
     const liveHeader=el("div","","workspace-live-heading");sampleLabel=el("span","","hint");liveHeader.append(sampleLabel);
-    const controls=el("div","","resource-controls"),label=document.createElement("label"),mode=document.createElement("select");label.textContent="RAM gösterimi ";mode.setAttribute("aria-label","RAM gösterimi");
-    for(const [value,text]of [["capacity","GiB / MiB"],["percent","Yüzde"],["both","Kapasite + yüzde"]])mode.add(new Option(text,value));mode.value=displayMode;
-    mode.title="Kartlar, araçlar ve süreçler için RAM gösterimi. Yüzdeler sistem toplamına göredir; tercih bu cihazda saklanır.";
+    const controls=el("div","","resource-controls"),label=document.createElement("label"),mode=document.createElement("select");label.textContent="RAM display ";mode.setAttribute("aria-label","RAM display");
+    for(const [value,text]of [["capacity","GiB / MiB"],["percent","Percent"],["both","Capacity + percent"]])mode.add(new Option(text,value));mode.value=displayMode;
+    mode.title="RAM display for cards, tools, and processes. Percentages use the system total. Your preference is saved on this device.";
     mode.onchange=()=>{displayMode=memoryMode(mode.value);try{localStorage.setItem("roomit-ram-display",displayMode);}catch{}updateLive();};label.append(mode);controls.append(label);
-    const pause=document.createElement("button");pause.type="button";pause.className="text-button";pause.textContent=paused?"Ölçümü sürdür":"Ölçümü duraklat";pause.disabled=!isTauri();pause.onclick=()=>{paused=!paused;pendingBreak=true;pause.textContent=paused?"Ölçümü sürdür":"Ölçümü duraklat";clearTimeout(timer);updateLive();if(!paused)void poll();};controls.append(pause);liveHeader.append(controls);
-    metrics=el("div","","resource-grid");networkSummary=el("p","","resource-network hint");container.append(liveHeader,metrics,el("p","Son 2 dakika · %0–100 ölçek · Geçmiş bu ekran açıkken birikir. Eksik veya duraklatılan ölçümler çizgide boşluk bırakır.","history-note hint"),networkSummary);
+    const pause=document.createElement("button");pause.type="button";pause.className="text-button";pause.textContent=paused?"Resume monitoring":"Pause monitoring";pause.disabled=!isTauri();pause.onclick=()=>{paused=!paused;pendingBreak=true;pause.textContent=paused?"Resume monitoring":"Pause monitoring";clearTimeout(timer);updateLive();if(!paused)void poll();};controls.append(pause);liveHeader.append(controls);
+    metrics=el("div","","resource-grid");networkSummary=el("p","","resource-network hint");container.append(liveHeader,metrics,el("p","Last 2 minutes · 0–100% scale · History accumulates while this view is open. Missing or paused measurements leave gaps.","history-note hint"),networkSummary);
     const controlLayout=current==="control"?el("div","","control-layout"):null;
     if(controlLayout){controlLayout.append(renderStorageMap(groups,report?.sizeIndexId, Boolean(report && (!report.totalSizeComplete || report.status!=="completed" || report.resultsTruncated))));container.append(controlLayout);}
     if(current!=="activity"){
-      const panel=el("section","","tool-inventory panel"),heading=el("div","","panel-heading"),title=el("div");title.append(el("h2","AI araçların"),el("p","Masaüstü uygulamaları ve terminal araçları birlikte.","hint"));
-      const refresh=document.createElement("button");refresh.type="button";refresh.className="secondary";refresh.textContent="Araçları yeniden bul";refresh.disabled=!isTauri();refresh.onclick=()=>void discover();heading.append(title,refresh);panel.append(heading);
-      const disclosure=document.createElement("details");disclosure.className="catalog-note";const summary=document.createElement("summary");summary.textContent=`Keşif kapsamı · ${inventory?.supportedCount||catalog.length} araç`;disclosure.append(summary,el("p",`${catalog.map(t=>t.name).join(" · ")}. PATH, bilinen uygulama konumları ve kurulum kayıtları kontrol edilir. Özel kurulumlar, eklentiler, WSL, container içleri ve tarayıcıdaki AI siteleri otomatik keşfedilmez.`,"hint"));panel.append(disclosure);
+      const panel=el("section","","tool-inventory panel"),heading=el("div","","panel-heading"),title=el("div");title.append(el("h2","Your AI tools"),el("p","Desktop apps and terminal tools, together.","hint"));
+      const refresh=document.createElement("button");refresh.type="button";refresh.className="secondary";refresh.textContent="Refresh discovery";refresh.disabled=!isTauri();refresh.onclick=()=>void discover();heading.append(title,refresh);panel.append(heading);
+      const disclosure=document.createElement("details");disclosure.className="catalog-note";const summary=document.createElement("summary");summary.textContent=`Discovery scope · ${inventory?.supportedCount||catalog.length} tools`;disclosure.append(summary,el("p",`${catalog.map(t=>t.name).join(" · ")}. Checks PATH, known app locations, and installation records. Custom installations, plugins, WSL, container internals, and AI websites are not automatically discovered.`,"hint"));panel.append(disclosure);
       toolsList=el("div","","installed-tools");panel.append(toolsList);
-      if(current==="control"){const all=document.createElement("button");all.type="button";all.className="text-button";all.textContent="Tüm araçları ve konumlarını gör";all.onclick=()=>navigate("tools");panel.append(all);}
+      if(current==="control"){const all=document.createElement("button");all.type="button";all.className="text-button";all.textContent="View all tools and locations";all.onclick=()=>navigate("tools");panel.append(all);}
       if(inventory?.warnings.length)panel.append(el("p",inventory.warnings.join(" "),"warning"));(controlLayout||container).append(panel);renderTools();
     } else {
-      const panel=el("section","","activity-panel panel"),heading=el("div","","panel-heading");heading.append(el("h2","Çalışan uygulamalar ve süreçler"));
-      const filters=el("div","","activity-filters");const search=document.createElement("input");search.type="search";search.placeholder="Chrome, Docker, araç veya PID ara…";search.setAttribute("aria-label","Süreç ara");search.value=processQuery;search.oninput=()=>{processQuery=search.value;processIndex=0;renderProcesses();};
-      const sort=document.createElement("select");sort.setAttribute("aria-label","Süreç sıralaması");sort.add(new Option("RAM: yüksekten düşüğe","memory"));sort.add(new Option("CPU: yüksekten düşüğe","cpu"));sort.add(new Option("GPU: yüksekten düşüğe","gpu"));sort.value=processSort;sort.onchange=()=>{processSort=sort.value as ProcessSort;processIndex=0;renderProcesses();};
-      const only=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=aiOnly;check.onchange=()=>{aiOnly=check.checked;processIndex=0;renderProcesses();};only.append(check,document.createTextNode("Yalnızca AI"));filters.append(search,sort,only);
-      processes=el("div");panel.append(heading,el("p","CPU toplam cihaz kapasitesine göredir. RAM süreçlerin yerleşik belleğidir; paylaşılan sayfalar birden fazla süreçte sayılabilir. Docker container içi ve Chrome sekme bazlı ayrım yapılmaz.","hint"),filters,processes);container.append(panel);renderProcesses();
+      const panel=el("section","","activity-panel panel"),heading=el("div","","panel-heading");heading.append(el("h2","Running apps and processes"));
+      const filters=el("div","","activity-filters");const search=document.createElement("input");search.type="search";search.placeholder="Search Chrome, Docker, tool, or PID…";search.setAttribute("aria-label","Search processes");search.value=processQuery;search.oninput=()=>{processQuery=search.value;processIndex=0;renderProcesses();};
+      const sort=document.createElement("select");sort.setAttribute("aria-label","Process sort order");sort.add(new Option("RAM: high to low","memory"));sort.add(new Option("CPU: high to low","cpu"));sort.add(new Option("GPU: high to low","gpu"));sort.value=processSort;sort.onchange=()=>{processSort=sort.value as ProcessSort;processIndex=0;renderProcesses();};
+      const only=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=aiOnly;check.onchange=()=>{aiOnly=check.checked;processIndex=0;renderProcesses();};only.append(check,document.createTextNode("AI only"));filters.append(search,sort,only);
+      processes=el("div");panel.append(heading,el("p","CPU is normalized to total device capacity. RAM is process resident memory; shared pages may be counted in several processes. Docker container internals and individual Chrome tabs are not separated.","hint"),filters,processes);container.append(panel);renderProcesses();
     }
-    container.append(el("p","Çalışmıyor olması kullanılmadığı anlamına gelmez. Geçmiş kullanım ve dosyanın güvenle kaldırılabileceği bu ölçümlerden belirlenmez.","hint usage-caveat"));updateLive();
+    container.append(el("p","Not running does not mean unused. These measurements do not establish past use or whether a file can be safely removed.","hint usage-caveat"));updateLive();
   }
   return {show(view,nextReport,nextGroups){const changed=current!==view||report!==nextReport||groups!==nextGroups;current=view;if(!visible())pendingBreak=true;report=nextReport;groups=nextGroups;container.hidden=!["control","tools","activity"].includes(view);if(changed)render();clearTimeout(timer);if(visible()&&isTauri()){if(!inventory&&!inventoryBusy)void discover();void poll();}}};
 }

@@ -2,7 +2,7 @@
   {
     "id": "codex",
     "name": "Codex",
-    "kind": "CLI + masaüstü",
+    "kind": "CLI + desktop",
     "commands": [
       "codex",
       "codex-cli"
@@ -34,7 +34,7 @@
   {
     "id": "opencode",
     "name": "OpenCode",
-    "kind": "CLI + masaüstü",
+    "kind": "CLI + desktop",
     "commands": [
       "opencode"
     ],
@@ -50,7 +50,7 @@
   {
     "id": "cursor",
     "name": "Cursor",
-    "kind": "Editör",
+    "kind": "Editor",
     "commands": [
       "cursor"
     ],
@@ -65,7 +65,7 @@
   {
     "id": "windsurf",
     "name": "Windsurf",
-    "kind": "Editör",
+    "kind": "Editor",
     "commands": [
       "windsurf"
     ],
@@ -80,7 +80,7 @@
   {
     "id": "ollama",
     "name": "Ollama",
-    "kind": "Yerel modeller",
+    "kind": "Local models",
     "commands": [
       "ollama"
     ],
@@ -95,7 +95,7 @@
   {
     "id": "lmstudio",
     "name": "LM Studio",
-    "kind": "Yerel modeller",
+    "kind": "Local models",
     "commands": [
       "lm-studio",
       "lmstudio",
@@ -113,7 +113,7 @@
   {
     "id": "claude",
     "name": "Claude",
-    "kind": "Masaüstü",
+    "kind": "Desktop",
     "commands": [
       "claude-desktop"
     ],
@@ -128,7 +128,7 @@
   {
     "id": "chatgpt",
     "name": "ChatGPT",
-    "kind": "Masaüstü",
+    "kind": "Desktop",
     "commands": [
       "chatgpt"
     ],
@@ -181,7 +181,7 @@
   {
     "id": "jan",
     "name": "Jan",
-    "kind": "Yerel modeller",
+    "kind": "Local models",
     "commands": [
       "jan"
     ],
@@ -196,7 +196,7 @@
   {
     "id": "anythingllm",
     "name": "AnythingLLM",
-    "kind": "Masaüstü",
+    "kind": "Desktop",
     "commands": [
       "anythingllm"
     ],
@@ -209,7 +209,7 @@
   {
     "id": "antigravity",
     "name": "Antigravity",
-    "kind": "Editör",
+    "kind": "Editor",
     "commands": [
       "antigravity"
     ],
@@ -224,7 +224,7 @@
   {
     "id": "trae",
     "name": "Trae",
-    "kind": "Editör",
+    "kind": "Editor",
     "commands": [
       "trae"
     ],
@@ -239,7 +239,7 @@
   {
     "id": "zcode",
     "name": "ZCode",
-    "kind": "Masaüstü + CLI",
+    "kind": "Desktop + CLI",
     "commands": [
       "zcode"
     ],
@@ -254,7 +254,7 @@
   {
     "id": "qwen",
     "name": "Qwen",
-    "kind": "Masaüstü + CLI",
+    "kind": "Desktop + CLI",
     "commands": [
       "qwen"
     ],
@@ -269,7 +269,7 @@
   {
     "id": "kimi",
     "name": "Kimi",
-    "kind": "Masaüstü + CLI",
+    "kind": "Desktop + CLI",
     "commands": [
       "kimi",
       "kimi-code"

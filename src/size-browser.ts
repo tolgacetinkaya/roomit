@@ -26,34 +26,34 @@ function entryCard(entry: SizedEntry): HTMLElement {
 
 export function renderSizeBrowser(indexId: string, minimum: bigint, search: string): HTMLElement {
   const root = node("div", "", "size-browser");
-  root.append(node("p", `${minimum > 0n ? formatBytes(minimum.toString()) + " ve üzeri" : "Boyut sınırı yok"} · Ölçülen dosya ve alt klasörler`, "size-filter-summary"),
-    node("p", "Tüm eşleşmeler sayfa sayfa gösterilir. Klasör boyutu alt dosyalarını da içerir; bu boyutları birlikte toplama.", "hint"));
-  const jumps = node("nav", "", "size-jumps"); jumps.setAttribute("aria-label", "Boyut listelerine git"); root.append(jumps);
+  root.append(node("p", `${minimum > 0n ? formatBytes(minimum.toString()) + " and above" : "No minimum size"} · Measured files and subfolders`, "size-filter-summary"),
+    node("p", "All matches are paged. Folder totals include their files. Do not add overlapping sizes together.", "hint"));
+  const jumps = node("nav", "", "size-jumps"); jumps.setAttribute("aria-label", "Go to size lists"); root.append(jumps);
   const cleanup: (() => void)[] = [];
   activeCleanup = () => { for (const dispose of cleanup) dispose(); };
   for (const kind of ["file", "directory"] as const) {
     const panel = node("section", "", "size-page-panel");
     const heading = node("div", "", "section-header");
-    const name = kind === "file" ? "Dosyalar" : "Klasörler";
+    const name = kind === "file" ? "Files" : "Folders";
     const jump = document.createElement("button"); jump.type = "button"; jump.className = "text-button";
-    jump.textContent = kind === "file" ? "Dosyalara git" : "Klasörlere git";
+    jump.textContent = kind === "file" ? "Go to files" : "Go to folders";
     jump.addEventListener("click", () => { panel.scrollIntoView({ block: "start" }); heading.tabIndex = -1; heading.focus({ preventScroll: true }); }); jumps.append(jump);
-    const count = node("span", "Yükleniyor…", "section-count");
+    const count = node("span", "Loading…", "section-count");
     heading.append(node("h3", name), count);
     const status = node("p", "", "hint"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
-    const progress = document.createElement("progress"); progress.setAttribute("aria-label", `${name} yükleniyor`);
+    const progress = document.createElement("progress"); progress.setAttribute("aria-label", `${name} loading`);
     const list = node("div", "", "group-list size-page-list");
     const controls = node("div", "", "size-page-controls");
     const button = (text: string): HTMLButtonElement => {
       const element = document.createElement("button"); element.type = "button"; element.className = "secondary"; element.textContent = text; return element;
     };
-    const previous = button("Önceki"), next = button("Sonraki"), cancel = button("Yüklemeyi iptal et"), retry = button("Tekrar dene");
-    const previousTop = button("Önceki"), nextTop = button("Sonraki");
-    previous.setAttribute("aria-label", `Önceki ${kind === "file" ? "dosya" : "klasör"} sayfası`);
-    next.setAttribute("aria-label", `Sonraki ${kind === "file" ? "dosya" : "klasör"} sayfası`);
+    const previous = button("Previous"), next = button("Next"), cancel = button("Cancel loading"), retry = button("Try again");
+    const previousTop = button("Previous"), nextTop = button("Next");
+    previous.setAttribute("aria-label", `Previous ${kind === "file" ? "file" : "folder"} page`);
+    next.setAttribute("aria-label", `Next ${kind === "file" ? "file" : "folder"} page`);
     previousTop.setAttribute("aria-label", previous.getAttribute("aria-label")!); nextTop.setAttribute("aria-label", next.getAttribute("aria-label")!);
     const topControls = node("div", "", "size-page-top-controls"); topControls.append(previousTop, nextTop); heading.append(topControls);
-    cancel.setAttribute("aria-label", `${name} yüklemesini iptal et`);
+    cancel.setAttribute("aria-label", `${name}: cancel loading`);
     retry.hidden = true; controls.append(previous, next, cancel, retry);
     panel.append(heading, status, progress, list, controls); root.append(panel);
     let disposed = false, currentRequest: string | null = null, total: string | null = null;
@@ -65,13 +65,13 @@ export function renderSizeBrowser(indexId: string, minimum: bigint, search: stri
       panel.setAttribute("aria-busy", String(busy)); progress.hidden = !busy; cancel.hidden = !busy;
       previous.disabled = busy || !page?.hasPrevious; next.disabled = busy || !page?.hasNext;
       previousTop.disabled = previous.disabled; nextTop.disabled = next.disabled;
-      count.textContent = total !== null ? `${new Intl.NumberFormat("tr-TR").format(BigInt(total))} ${kind === "file" ? "dosya" : "klasör"} · Sayfa ${pageNumber}` : busy ? "Yükleniyor…" : "—";
+      count.textContent = total !== null ? `${new Intl.NumberFormat("en-US").format(BigInt(total))} ${kind === "file" ? "file" : "folder"} · Page ${pageNumber}` : busy ? "Loading…" : "—";
     };
     const load = async (cursor: Cursor | null, direction: "next" | "previous", target: number): Promise<void> => {
       if (disposed) return;
       if (currentRequest) cancelRequest(currentRequest);
       const requestId = crypto.randomUUID(); currentRequest = requestId;
-      lastAttempt = { cursor, direction, target }; status.className = "hint"; status.textContent = "Sonuçlar yükleniyor…";
+      lastAttempt = { cursor, direction, target }; status.className = "hint"; status.textContent = "Loading results…";
       retry.hidden = true; cancel.disabled = false; update();
       try {
         const response = await invoke<SizePage>("query_size_entries", { request: {
@@ -81,8 +81,8 @@ export function renderSizeBrowser(indexId: string, minimum: bigint, search: stri
         if (disposed || currentRequest !== requestId) return;
         page = response; pageNumber = target; total = response.total ?? total;
         list.replaceChildren(...response.entries.map(entryCard));
-        if (!response.entries.length) list.append(node("div", "Bu boyut ve arama koşullarına uyan öğe bulunamadı.", "empty-note"));
-        status.textContent = response.entries.length ? `Bu sayfada ${response.entries.length} öğe gösteriliyor.` : "Eşleşme yok.";
+        if (!response.entries.length) list.append(node("div", "No items match this size and search.", "empty-note"));
+        status.textContent = response.entries.length ? `This page: ${response.entries.length} items shown.` : "No matches.";
         if (cursor) { panel.scrollIntoView({ block: "start" }); heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
       } catch (error: unknown) {
         if (disposed || currentRequest !== requestId) return;
@@ -97,7 +97,7 @@ export function renderSizeBrowser(indexId: string, minimum: bigint, search: stri
     cancel.addEventListener("click", () => {
       if (!currentRequest) return;
       const requestId = currentRequest; currentRequest = null; cancelRequest(requestId);
-      status.className = "hint"; status.textContent = "Sonuç yükleme iptal edildi. Tekrar deneyebilirsin.";
+      status.className = "hint"; status.textContent = "Result loading cancelled. You can try again.";
       retry.hidden = false; update();
     });
     cleanup.push(() => { disposed = true; if (currentRequest) cancelRequest(currentRequest); currentRequest = null; });

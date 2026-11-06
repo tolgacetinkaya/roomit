@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 pub(crate) fn checked_path(value: &str) -> Result<PathBuf, String> {
     let path = Path::new(value);
     if !path.is_absolute() {
-        return Err("Geçerli bir yerel dosya veya klasör yolu gerekir.".into());
+        return Err("A valid local file or folder path is required.".into());
     }
-    let metadata = path.symlink_metadata().map_err(|_| "Konum artık mevcut değil veya erişilemiyor. Yeniden taramayı deneyin.")?;
+    let metadata = path.symlink_metadata().map_err(|_| "The location no longer exists or is inaccessible. Try rescanning.")?;
     if !metadata.is_file() && !metadata.is_dir() {
-        return Err("Yalnızca dosya ve klasör konumları gösterilebilir.".into());
+        return Err("Only file and folder locations can be revealed.".into());
     }
-    path.canonicalize().map_err(|_| "Konuma erişilemiyor. Yeniden taramayı deneyin.".into())
+    path.canonicalize().map_err(|_| "The location is inaccessible. Try rescanning.".into())
 }
 
 pub(crate) fn reveal(value: &str) -> Result<(), String> {
@@ -17,7 +17,7 @@ pub(crate) fn reveal(value: &str) -> Result<(), String> {
     // Reveal only: never open a file with its associated application, and never
     // interpolate paths into a shell command. No general opener IPC is exposed.
     tauri_plugin_opener::reveal_item_in_dir(path)
-        .map_err(|error| format!("Konum dosya yöneticisinde gösterilemedi: {error}"))
+        .map_err(|error| format!("Could not reveal the location in the file manager: {error}"))
 }
 
 #[cfg(test)]

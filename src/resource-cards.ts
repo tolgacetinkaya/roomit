@@ -4,7 +4,7 @@ import {HISTORY_MS,memoryPercent,memoryBreakdown,usageSegments,validPercent} fro
 import type {MemoryMode,UsagePoint,ResourceKey} from "./resource-history";
 export interface ResourceSnapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;memoryAvailable?:string;memoryInstalled?:string|null;gpuAi?:GpuReading}
 const el=(tag:string,text="",cls="")=>{const element=document.createElement(tag);element.textContent=text;element.className=cls;return element;};
-export function percentText(value:number|null):string{return value===null?"Ölçülemiyor":`%${value.toLocaleString("tr-TR",{maximumFractionDigits:1})}`;}
+export function percentText(value:number|null):string{return value===null?"Unavailable":`${value.toLocaleString("en-US",{maximumFractionDigits:1})}%`;}
 export function memoryText(value:string,total:string,mode:MemoryMode):string {
   const pct=percentText(memoryPercent(value,total));
   return mode==="capacity"?formatMemory(value):mode==="percent"?pct:`${formatMemory(value)} · ${pct}`;
@@ -14,11 +14,11 @@ function chart(card:HTMLElement,key:ResourceKey,history:readonly UsagePoint[],em
   const segments=usageSegments(history,key),known=history.filter(p=>p[key]!==null);
   const values=known.map(p=>p[key]!);
   canvas.setAttribute("role","img");
-  canvas.setAttribute("aria-label",`${key.toUpperCase()} · son 2 dakika · ${values.length?`${values.length} ölçüm, en düşük ${percentText(Math.min(...values))}, en yüksek ${percentText(Math.max(...values))}.`:empty} Eksik ölçümler boşluk olarak gösterilir.`);
-  const scale=el("div","","chart-scale");scale.append(el("span","%100"),el("span","%0"));
+  canvas.setAttribute("aria-label",`${key.toUpperCase()} · last 2 minutes · ${values.length?`${values.length} samples, minimum ${percentText(Math.min(...values))}, maximum ${percentText(Math.max(...values))}.`:empty} Missing measurements appear as gaps.`);
+  const scale=el("div","","chart-scale");scale.append(el("span","100%"),el("span","0%"));
   wrapper.append(scale,canvas);
   if(!known.length)wrapper.append(el("span",empty,"chart-empty"));
-  const times=el("div","","chart-times");times.append(el("span","−2 dk"),el("span","Son ölçüm"));
+  const times=el("div","","chart-times");times.append(el("span","−2 min"),el("span","Latest sample"));
   card.append(wrapper,times);
   requestAnimationFrame(()=>{
     if(!canvas.isConnected)return;
@@ -44,21 +44,21 @@ function card(label:string,value:string,hint:string,cls:string):HTMLElement {
 }
 export function renderResourceCards(snapshot:ResourceSnapshot|null,history:readonly UsagePoint[],mode:MemoryMode,error:string,running:number):DocumentFragment {
   const fragment=document.createDocumentFragment(),live=error?null:snapshot;
-  const cpu=card("CPU · cihaz",live?percentText(validPercent(live.cpuPercent)):"Ölçülemiyor","Toplam işlemci kapasitesi","cpu-metric");
-  chart(cpu,"cpu",history,live?.cpuPercent===null?"İlk ölçüm bekleniyor":"Ölçüm alınamadı");
+  const cpu=card("CPU · device",live?percentText(validPercent(live.cpuPercent)):"Unavailable","Total CPU capacity","cpu-metric");
+  chart(cpu,"cpu",history,live?.cpuPercent===null?"Waiting for first sample":"Measurement unavailable");
   const ram=live?memoryBreakdown(live.memoryTotal,live.memoryUsed,live.memoryAvailable):null;
-  const ramCard=card("RAM · cihaz",ram?memoryText(ram.used,ram.total,mode):"Ölçülemiyor","Kullanılan bellek","ram-metric");
+  const ramCard=card("RAM · device",ram?memoryText(ram.used,ram.total,mode):"Unavailable","Memory used","ram-metric");
   const breakdown=document.createElement("dl");breakdown.className="ram-breakdown";
-  for(const [name,value]of [["Boş / kullanılabilir",ram?memoryText(ram.available,ram.total,mode):"Ölçülemiyor"],["Sistem toplamı",ram?memoryText(ram.total,ram.total,mode):"Ölçülemiyor"]]){
+  for(const [name,value]of [["Free / available",ram?memoryText(ram.available,ram.total,mode):"Unavailable"],["System total",ram?memoryText(ram.total,ram.total,mode):"Unavailable"]]){
     const row=el("div");row.append(el("dt",name),el("dd",value));breakdown.append(row);
   }
   ramCard.append(breakdown);
-  const capacity=el("p",live?memoryCapacity(live.memoryTotal,live.memoryInstalled):"Güncel bellek ölçümü yok","ram-installed");
-  capacity.title="Takılı RAM ve sistem toplamı farklı olabilir. Boş / kullanılabilir bellek, gerektiğinde geri kazanılabilen önbelleği de içerir. Yüzdelerin tabanı işletim sisteminin kullanabildiği toplam RAM'dir.";
-  ramCard.append(capacity);chart(ramCard,"ram",history,"Ölçüm alınamadı");
-  const gpu=card("GPU · AI süreçleri",gpuText(live?.gpuAi),`${running} çalışan AI aracı · bu cihazda`,"gpu-metric");
-  const gpuNote=live?.gpuAi?.status==="partial"?"Kesikli çizgi: kısmi ölçüm / alt sınır":live?.gpuAi?.reason||"Eksik GPU değeri sıfır değildir.";
-  gpu.title=error||live?.gpuAi?.reason||"Güncel GPU ölçümü yok";gpu.append(el("p",gpuNote,"gpu-chart-note"));
-  chart(gpu,"gpu",history,live?.gpuAi?.status==="warmingUp"?"Ölçüm bekleniyor":"GPU ölçülemiyor");
+  const capacity=el("p",live?memoryCapacity(live.memoryTotal,live.memoryInstalled):"No current memory measurement","ram-installed");
+  capacity.title="Installed RAM may differ from the system total. Free / available memory includes cache that can be reclaimed. Percentages use the total RAM available to the operating system.";
+  ramCard.append(capacity);chart(ramCard,"ram",history,"Measurement unavailable");
+  const gpu=card("GPU · AI processes",gpuText(live?.gpuAi),`${running} running AI tools · on this device`,"gpu-metric");
+  const gpuNote=live?.gpuAi?.status==="partial"?"Dashed line: partial measurement / lower bound":live?.gpuAi?.reason||"A missing GPU value does not mean zero usage.";
+  gpu.title=error||live?.gpuAi?.reason||"No current GPU measurement";gpu.append(el("p",gpuNote,"gpu-chart-note"));
+  chart(gpu,"gpu",history,live?.gpuAi?.status==="warmingUp"?"Waiting for measurement":"GPU unavailable");
   fragment.append(cpu,ramCard,gpu);return fragment;
 }

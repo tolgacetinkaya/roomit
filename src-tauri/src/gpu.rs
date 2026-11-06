@@ -10,7 +10,7 @@ pub(crate) struct Collector;
 #[cfg(not(windows))]
 impl Collector {
     pub fn sample(&mut self) -> Frame {
-        Frame::unavailable(Status::Unsupported, "Bu platformda süreç bazlı GPU ölçümü bu sürümde desteklenmiyor.")
+        Frame::unavailable(Status::Unsupported, "Per-process GPU measurement is not supported on this platform in this version.")
     }
 }
 
@@ -41,13 +41,13 @@ impl Frame {
     pub fn ready(samples: Vec<EngineSample>, invalid_pids: HashSet<u32>) -> Self {
         let mut sample_indices: HashMap<u32,Vec<usize>>=HashMap::new();
         for (index,sample) in samples.iter().enumerate(){sample_indices.entry(sample.pid).or_default().push(index);}
-        Self { status: Status::Measured, reason: "Windows GPU Engine · en yoğun GPU motoru".into(), samples, invalid_pids, sample_indices }
+        Self { status: Status::Measured, reason: "Windows GPU Engine · busiest GPU engine".into(), samples, invalid_pids, sample_indices }
     }
     pub fn reading(&self, pids: &[u32], stable_pids: &HashSet<u32>) -> Reading {
         let pids: HashSet<_> = pids.iter().copied().collect();
         let total = pids.len();
         let absent = |status, reason: String| Reading { percent: None, status, reason, measured_processes: 0, total_processes: total };
-        if total == 0 { return absent(Status::NoProcess, "Çalışan, tanınan AI süreci yok.".into()); }
+        if total == 0 { return absent(Status::NoProcess, "No running recognized AI processes.".into()); }
         if self.status != Status::Measured { return absent(self.status, self.reason.clone()); }
         let mut by_process_engine: HashMap<(u32, &str), f64> = HashMap::new();
         let mut incomplete = HashSet::new();
@@ -62,8 +62,8 @@ impl Frame {
         let measured: HashSet<_> = by_process_engine.keys().map(|(pid,_)|*pid).collect();
         if measured.is_empty() {
             return if pids.iter().any(|pid| !stable_pids.contains(pid)) {
-                absent(Status::WarmingUp, "Yeni süreç için ikinci GPU ölçüm aralığı bekleniyor.".into())
-            } else { absent(Status::NoCounter, "Bu süreçler için geçerli GPU sayacı yok; kullanımın sıfır olduğu anlamına gelmez.".into()) };
+                absent(Status::WarmingUp, "Waiting for a second GPU sample for the new process.".into())
+            } else { absent(Status::NoCounter, "No valid GPU counters for these processes. This does not mean zero usage.".into()) };
         }
         let mut engines: HashMap<&str, f64> = HashMap::new();
         for ((_,engine), value) in by_process_engine { *engines.entry(engine).or_default() += value; }
@@ -72,8 +72,8 @@ impl Frame {
         let percent = engines.values().copied().fold(0.0, f64::max).clamp(0.0,100.0);
         let partial = measured.len() != total || pids.iter().any(|pid| self.invalid_pids.contains(pid) || incomplete.contains(pid));
         Reading { percent: Some(percent), status: if partial { Status::Partial } else { Status::Measured },
-            reason: if partial { format!("{}/{total} süreçte geçerli GPU değeri var. En yoğun motorda ölçülebilen alt sınırdır; eksik sayaçlar sıfır kabul edilmez.",measured.len()) }
-                else { "Ölçülen süreçlerin en yoğun GPU motoru. Birden fazla GPU/motor toplanmaz; VRAM değildir.".into() },
+            reason: if partial { format!("{}/{total} processes have valid GPU measurements. This is a measured lower bound on the busiest engine; missing counters do not mean zero.",measured.len()) }
+                else { "Busiest GPU engine across measured processes. GPUs and engines are not added together. This is not VRAM.".into() },
             measured_processes: measured.len(), total_processes: total }
     }
 }

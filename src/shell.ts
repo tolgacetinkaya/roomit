@@ -18,7 +18,7 @@ export function installShell(navigate:(view:ResultView)=>void, openScan:()=>void
     document.documentElement.classList.toggle("sidebar-collapsed",collapsed);
     get("app-sidebar").hidden=collapsed;
     toggle.setAttribute("aria-expanded",String(!collapsed));
-    const label=`Kenar çubuğunu ${collapsed?"göster":"gizle"}`;
+    const label=collapsed?"Show sidebar":"Hide sidebar";
     toggle.setAttribute("aria-label",label);toggle.title=`${label} (${ /Mac/i.test(navigator.platform)?"⌘":"Ctrl"}+B)`;menuSidebar.textContent=label;
   }
   function flipSidebar():void {collapsed=!collapsed;updateSidebar();try{localStorage.setItem("roomit-sidebar-collapsed",String(collapsed));}catch{}}
@@ -34,14 +34,14 @@ export function installShell(navigate:(view:ResultView)=>void, openScan:()=>void
     if((event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&event.key.toLowerCase()==="b"&&!(event.target instanceof Element&&event.target.closest("input,textarea,select,[contenteditable=true]"))){event.preventDefault();flipSidebar();}
   });
   updateSidebar();
-  const fail=(error:unknown)=>{status.hidden=false;status.textContent=`Pencere işlemi yapılamadı: ${String(error)}`;};
+  const fail=(error:unknown)=>{status.hidden=false;status.textContent=`Window action failed: ${String(error)}`;};
   async function act(action:()=>Promise<unknown>):Promise<void>{try{await action();status.hidden=true;}catch(error){fail(error);}}
   if(isTauri()) {
     const window=getCurrentWindow();
     async function syncMaximize():Promise<void>{
       const expanded=await window.isMaximized();
       maximize.replaceChildren(icon(expanded?"restore":"maximize"));
-      maximize.setAttribute("aria-label",expanded?"Pencereyi geri yükle":"Pencereyi büyüt");maximize.title=expanded?"Geri yükle":"Büyüt";
+      maximize.setAttribute("aria-label",expanded?"Restore window":"Maximize window");maximize.title=expanded?"Restore":"Maximize";
     }
     minimize.onclick=()=>void act(()=>window.minimize());close.onclick=()=>void act(()=>window.close());
     maximize.onclick=()=>void act(async()=>{await window.toggleMaximize();await syncMaximize();});
@@ -56,7 +56,7 @@ export function installShell(navigate:(view:ResultView)=>void, openScan:()=>void
     void window.onResized(()=>void act(syncMaximize)).then(unlisten=>windowCleanup=unlisten).catch(fail);
     addEventListener("pagehide",()=>windowCleanup?.(),{once:true});
   } else {
-    for(const button of [minimize,maximize,close]){button.disabled=true;button.title="Masaüstü uygulamasında kullanılabilir";}
+    for(const button of [minimize,maximize,close]){button.disabled=true;button.title="Available in the desktop app";}
   }
   return {setTitle:title=>{get("shell-view-title").textContent=title;}};
 }
