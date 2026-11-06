@@ -14,16 +14,16 @@ Tauri 2 + TypeScript interface. The project is open source under the MIT license
   with saved results and is reused for rescanning. See [app data scans](docs/APP_DATA_SCANS.md)
   for known-location coverage and limitations.
 
-**Current source: 0.4.1 — expandable application groups.**
+**Current source: 0.4.4 — per-app AI data scans.**
 Live resources shows combined CPU, RAM and GPU usage per app. Expand an app to
 inspect individual processes. Groups and member lists are paged; open groups and
 focused controls survive live updates. See [live resources](docs/LIVE_RESOURCES.md).
 
-The latest published Windows release is **0.4.0**.
-Download the [Windows release](https://github.com/tolgacetinkaya/roomit/releases/tag/v0.4.0)
+Download the [latest published Windows release](https://github.com/tolgacetinkaya/roomit/releases/latest)
 or build from source below. Choose the Windows x64 setup for installation and
 future in-app updates, or the standalone EXE to run directly with WebView2
-installed. Roomit checks new published releases and offers **Update and restart**;
+installed. Roomit checks new published releases and offers **Review update…**, with installation
+confirmation or a portable EXE download;
 a Git push alone does not trigger an update. Local build caches, scan indexes,
 EXEs and signing keys are excluded from Git. See [releasing](docs/RELEASING.md)
 for signing, portable-update behavior, and verification. Windows binaries do not
