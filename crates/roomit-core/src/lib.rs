@@ -6,4 +6,5 @@ mod rules;
 mod scanner;
 
 pub use model::*;
-pub use scanner::{ScanOptions, inspect_workspace, scan_locations, scan_workspace};
+pub use scanner::{ScanOptions, SizeSink, inspect_workspace, scan_locations, scan_workspace,
+    scan_locations_with_sink, scan_workspace_with_sink};

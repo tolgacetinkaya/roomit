@@ -12,6 +12,7 @@ import { icon } from "./icons";
 import type { IconName } from "./icons";
 import { installRevealShortcut, revealShortcut } from "./reveal";
 import { parseMinimumGb } from "./size-filter";
+import { disposeSizeBrowser } from "./size-browser";
 import "./styles.css";
 
 function element<T extends HTMLElement>(selector: string): T {
@@ -175,6 +176,8 @@ let settingsExpanded = false;
 toggleScan.addEventListener("click", () => { settingsExpanded = !settingsExpanded; renderCurrent(); });
 function navigate(view: ResultView): void { currentView = view; renderCurrent(); }
 function renderCurrent(): void {
+  clearTimeout(searchTimer);
+  disposeSizeBrowser();
   sizeForm.hidden = currentView !== "largest";
   form.hidden = Boolean(lastReport) && !settingsExpanded;
   toggleScan.hidden = !lastReport;

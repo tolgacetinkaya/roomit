@@ -247,9 +247,9 @@ fn report_serialization_matches_the_frontend_contract() {
     assert_eq!(value["findings"][0]["kind"], "file");
     assert_eq!(value["findings"][0]["sizeComplete"], true);
     assert!(value["largestEntries"].is_array());
-    assert_eq!(value["sizeEntries"][0]["logicalBytes"], "4");
-    assert_eq!(value["sizeFilesTruncated"], false);
-    assert_eq!(value["sizeDirectoriesTruncated"], false);
+
+
+
 }
 
 #[test]
@@ -311,39 +311,53 @@ fn symbolic_links_and_cycles_are_skipped_and_markers_are_not_followed() {
 }
 
 #[test]
-fn size_lists_keep_files_and_directories_independently_without_changing_totals() {
+fn streaming_sink_receives_more_than_ten_thousand_files_without_retention() {
     let fixture = tempdir().unwrap();
-    file(fixture.path(), "a/deep/one", 10);
-    file(fixture.path(), "a/deep/two", 20);
-    file(fixture.path(), "b/three", 30);
-    file(fixture.path(), "c/four", 40);
-    let options = ScanOptions { max_largest_entries: 1, max_size_entries_per_kind: 2, ..Default::default() };
-    let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
-    assert_eq!(report.stats.total_logical_bytes, 100);
-    assert_eq!(report.stats.files_scanned, 4);
-    assert!(report.total_size_complete);
-    let files: Vec<_> = report.size_entries.iter().filter(|entry| entry.kind == EntryKind::File).map(|entry| entry.logical_bytes).collect();
-    let directories: Vec<_> = report.size_entries.iter().filter(|entry| entry.kind == EntryKind::Directory).map(|entry| entry.logical_bytes).collect();
-    assert_eq!(files, [40, 30]);
-    assert_eq!(directories, [40, 30]);
-    assert!(report.size_files_truncated && report.size_directories_truncated);
+    for index in 0..10_013 { file(fixture.path(), &format!("file-{index:05}"), 0); }
+    let options = ScanOptions { max_entries: None, max_depth: None, max_largest_entries: 1, ..Default::default() };
+    let mut received = 0;
+    let mut sink = |entry: &roomit_core::SizedEntry| { if entry.kind == EntryKind::File { received += 1; } Ok(()) };
+    let report = roomit_core::scan_workspace_with_sink(fixture.path(), options, &AtomicBool::new(false), |_| {}, &mut sink).unwrap();
+    assert_eq!(received, 10_013);
+    assert_eq!(report.stats.files_scanned, 10_013);
     assert_eq!(report.largest_entries.len(), 1);
-    assert!(!report.results_truncated); // Recognition and size-list limits are independent.
+    assert!(report.total_size_complete);
 }
 
 #[test]
-fn size_lists_keep_zero_and_partial_entries_and_can_be_disabled_without_stopping_scan() {
+fn streaming_sink_retains_measured_partial_results_on_cancel_and_reports_write_errors() {
     let fixture = tempdir().unwrap();
-    file(fixture.path(), "empty", 0);
-    file(fixture.path(), "nested/deep/file", 11);
-    let options = ScanOptions { max_depth: Some(0), ..Default::default() };
-    let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
-    assert!(report.size_entries.iter().any(|entry| entry.kind == EntryKind::File && entry.logical_bytes == 0 && entry.size_complete));
-    assert!(report.size_entries.iter().any(|entry| entry.kind == EntryKind::Directory && !entry.size_complete));
-    let options = ScanOptions { max_size_entries_per_kind: 0, max_largest_entries: 0, ..Default::default() };
-    let report = scan_workspace(fixture.path(), options, &AtomicBool::new(false), |_| {}).unwrap();
-    assert!(report.size_entries.is_empty());
-    assert!(report.size_files_truncated && report.size_directories_truncated);
-    assert_eq!(report.stats.total_logical_bytes, 11);
+    for index in 0..20 { file(fixture.path(), &format!("nested/file-{index:02}"), 3); }
+    let cancel = AtomicBool::new(false);
+    let mut files = 0;
+    let mut partial_directory = false;
+    let mut sink = |entry: &roomit_core::SizedEntry| {
+        if entry.kind == EntryKind::File { files += 1; if files == 2 { cancel.store(true, Ordering::Relaxed); } }
+        else if !entry.size_complete { partial_directory = true; }
+        Ok(())
+    };
+    let report = roomit_core::scan_workspace_with_sink(fixture.path(), ScanOptions::default(), &cancel, |_| {}, &mut sink).unwrap();
+    assert_eq!(report.status, ScanStatus::Cancelled);
+    assert_eq!(files, 2);
+    assert!(partial_directory);
+    assert_eq!(report.stats.total_logical_bytes, 6);
+    let mut failing = |_: &roomit_core::SizedEntry| Err(std::io::Error::other("simulated result disk full"));
+    let error = roomit_core::scan_workspace_with_sink(fixture.path(), ScanOptions::default(), &AtomicBool::new(false), |_| {}, &mut failing).unwrap_err();
+    assert!(error.to_string().contains("result disk full"));
+}
+
+#[test]
+fn app_owned_index_directory_is_excluded_without_hiding_user_results() {
+    let fixture = tempdir().unwrap();
+    file(fixture.path(), "user/important.bin", 7);
+    file(fixture.path(), "roomit-index/results.sqlite", 11);
+    let options = ScanOptions { excluded_paths: vec![fixture.path().join("roomit-index")], ..Default::default() };
+    let mut paths = Vec::new();
+    let mut sink = |entry: &roomit_core::SizedEntry| { paths.push(entry.path.clone()); Ok(()) };
+    let report = roomit_core::scan_workspace_with_sink(fixture.path(), options, &AtomicBool::new(false), |_| {}, &mut sink).unwrap();
+    assert_eq!(report.stats.files_scanned, 1);
+    assert_eq!(report.stats.total_logical_bytes, 7);
     assert!(report.total_size_complete);
+    assert!(paths.iter().all(|path| !path.contains("roomit-index")));
+    assert_eq!(fs::read(fixture.path().join("roomit-index/results.sqlite")).unwrap().len(), 11);
 }

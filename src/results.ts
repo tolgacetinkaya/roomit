@@ -1,10 +1,10 @@
-import { categoryLabels, formatBytes, formatCount, scanSummary, sizeLabel } from "./report";
-import type { Finding, InspectionReport, SizedEntry } from "./report";
+import { categoryLabels, formatCount, scanSummary, sizeLabel } from "./report";
+import type { Finding, InspectionReport } from "./report";
 import { filterGroups, pathName } from "./groups";
 import type { GroupedReport, ResultGroup } from "./groups";
 import { icon } from "./icons";
 import { revealActions, revealShortcut } from "./reveal";
-import { filterSizeEntries, sizeListIncomplete } from "./size-filter";
+import { renderSizeBrowser } from "./size-browser";
 
 export type ResultView = "overview" | "projects" | "ai" | "largest" | "details";
 const node = (tag: string, text = "", className = ""): HTMLElement => {
@@ -93,9 +93,10 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
     ]) { const card = node("div", "", "metric"); card.append(node("span", label), node("strong", value), node("small", hint)); metrics.append(card); }
     container.append(metrics);
   }
-  if (!report.totalSizeComplete || report.status !== "completed" || report.resultsTruncated) {
+  const groupSummaryTruncated = report.resultsTruncated && view !== "largest";
+  if (!report.totalSizeComplete || report.status !== "completed" || groupSummaryTruncated) {
     const notice = node("div", "", "result-notice");
-    notice.append(node("span", report.resultsTruncated ? "Liste özetlendi. Gösterilen gruplar eksik olabilir; tarama toplamı tüm ölçülen dosyaları kapsar." : "Bazı alanlar taranamadı veya tarama durduruldu. Boyutlar kısmi olabilir."));
+    notice.append(node("span", groupSummaryTruncated ? "Grup özeti sınırlı tutuldu. Tüm ölçülen dosya ve klasörler Büyük öğeler görünümünde bulunur." : "Bazı alanlar taranamadı veya tarama durduruldu. Boyutlar kısmi olabilir."));
     const details = document.createElement("button"); details.type = "button"; details.className = "text-button"; details.textContent = "Ayrıntıları gör";
     details.addEventListener("click", () => navigate("details")); notice.append(details); container.append(notice);
   }
@@ -118,29 +119,7 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
     details.addEventListener("toggle", () => { if (details.open && !built) { details.append(paged(protectedGroups, groupCard)); built = true; } });
     container.append(details);
   }
-  if (view === "largest") {
-    const entries = report.sizeEntries ?? report.largestEntries;
-    const fileMatches = filterSizeEntries(entries, minimumBytes, query, "file");
-    const directoryMatches = filterSizeEntries(entries, minimumBytes, query, "directory");
-    container.append(node("p", `${minimumBytes > 0n ? formatBytes(minimumBytes.toString()) + " ve üzeri" : "Boyut sınırı yok"} · Ölçülen dosya ve alt klasörler`, "size-filter-summary"));
-    container.append(node("p", "Dosyalar ve klasörler ayrı listelenir. Klasör boyutu alt dosyalarını da içerir; bu boyutları birlikte toplama.", "hint"));
-    const fileLimited = sizeListIncomplete(entries, "file", report.sizeFilesTruncated, minimumBytes);
-    const directoryLimited = sizeListIncomplete(entries, "directory", report.sizeDirectoriesTruncated, minimumBytes);
-    if (fileLimited || directoryLimited) container.append(node("p", "Liste sınırına ulaşıldı: En büyük 10.000 dosya ve 10.000 klasör tutulur. Bu eşiğe uyan başka öğeler olabilir. Tarama ve toplam boyut hesaplaması bu sınırda durmaz.", "result-notice"));
-    const sizeCard = (entry: SizedEntry): HTMLElement => {
-      const card = node("article", "", "result-card size-result");
-      const heading = node("div", "", "member-heading");
-      const title = node("span", "", "size-entry-title");
-      title.append(icon(entry.kind === "file" ? "file" : "folder"), node("strong", pathName(entry.path)));
-      heading.append(title, node("span", sizeLabel(entry.logicalBytes, entry.sizeComplete)));
-      card.append(heading, node("p", entry.path, "report-path"));
-      attachReveal(card, [entry.path], true); return card;
-    };
-    container.append(section("Dosyalar", fileMatches.length, undefined, "dosya"));
-    container.append(fileMatches.length ? paged(fileMatches, sizeCard) : empty("Bu boyut ve arama koşullarına uyan dosya bulunamadı."));
-    container.append(section("Klasörler", directoryMatches.length, undefined, "klasör"));
-    container.append(directoryMatches.length ? paged(directoryMatches, sizeCard) : empty("Bu boyut ve arama koşullarına uyan alt klasör bulunamadı."));
-  }
+  if (view === "largest") container.append(renderSizeBrowser(report.sizeIndexId, minimumBytes, query));
   if (view === "details") {
     container.append(section("Tarama ayrıntıları", report.roots.length, undefined, "konum"), node("p", scanSummary(report), "muted"), node("p", report.root, "report-path"));
     for (const root of report.roots) {
@@ -151,7 +130,7 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
       if (root.error) row.append(node("p", root.error, "warning")); container.append(row);
     }
     container.append(node("p", "Boyutlar dosya uzunluklarının toplamıdır. Diskte ayrılan veya boşaltılabilecek alanı göstermez; hardlinkler her yol için sayılır.", "hint"));
-    if (report.scope === "computer" || report.scope === "disk") container.append(node("p", "Disk ve bütün bilgisayar taramalarında öğe sayısı veya klasör derinliği sınırı yoktur. Liste ve uyarı sayıları belleği korumak için sınırlı tutulur; bu sınırlar taramayı durdurmaz.", "hint"));
+    container.append(node("p", "Masaüstü taramalarında öğe ve derinlik sınırı yoktur. Büyük öğeler listesindeki tüm ölçülen sonuçlar sayfa sayfa açılır; yazılım/AI grup özeti ve uyarı sayısı sınırlı tutulur.", "hint"));
     for (const warning of report.warnings) container.append(node("p", warning, "warning"));
     if (report.warningsOmitted) container.append(node("p", `${formatCount(report.warningsOmitted)} ek uyarı listelenmedi.`, "hint"));
     if (protectedGroups.length) container.append(section("Korunan veriler", protectedGroups.length), paged(protectedGroups, groupCard));

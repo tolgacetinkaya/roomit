@@ -24,6 +24,7 @@ is configured. MIT licensed.
   compact completed-scan setup, and per-volume capacity/free-space previews.
 - Inspect grouped development/AI results; use **Büyük öğeler** for separate file/folder lists.
 - Enter a minimum GB size (for example 5 or 0,5), apply or clear it without rescanning.
+  **All measured matches** are available through Previous/Next pages, with no result-count cutoff.
   The threshold is inclusive, uses exact decimal bytes and combines with path search.
 - Skip symlinks/reparse points; bound work and report memory; keep totals independent
   of paginated or capped result lists.
@@ -40,17 +41,29 @@ filesystem clones may occupy different physical space. Directory totals overlap
 child rows; use the report root total, not a sum of displayed rows. Recognized
 space counts nested findings only once.
 
-Skipped links, inaccessible entries, cancelled scans and depth/entry limits make
-sizes partial lower bounds. Disk and computer scans have no count/depth cutoff; folder-mode limits remain configurable in the library. The filesystem may change during a scan; this is
-not a snapshot or a proof that an item can safely be removed.
+Skipped links, inaccessible entries and cancelled scans make sizes partial lower
+bounds. All desktop scopes (folder, one disk, computer) have no entry/depth cutoff.
+The library retains configurable traversal budgets for other callers. A live
+filesystem scan is not an atomic snapshot or proof that an item can be removed.
 
-Folder-mode defaults: 1,000,000 observed entries and 128 directory levels. Disk and computer modes have no entry or depth cutoff. All modes retain
-up to 10,000 findings/projects each, 100 legacy largest entries, and 100 retained
-warnings. The size view independently retains the largest 10,000 files and 10,000
-subdirectories, with a notice when omitted entries could meet the current threshold.
-The selected root is summarized separately. Hitting a list cap does not stop size accounting. Progress is
-throttled to about 100 ms. Only one desktop scan can run at once.
+The desktop streams every measured file/subdirectory into an app-owned temporary
+SQLite index. The size view has **no 10,000-result cap** and requests only 50 rows
+per file/directory page. Changing GB size or search queries the existing index;
+there is no rescan. Progress, scan cancellation and result-loading cancellation
+are available. Cancelled scans retain the metadata measured so far. The selected
+root is summarized separately; links and the running app's own result directory
+are excluded. The latter also has a macOS APFS Data alias exclusion.
 
+Scanned user files remain unchanged. The index stores paths, types and sizes on
+the local device; normal scan replacement/app shutdown removes it. Available
+temporary disk space bounds storage, and write failures are shown explicitly.
+No full-result array is kept in the UI. SQLite page caches are configured to
+4 MiB per connection; this is not a total process-memory guarantee.
+
+Development/AI summaries still retain 10,000 findings/projects each, plus 100
+legacy largest entries and 100 warnings. These summary limits do not limit the
+size index or stop traversal. Progress is throttled to about 100 ms, and only one
+desktop scan can run at once.
 Byte counts are u64 in Rust and decimal strings in JSON/IPC to preserve precision
 in JavaScript. The UI uses decimal units: 1 GB = 1,000,000,000 bytes.
 

@@ -197,3 +197,11 @@ footer span:last-child { font-size: 8px; letter-spacing: 1.2px; }
 .size-entry-title strong { overflow-wrap: anywhere; }
 .size-result > .reveal-actions { padding: 4px 0 0; }
 @media (max-width: 740px) { .size-filter-controls { width: 100%; flex-wrap: wrap; } .gb-field { flex: 1; } .gb-field input { width: 100%; } .size-result { padding: 14px 12px; } }
+.size-page-controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 0 24px; }
+.size-page-panel > progress { margin: 5px 0 12px; }
+.size-page-panel > .warning { font-size: 12px; }
+.size-page-list { min-width: 0; }
+.size-page-panel .section-header { flex-wrap: wrap; }
+.size-page-top-controls { display: flex; gap: 8px; margin-left: auto; }
+.size-page-top-controls button { padding: 7px 11px; font-size: 11px; }
+.size-jumps { display: flex; gap: 22px; margin: 16px 0 6px; }

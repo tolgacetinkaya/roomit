@@ -25,14 +25,13 @@ establish that the new native screen has been accepted.
 - **Büyük öğeler** lists files and subdirectories separately, with a minimum GB filter.
 - **Tarama ayrıntıları** contains disk outcomes, warnings and other protected data. Main
   navigation and search must not start a new scan.
-- With many results, verify **Daha fazla göster** and lazy group expansion.
+- With many groups, verify **Daha fazla göster** and lazy expansion; size results use separate Previous/Next pages.
 
 ## Unlimited computer mode
 
 - Select **Bütün bilgisayar**: detected local disk roots should appear. Discovery
   alone must not start scanning. Network disks stay outside this mode.
-- Start: verify cumulative counts and disk index/count. There is no item-count
-  or directory-depth cutoff in computer mode. Folder-mode defaults stay bounded.
+- Start: verify cumulative counts and disk index/count. There is no item-count or directory-depth cutoff in any desktop scan scope.
 - Cancel during a sufficiently long scan; measured data should be returned as
   partial, and later roots marked not scanned. Start another scan afterwards.
 - An inaccessible/deleted/unmounted path should produce a readable error or
@@ -85,19 +84,30 @@ or macOS native acceptance is claimed by this implementation pass.
 - Confirm no file is launched and no delete/trash action is present. Check Mac
   Finder and its Command shortcut on a real device separately.
 
-## Minimum GB filter
+## Unlimited minimum-GB results
 
-1. Scan a selected scope, open **Büyük öğeler**, enter **5**, press **Uygula**.
-   Every displayed item must have at least 5,000,000,000 measured logical bytes.
-   Exactly 5 GB is included; a byte less is excluded even if display rounding says 5 GB.
-2. Try **0,5**, **0.5**, **0**, blank and **Temizle**. Lowering/raising/clearing the
-   threshold must not rescan. Only the large-items view is filtered; software/AI
-   grouped views and whole-scan metrics remain the original report.
-3. Apply a negative/non-number value: a validation message must appear and the
-   previous valid threshold must remain applied. A valid unmatched threshold
-   must show empty states rather than inventing results.
-4. Combine the threshold with path search, page through files/directories and
-   verify **Klasörde göster** and keyboard reveal still target each actual row.
-5. File/directory lists retain 10,000 each. When omissions could meet the chosen
-   threshold, the UI must show a list-limit notice. This does not stop scanning.
-6. Check 720 x 600 window layout and repeat native/device acceptance on macOS.
+1. Scan a scope with more than 10,000 regular files/subdirectories. Open **Büyük
+   öğeler**, enter a GB threshold and press **Uygula**. Counts must include all
+   measured matches; each kind shows only 50 rows per page.
+2. Page forward/back and check stable ordering for equal sizes, no repeated/missing
+   paths, and that cards replace the previous page. Use **Klasörlere git** to jump
+   to directory results without scrolling through all file cards.
+3. Search for a file near the end of the complete catalog, including an item beyond
+   the old 10,000 cutoff. Lower the GB threshold, use comma/dot decimals, clear it,
+   and combine with path search. No operation should start another scan.
+4. Change search/size quickly while queries load. Old responses must not overwrite
+   newer results. Cancel result loading, verify cancellation stays in effect, then
+   retry or change the filter. Next/Previous must remain usable afterwards.
+5. Cancel an active filesystem scan. Partial status/warnings should remain clear,
+   measured records should still be pageable, and a new scan should work. A new
+   scan replaces the prior temporary catalog; stale result IDs must not reappear.
+6. Confirm row **Klasörde göster**, Ctrl+Enter / Command+Enter still reveal exactly
+   that row, including a result after the old cutoff.
+7. Compare exact logical bytes. Exactly 5,000,000,000 bytes is included at 5 GB;
+   one byte less is excluded even if display rounding says 5 GB. Folder/child
+   sizes overlap. Inaccessible/link/unmeasured items are not claimed as complete.
+8. Resize to 720 x 600, navigate by keyboard, then test real macOS Finder/APFS
+   behavior separately. No delete/trash action should appear.
+
+The app's own live temporary results directory is intentionally excluded from the
+scan. Ordinary filesystem mutations/permission errors still yield partial results.

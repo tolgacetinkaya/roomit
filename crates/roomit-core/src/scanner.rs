@@ -14,22 +14,22 @@ pub struct ScanOptions {
     pub max_depth: Option<usize>,
     pub max_findings: usize,
     pub max_largest_entries: usize,
-    pub max_size_entries_per_kind: usize,
     pub max_warnings: usize,
     pub progress_interval: Duration,
     /// Computer mode partitions volumes; Unix mount crossings are not followed.
     pub same_file_system: bool,
     /// Prefer the branch containing this directory, e.g. the current user's home.
     pub preferred_path: Option<PathBuf>,
+    /// App-owned metadata directories, excluded intentionally from measured data.
+    pub excluded_paths: Vec<PathBuf>,
 }
 impl Default for ScanOptions {
     fn default() -> Self {
         Self {
             max_entries: Some(1_000_000), max_depth: Some(128), max_findings: 10_000,
             max_largest_entries: 100, max_warnings: 100,
-            max_size_entries_per_kind: 10_000,
             progress_interval: Duration::from_millis(100),
-            same_file_system: false, preferred_path: None,
+            same_file_system: false, preferred_path: None, excluded_paths: Vec::new(),
         }
     }
 }
@@ -51,7 +51,22 @@ pub fn inspect_workspace(root: &Path) -> io::Result<InspectionReport> {
 pub fn scan_workspace<F: FnMut(&ScanProgress)>(
     root: &Path, options: ScanOptions, cancel: &AtomicBool, on_progress: F,
 ) -> io::Result<InspectionReport> {
-    run_scan(&[root.to_path_buf()], options, cancel, on_progress, false)
+    run_scan(&[root.to_path_buf()], options, cancel, on_progress, false, None)
+}
+
+/// Receives each measured regular file and subdirectory exactly once. Errors
+/// abort explicitly; a failed sink must never silently return an incomplete index.
+pub trait SizeSink {
+    fn record(&mut self, entry: &SizedEntry) -> io::Result<()>;
+}
+impl<F: FnMut(&SizedEntry) -> io::Result<()>> SizeSink for F {
+    fn record(&mut self, entry: &SizedEntry) -> io::Result<()> { self(entry) }
+}
+
+pub fn scan_workspace_with_sink<'a, F: FnMut(&ScanProgress)>(
+    root: &Path, options: ScanOptions, cancel: &'a AtomicBool, on_progress: F, sink: &'a mut dyn SizeSink,
+) -> io::Result<InspectionReport> {
+    run_scan(&[root.to_path_buf()], options, cancel, on_progress, false, Some(sink))
 }
 
 /// Scan several roots with shared limits, cumulative progress, and one bounded
@@ -60,7 +75,13 @@ pub fn scan_workspace<F: FnMut(&ScanProgress)>(
 pub fn scan_locations<F: FnMut(&ScanProgress)>(
     roots: &[PathBuf], options: ScanOptions, cancel: &AtomicBool, on_progress: F,
 ) -> io::Result<InspectionReport> {
-    run_scan(roots, options, cancel, on_progress, true)
+    run_scan(roots, options, cancel, on_progress, true, None)
+}
+
+pub fn scan_locations_with_sink<'a, F: FnMut(&ScanProgress)>(
+    roots: &[PathBuf], options: ScanOptions, cancel: &'a AtomicBool, on_progress: F, sink: &'a mut dyn SizeSink,
+) -> io::Result<InspectionReport> {
+    run_scan(roots, options, cancel, on_progress, true, Some(sink))
 }
 
 fn checked_root(root: &Path) -> io::Result<PathBuf> {
@@ -71,8 +92,9 @@ fn checked_root(root: &Path) -> io::Result<PathBuf> {
     root.canonicalize()
 }
 
-fn run_scan<F: FnMut(&ScanProgress)>(
-    roots: &[PathBuf], mut options: ScanOptions, cancel: &AtomicBool, on_progress: F, computer: bool,
+fn run_scan<'a, F: FnMut(&ScanProgress)>(
+    roots: &[PathBuf], mut options: ScanOptions, cancel: &'a AtomicBool, on_progress: F, computer: bool,
+    sink: Option<&'a mut dyn SizeSink>,
 ) -> io::Result<InspectionReport> {
     if roots.is_empty() || roots.len() > 256 || roots.iter().any(|root| !root.is_absolute()) || options.max_entries == Some(0) {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "1–256 mutlak klasör yolu ve pozitif tarama sınırı gerekir."));
@@ -87,13 +109,13 @@ fn run_scan<F: FnMut(&ScanProgress)>(
         if !plans.iter().any(|(existing, _)| existing == &path) { plans.push((path, error)); }
     }
     options.preferred_path = options.preferred_path.and_then(|path| path.canonicalize().ok());
+    options.excluded_paths = options.excluded_paths.into_iter().filter_map(|path| path.canonicalize().ok()).collect();
     let root_label = if computer { "Bütün bilgisayar".into() } else { display_path(&plans[0].0) };
     let mut scanner = Scanner {
         report: InspectionReport {
             root: root_label, scope: if computer { "computer" } else { "recursive" }, status: ScanStatus::Completed,
             total_size_complete: true, stats: ScanStats::default(), projects: Vec::new(),
-            findings: Vec::new(), largest_entries: Vec::new(), size_entries: Vec::new(),
-            size_files_truncated: false, size_directories_truncated: false, warnings: Vec::new(),
+            findings: Vec::new(), largest_entries: Vec::new(), warnings: Vec::new(),
             warnings_omitted: 0, results_truncated: false, roots: Vec::new(),
         },
         root_count: plans.len(), root_index: 0,
@@ -101,7 +123,7 @@ fn run_scan<F: FnMut(&ScanProgress)>(
         root_device: None,
         options, cancel, on_progress, last_progress: Instant::now(),
         largest: BinaryHeap::new(), halted: false,
-        size_files: BinaryHeap::new(), size_directories: BinaryHeap::new(),
+        size_sink: sink, sink_error: None,
     };
     for (index, (root, error)) in plans.into_iter().enumerate() {
         scanner.root_index = index + 1;
@@ -139,9 +161,8 @@ fn run_scan<F: FnMut(&ScanProgress)>(
     scanner.report.projects.sort_by(|a, b| a.path.cmp(&b.path));
     scanner.report.largest_entries = scanner.largest.drain().map(|v| v.0).collect();
     scanner.report.largest_entries.sort_by(|a, b| b.logical_bytes.cmp(&a.logical_bytes).then(a.path.cmp(&b.path)));
-    scanner.report.size_entries = scanner.size_files.drain().chain(scanner.size_directories.drain()).map(|v| v.0).collect();
-    scanner.report.size_entries.sort_by(|a, b| b.logical_bytes.cmp(&a.logical_bytes).then(a.path.cmp(&b.path)));
     scanner.progress(Path::new(""), true, true);
+    if let Some(error) = scanner.sink_error { return Err(error); }
     Ok(scanner.report)
 }
 
@@ -169,8 +190,8 @@ struct Scanner<'a, F> {
     on_progress: F,
     last_progress: Instant,
     largest: BinaryHeap<Reverse<SizedEntry>>,
-    size_files: BinaryHeap<Reverse<SizedEntry>>,
-    size_directories: BinaryHeap<Reverse<SizedEntry>>,
+    size_sink: Option<&'a mut dyn SizeSink>,
+    sink_error: Option<io::Error>,
     halted: bool,
     partition_roots: Vec<PathBuf>,
     root_device: Option<u64>,
@@ -288,6 +309,9 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                     frame.complete = false;
                     self.warn(format!("Bağlantı/reparse point atlandı: {}", display_path(&path)));
                 }
+                Ok(metadata) if metadata.is_dir() && self.options.excluded_paths.contains(&path) => {
+                    // The running app's own index is not scanned into itself.
+                }
                 Ok(metadata) if metadata.is_dir() && (
                     self.partition_roots.contains(&path) ||
                     (self.options.same_file_system && device_id(&metadata) != self.root_device)
@@ -364,10 +388,14 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
     }
 
     fn keep_largest(&mut self, entry: SizedEntry) {
-        let (heap, truncated) = if entry.kind == EntryKind::File {
-            (&mut self.size_files, &mut self.report.size_files_truncated)
-        } else { (&mut self.size_directories, &mut self.report.size_directories_truncated) };
-        *truncated |= retain_largest(heap, &entry, self.options.max_size_entries_per_kind);
+        if self.sink_error.is_none() {
+            if let Some(sink) = &mut self.size_sink {
+                if let Err(error) = sink.record(&entry) {
+                    self.sink_error = Some(error); self.halted = true;
+                    self.report.status = ScanStatus::Limited;
+                }
+            }
+        }
         retain_largest(&mut self.largest, &entry, self.options.max_largest_entries);
     }
 }

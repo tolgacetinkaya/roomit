@@ -25,3 +25,5 @@ tauri-plugin-dialog = "2"
 sysinfo = { version = "0.37", default-features = false, features = ["disk"] }
 serde = { version = "1", features = ["derive"] }
 tauri-plugin-opener = { version = "2", default-features = false }
+rusqlite = { version = "0.37", features = ["bundled", "hooks"] }
+tempfile = "3"

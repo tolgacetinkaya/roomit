@@ -1,3 +1,37 @@
+# Unlimited, disk-backed size results — 2026-11-04
+
+- **64 automated tests passed**: 29 core (20 inspection + 9 multi-root), 14 native
+  state/discovery/reveal-validation/index tests, 21 frontend tests. The existing
+  interactive Explorer smoke test remains ignored in default runs.
+- TypeScript/Vite build, Rust workspace check and Windows debug/no-bundle build
+  passed. The delivered executable is copied and SHA-256 checked against output.
+- A real fixture streamed **10,013 files** through the scanner without retaining
+  a full array. An independent SQLite test traversed every page of **10,073 files
+  and 10,073 directories**, including equal-size ties, forward/backward cursors,
+  high-end searches and inclusive byte boundaries. No duplicate/missing rows.
+- Tests cover exact u64::MAX sizing, literal Unicode/punctuation search, missing
+  index IDs, cancellation generations, owned-directory cleanup with live readers,
+  a real cancelled walk producing a queryable partial index, write-error propagation
+  and excluding the app's own temporary metadata without hiding user results.
+- Synthetic metadata benchmark (Windows debug build): 100,001 catalog rows wrote
+  in **1.758 s**; first 50 rows plus exact count took **94.4 ms**. Database size
+  **15,753,216 bytes**. Connection page cache configured to 4 MiB. This is an index
+  benchmark, not a whole-disk scan-speed, peak-RAM or native-frame-rate claim.
+- Browser mocked-IPC evidence covers 10,123 matches per kind, at most 100 rendered
+  cards total, next/previous replacing rows, finding a path beyond 10,000, no-rescan
+  filtering, stale delayed responses, result-query cancellation, and scan cancel
+  partial-state rendering. Actual data correctness is separately covered above.
+- All desktop scan scopes are now uncapped by entry/depth. Core library budgets,
+  developer/AI group summaries and warning retention remain separate concerns.
+- The temporary metadata database is local, removed on normal scan replacement/
+  shutdown and excluded from its own walk (APFS alias handling is source-checked).
+  Insufficient temporary space fails explicitly; it does not silently cap results.
+- No delete/trash UI, GitHub publication or remote. Windows native app screen
+  acceptance and real macOS build/Finder/APFS device checks remain pending.
+
+Prior sections describe earlier builds and superseded bounded list designs.
+
+---
 # Minimum GB filter — 2026-11-04
 
 - **60 tests passed**: 28 core (19 inspection + 9 multi-root), 8 native

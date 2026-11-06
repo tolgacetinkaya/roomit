@@ -3,7 +3,8 @@
 ## Product boundaries
 
 Development and AI-tool recognition is primary. Size-threshold search is phase 2
-and has no date/age requirement. Runtime work is local and read-only. There is no
+and has no date/age requirement. Runtime work is local; scanned files are read-only.
+Only app-owned temporary result metadata is written or cleaned up. There is no
 LLM service, hosted API, telemetry, account, publishing, or deletion capability.
 
 ## Layers
@@ -30,9 +31,12 @@ listed once: file metadata is accounted immediately; child directories are
 queued after local project evidence is known. Completed child totals propagate
 to their parent. No file contents, hashes or AI transcripts are opened.
 
-File entries are not retained as a full inventory. A bounded min-heap keeps the
-largest 100 files/directories; up to 10,000 findings and 10,000 projects are
-retained. Folder mode defaults to 1,000,000 entries and 128 levels; computer mode has neither count nor depth cutoff. Pending directory queues can grow with the scanned tree. Warnings are capped at 100 with an omitted counter.
+File entries are not retained as a full in-memory inventory. Every measured size
+record streams to the native temporary index. A legacy summary min-heap keeps
+100 entries; development/AI summaries retain at most 10,000 findings/projects.
+Library traversal defaults remain 1,000,000 entries / 128 levels, while all desktop
+scopes explicitly disable those budgets. Pending directory queues can grow with
+the tree. Warnings retain 100 messages with an omitted counter.
 Files are not deterministically ordered by the filesystem; completed reports
 are sorted, while partial selection can depend on enumeration order.
 
@@ -128,8 +132,8 @@ Disk discovery source: https://github.com/GuillaumeGomez/sysinfo/tree/v0.37.2/sr
 ## Unlimited computer traversal and result presentation
 
 `ScanOptions.max_entries` / `max_depth` are optional. The desktop computer command
-uses `ScanOptions::computer`, setting both to None, while normal folder/library
-defaults remain bounded. Work is still iterative and cancellation/progress are
+uses `ScanOptions::computer`, setting both to None. Desktop folder mode also
+disables traversal budgets; only library defaults remain bounded. Work is still iterative and cancellation/progress are
 preserved. Report list/warning limits remain independent of traversal. Tests
 exercise traversal beyond the former depth cap, later roots, and cancellation.
 
@@ -137,8 +141,8 @@ exercise traversal beyond the former depth cap, later roots, and cancellation.
 on Mac paths, removes nested/duplicate byte contributions, associates outputs
 with the nearest project, and merges AI locations by tool. Truncated retained
 reports produce lower-bound group labels. `src/results.ts` renders lazy,
-paginated group accordions and separate result views. Large folders are shown
-at their outer boundary, with included child paths inside the accordion.
+paginated group accordions and separate result views. The size view reads all
+measured files/subdirectories from its separate indexed pages.
 Search and view navigation do not rescan. Full paths/warnings are secondary.
 
 The existing Roomit palette, system fonts and logo are preserved; the large
@@ -179,25 +183,55 @@ result owner; nested rows take priority over parent projects. Ctrl+Enter on
 Windows and Command+Enter on macOS trigger the same action, while typing fields,
 key repeats, composition and extra modifiers are ignored.
 
-## Minimum-size presentation
+## Unlimited size-result index (current)
 
-The scanner now keeps independent bounded heaps for files and subdirectories,
-controlled by `ScanOptions.max_size_entries_per_kind` (10,000 by default). Their
-merged `sizeEntries` plus per-kind truncation flags are separate from legacy
-`largestEntries`, recognition findings and all measured totals. Full traversal,
-progress, cancellation, link skipping and the absence of disk/computer cutoffs
-are preserved. The chosen root remains in `roots`, not duplicated as a subfolder.
-A low heap candidate is rejected without cloning its path once the heap fills.
+The previous bounded in-memory `sizeEntries` heaps are removed. Core streaming
+APIs `scan_workspace_with_sink` and `scan_locations_with_sink` accept a fallible
+`SizeSink`. Every regular file and measured subdirectory is emitted once, including
+partial directory records on cancellation. Sink I/O errors abort explicitly rather
+than publishing an incomplete index as complete. Legacy summary retention is
+independent. Desktop folder, disk and computer options have no traversal budgets;
+library defaults remain configurable/bounded for external callers.
 
-`src/size-filter.ts` parses comma/dot decimal GB directly into BigInt bytes (up
-to u64, at most nine fractional digits) and compares inclusively without using
-rounded display strings. Filtering is on measured sizes. A partial directory
-below the threshold may be omitted even if its true unmeasured size is larger;
-existing partial-report notices still apply. Blank/zero clear the size cutoff.
+`src-tauri/src/size_index.rs` writes every record into a uniquely app-created
+temporary SQLite directory. Inserts use cached statements and 1,000-row
+transactions. The `WITHOUT ROWID` primary B-tree is `(kind, sort_key, path)`;
+`sort_key` is the 20-character zero-padded decimal `u64::MAX - logical_bytes`.
+This preserves exact u64 size order without SQLite signed-integer overflow or
+floating-point comparisons. The ordered tree is maintained while scanning;
+there is no final all-row sort or multi-million-row IPC payload.
 
-The **Büyük öğeler** view shows flat, independently paged files and directories;
-parent and child sizes overlap and are not summed. Search/threshold changes use
-the retained report and never invoke a scan. Recognition/group totals are not
-filtered. A truncation notice appears when the lowest retained item of that kind
-still meets the threshold (including ties); above that boundary all matches by
-measured size are retained. This is bounded display, not a complete file index.
+The desktop response flattens the normal inspection report and adds
+`sizeIndexId`, an opaque scan ID. `query_size_entries` accepts that ID, kind,
+minimum-byte string, literal path search, and a first/last cursor plus direction.
+Pages contain at most 50 rows. Cursor seeking uses tuple comparisons, not growing
+OFFSET scans; the response includes first/last cursors and exact next/previous
+availability. Exact total counts are requested on the first page for each filter
+and reused during navigation. Counts and byte values cross IPC as decimal strings.
+Search uses Turkish lowercase and literal `instr`, not SQL wildcard interpolation.
+All request values are bound parameters; database filenames are never client input.
+
+Readers open separate read-only SQLite connections on blocking workers. Each
+connection targets a 4 MiB page cache, file-backed temporary work, and no mmap.
+Search/count may still scan eligible index rows; indeterminate progress and
+cancellation keep that work off the WebView thread. Per-kind query leases cancel
+superseded requests, and SQLite progress handlers interrupt running queries.
+Frontend disposal/request IDs reject delayed stale responses, including those
+arriving after a view/filter change. A queued search debounce is cleared by manual
+Apply/navigation so it cannot restart a cancelled result load.
+
+The registry holds one current snapshot. Arc ownership keeps old readers' files
+alive until those readers finish; replacing/clearing the current index rejects
+old IDs. Temporary directory deletion happens outside registry locks and scan
+cleanup runs on a blocking worker. Normal replacement/shutdown drops owned files;
+abnormal process termination can leave OS temporary data. The current metadata
+directory is excluded from its own scan, including its APFS Data alias on macOS.
+Only app-created temporary metadata is written/deleted; scanned files are untouched.
+
+`src/size-browser.ts` replaces, rather than appends, each page. There are at most
+50 visible file cards and 50 directory cards. Previous/Next controls are at both
+ends, section jumps avoid scrolling through the other list, and reveal actions
+and keyboard shortcuts still use the actual row path. Filtering/searching never
+reruns the filesystem walk. A cancelled scan publishes a queryable partial index;
+a failed index write publishes no successful index. Native screen/macOS acceptance
+is separate from core/SQLite tests and browser mocked-IPC evidence.

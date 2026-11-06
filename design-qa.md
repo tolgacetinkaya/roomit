@@ -111,3 +111,21 @@ Additional size-filter evidence: a 999 GB filter produced both empty states;
 in the mock adapter. At 720 x 600 CSS px, document scrollWidth was 705 px and
 all filter controls remained reachable (`artifacts/qa/size-filter-720.jpg`).
 Scan invocation count stayed at one throughout. Final browser error log was empty.
+
+## Unlimited result paging follow-up — 2026-11-04
+
+The size view now reads all matches from a local temporary catalog, with 50 rows
+per kind/page and no retained-result cutoff. File/directory counts are exact for
+the measured catalog. Next/Previous replace cards; top/bottom controls and section
+jumps remain usable. Browser fixture evidence verifies 10,123 matches of each
+kind while rendering at most 100 cards, a second page starting at row 50, backwards
+navigation, search beyond row 10,000, delayed-query rejection and query/scan cancel.
+The last manual Apply/navigation cancels a pending search debounce; a cancelled
+query stays cancelled. Native/core data and performance evidence is in VALIDATION.
+This browser evidence uses sample data and does not certify native frame rates.
+
+Browser evidence: `artifacts/qa/unlimited-results.jpg` shows 10,123 matches with
+page controls and the second page. `unlimited-cancelled.jpg` records scan partial
+state. At 720 x 600, document scrollWidth was 705 and only 100 result cards were
+present. Overrides were reset; the final browser error log was empty. After scan
+cancellation, a new scan and second-page navigation both worked.
