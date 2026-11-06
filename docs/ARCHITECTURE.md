@@ -146,3 +146,18 @@ introductory area was replaced with a compact two-column analysis workspace.
 This is an implementation pass based on the user's usability feedback and the
 existing code target, not a screenshot-backed audit. No live visual or native
 screen acceptance is claimed; screen checks remain with the user.
+
+## Single-volume selection and visual workspace
+
+The desktop adds `local_disks` for volume metadata (mount path, label, total/free
+bytes as decimal strings, removable flag). Discovery does not walk files.
+`mode=disk` validates `root` against a fresh `computer_roots` list, scans exactly
+that one root with computer options, then returns `scope=disk` and that root.
+Unmounted/invalid choices return errors rather than expanding scan scope. On Unix,
+filesystem crossings remain excluded; a volume selection is not a physical-device
+or APFS-container scan. Capacity snapshots are never summed into logical totals.
+
+The existing vanilla TS UI uses local Phosphor SVG assets, graphite tokens and
+blue accents; completed reports compact setup to keep results prominent. The
+Vite asset inline limit is zero to keep images compatible with native strict CSP.
+UI fixture evidence is separate from native/platform acceptance; see design QA.

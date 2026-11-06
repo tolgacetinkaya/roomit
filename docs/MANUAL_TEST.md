@@ -1,4 +1,4 @@
-# Manual screen checks — grouped workspace and unlimited computer scan
+# Manual screen checks — single disk and graphite workspace
 
 Current native/visual acceptance belongs to the user. Automated tests cover the
 scan engine, scan state, report formatting and group accounting; they do not
@@ -9,7 +9,7 @@ establish that the new native screen has been accepted.
 1. Close your older Roomit window and open the freshly built exe from the handoff.
 2. Choose **Bir klasör**, then **Klasör seç…**. Pick a modest project parent folder
    containing several projects. Cancelling the picker should retain the old path.
-3. Press **Taramayı başlat**. Check the left-hand progress/counters and **İptal et**.
+3. Press **Taramayı başlat**. Check the progress/counters below the scan setup and **İptal et**.
    A percentage is not shown because the total work is initially unknown.
 
 ## Read the grouped report
@@ -24,7 +24,7 @@ establish that the new native screen has been accepted.
   distinguish identical project names using the parent-location label/tooltip.
 - **Büyük klasörler** begins with outer folders; expand for the included large child
   paths. Individual large files are collapsed separately.
-- **Ayrıntılar** contains disk outcomes, warnings and other protected data. Main
+- **Tarama ayrıntıları** contains disk outcomes, warnings and other protected data. Main
   navigation and search must not start a new scan.
 - With many results, verify **Daha fazla göster** and lazy group expansion.
 
@@ -52,3 +52,19 @@ cancel, view buttons, search and group expansion should remain reachable.
 macOS needs a real build/device test for native picker, APFS partitioning,
 permissions, progress, cancellation and layout. No current Windows screenshot
 or macOS native acceptance is claimed by this implementation pass.
+
+## Single disk and redesigned workspace
+
+1. Select **Tek disk**. Choose one local volume; confirm its name/path, total
+   capacity and free space. No scan should start until you press Start.
+2. Start and confirm only that volume appears in **Tarama ayrintilari**. Check
+   progress and cancellation. Disk mode has no entry/depth limit; inaccessible
+   files and links retain existing partial-result behavior.
+3. Once a report arrives, setup should collapse and show the scanned location.
+   **Alani degistir** must reopen it. Search/navigation must preserve the report.
+4. Unplug a removable drive between selection and start: refresh/reselect or a
+   readable error is expected, never a fallback to all disks.
+5. Check the graphite/blue theme, icons and logo inside the built exe. Try the
+   minimum window size and keyboard scope selection, scan, cancel and navigation.
+6. On macOS, separately check system/Data volumes and external volume selection.
+   APFS shared container capacities are OS-reported snapshots, not additive totals.

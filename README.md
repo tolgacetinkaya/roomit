@@ -10,13 +10,15 @@ is configured. MIT licensed.
 ## Current capabilities
 
 - Pick a folder using the native Windows/macOS dialog; its path stays visible.
-- Scan one folder or all detected local disks, without opening file contents.
+- Scan one folder, one selected local disk, or all detected local disks, without opening file contents.
 - Compute individual file lengths and directory totals in one iterative traversal.
 - Discover nested .NET, Node.js, Python, Rust and Java/Gradle projects from markers.
 - Identify development outputs/dependencies with reasons and review-required status.
 - Identify Codex, Claude Code, Cursor and Ollama directories; protect AI data,
   instructions, recognized settings/model stores, Git data and environment files.
 - Live progress, cancellation and clearly labeled partial results.
+- Graphite/electric-blue workspace with persistent navigation, grouped results,
+  compact completed-scan setup, and per-volume capacity/free-space previews.
 - Filter findings, inspect detected projects and view the largest 100 files/folders.
 - Skip symlinks/reparse points; bound work and report memory; keep totals independent
   of paginated or capped result lists.
@@ -34,10 +36,10 @@ child rows; use the report root total, not a sum of displayed rows. Recognized
 space counts nested findings only once.
 
 Skipped links, inaccessible entries, cancelled scans and depth/entry limits make
-sizes partial lower bounds. Computer scans have no count/depth cutoff; folder-mode limits remain configurable in the library. The filesystem may change during a scan; this is
+sizes partial lower bounds. Disk and computer scans have no count/depth cutoff; folder-mode limits remain configurable in the library. The filesystem may change during a scan; this is
 not a snapshot or a proof that an item can safely be removed.
 
-Folder-mode defaults: 1,000,000 observed entries and 128 directory levels. Computer mode has no entry or depth cutoff. Both modes retain
+Folder-mode defaults: 1,000,000 observed entries and 128 directory levels. Disk and computer modes have no entry or depth cutoff. All modes retain
 up to 10,000 findings/projects each, 100 largest entries and 100 retained
 warnings. Hitting a result-list cap does not stop size accounting. Progress is
 throttled to about 100 ms. Only one desktop scan can run at once.

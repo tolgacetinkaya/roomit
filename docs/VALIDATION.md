@@ -1,3 +1,25 @@
+# Single disk and graphite workspace — 2026-11-04
+
+- `scripts/check.ps1` passed: 26 core tests, 6 Tauri state/discovery/selection
+  tests, 15 frontend tests; total **47 passing tests**. TypeScript/Vite build
+  and Rust workspace check passed. Windows debug/no-bundle exe build passed.
+- Single disk is an explicit mode. Fresh volume discovery validates the exact
+  selected mount before scanning; missing disks never fall back to all disks.
+  It uses unlimited computer scan options and retains progress/cancellation.
+- Volume capacities/free space are OS snapshots, serialized as decimal strings.
+  They are separate from logical file-length totals in the scan report.
+- In-app browser visual checks and mocked IPC interactions passed: disk selection,
+  exact root/mode, progress, cancellation, reopening setup, navigation, search and
+  lazy details. Checked default, 1120 x 820 and 720 x 600 viewports. See root
+  `design-qa.md`; screenshot evidence is ignored under `artifacts/qa`.
+- This is browser/fixture UI evidence, not native executable or physical-disk
+  acceptance. No actual full-disk scan was run. macOS device test remains pending.
+- Compiled assets stay local files for native CSP. The UI harness and sample data
+  are absent from production output. No deletion, GitHub publication or remote.
+
+Earlier entries below describe historical builds.
+
+---
 # Unlimited computer scan and grouped workspace — 2026-11-04
 
 ## Automated evidence

@@ -44,7 +44,7 @@ async fn inspect_workspace(
     on_progress: Channel<roomit_core::ScanProgress>,
     state: tauri::State<'_, ScanRegistry>,
 ) -> Result<roomit_core::InspectionReport, String> {
-    if mode != "folder" && mode != "computer" { return Err("Geçersiz tarama kapsamı.".into()); }
+    if mode != "folder" && mode != "computer" && mode != "disk" { return Err("Geçersiz tarama kapsamı.".into()); }
     let lease = state.begin(scan_id)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease; // Releases registry even on scan errors or worker panic.
@@ -53,10 +53,14 @@ async fn inspect_workspace(
                     _lease.cancel.store(true, Ordering::Relaxed);
                 }
         };
-        if mode == "computer" {
+        if mode == "computer" || mode == "disk" {
             let roots = computer::computer_roots()?;
+            let roots = if mode == "disk" { vec![computer::selected_root(&root, &roots)?] } else { roots };
             let options = roomit_core::ScanOptions::computer(computer::preferred_home(&roots));
-            roomit_core::scan_locations(&roots, options, &_lease.cancel, &mut progress)
+            let mut report = roomit_core::scan_locations(&roots, options, &_lease.cancel, &mut progress)
+                .map_err(|error| error.to_string())?;
+            if mode == "disk" { report.scope = "disk"; report.root = root; }
+            Ok(report)
         } else {
             roomit_core::scan_workspace(&PathBuf::from(root), roomit_core::ScanOptions::default(), &_lease.cancel, &mut progress)
         }.map_err(|error| error.to_string())
@@ -73,6 +77,12 @@ async fn computer_scan_roots() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+async fn local_disks() -> Result<Vec<computer::LocalDisk>, String> {
+    tauri::async_runtime::spawn_blocking(computer::local_disks).await
+        .map_err(|error| format!("Disk listesi alınamadı: {error}"))?
+}
+
+#[tauri::command]
 fn cancel_scan(scan_id: String, state: tauri::State<'_, ScanRegistry>) -> Result<bool, String> {
     state.cancel(&scan_id)
 }
@@ -81,7 +91,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(ScanRegistry::default())
-        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots])
+        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks])
         .run(tauri::generate_context!())
         .expect("Roomit could not start");
 }

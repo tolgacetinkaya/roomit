@@ -1,9 +1,12 @@
 :root {
-  --canvas: #f5f4ef;
-  --panel: #fffefa;
-  --ink: #25352b;
-  --muted: #626b62;
-  --line: #dedfd5;
-  --green: #3e6c4f;
-  --accent: #69956a;
+  color-scheme: dark;
+  --canvas: #101114;
+  --panel: #191b20;
+  --ink: #f1f3f7;
+  --muted: #a1a6b3;
+  --line: #2c3039;
+  --green: #86afff;
+  --accent: #487dff;
+  --subtle: #22252c;
+  --purple: #c3b7ff;
 }

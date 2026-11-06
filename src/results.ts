@@ -2,6 +2,7 @@ import { categoryLabels, formatCount, scanSummary, sizeLabel } from "./report";
 import type { Finding, InspectionReport, SizedEntry } from "./report";
 import { filterGroups, pathName, topLevelFindings } from "./groups";
 import type { GroupedReport, ResultGroup } from "./groups";
+import { icon } from "./icons";
 
 export type ResultView = "overview" | "projects" | "ai" | "largest" | "details";
 const node = (tag: string, text = "", className = ""): HTMLElement => {
@@ -54,6 +55,7 @@ function groupCard(group: ResultGroup): HTMLElement {
     body.append(paged(group.items, findingRow, 20)); return body;
   });
   card.title = group.location || group.title;
+  card.querySelector(".group-row")?.prepend(icon(group.kind === "ai" ? "ai" : group.kind === "project" ? "project" : "shield", "ui-icon group-icon"));
   return card;
 }
 function section(title: string, count: number, action?: () => void, unit = "grup"): HTMLElement {
@@ -72,11 +74,11 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
   const container = node("div", "", "report-view");
   if (view === "overview") {
     const metrics = node("div", "", "metrics");
-    for (const [label, value] of [
-      ["İncelenen boyut", sizeLabel(report.stats.totalLogicalBytes, report.totalSizeComplete)],
-      ["Tanımlanan alan", sizeLabel(report.stats.recognizedLogicalBytes, report.totalSizeComplete)],
-      ["Yazılım / AI grubu", `${formatCount(grouped.projects.length)} / ${formatCount(grouped.ai.length)}`],
-    ]) { const card = node("div", "", "metric"); card.append(node("span", label), node("strong", value)); metrics.append(card); }
+    for (const [label, value, hint] of [
+      ["İncelenen boyut", sizeLabel(report.stats.totalLogicalBytes, report.totalSizeComplete), `${formatCount(report.stats.filesScanned)} dosya incelendi`],
+      ["Tanımlanan alan", sizeLabel(report.stats.recognizedLogicalBytes, report.totalSizeComplete), "Tanınan yazılım, AI ve korunan veri"],
+      ["Yazılım / AI grubu", `${formatCount(grouped.projects.length)} / ${formatCount(grouped.ai.length)}`, "Projelerine ve araçlarına göre düzenlendi"],
+    ]) { const card = node("div", "", "metric"); card.append(node("span", label), node("strong", value), node("small", hint)); metrics.append(card); }
     container.append(metrics);
   }
   if (!report.totalSizeComplete || report.status !== "completed" || report.resultsTruncated) {
@@ -141,7 +143,7 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
       if (root.error) row.append(node("p", root.error, "warning")); container.append(row);
     }
     container.append(node("p", "Boyutlar dosya uzunluklarının toplamıdır. Diskte ayrılan veya boşaltılabilecek alanı göstermez; hardlinkler her yol için sayılır.", "hint"));
-    if (report.scope === "computer") container.append(node("p", "Bütün bilgisayar modunda öğe sayısı veya klasör derinliği sınırı yoktur. Liste ve uyarı sayıları belleği korumak için sınırlı tutulur; bu sınırlar taramayı durdurmaz.", "hint"));
+    if (report.scope === "computer" || report.scope === "disk") container.append(node("p", "Disk ve bütün bilgisayar taramalarında öğe sayısı veya klasör derinliği sınırı yoktur. Liste ve uyarı sayıları belleği korumak için sınırlı tutulur; bu sınırlar taramayı durdurmaz.", "hint"));
     for (const warning of report.warnings) container.append(node("p", warning, "warning"));
     if (report.warningsOmitted) container.append(node("p", `${formatCount(report.warningsOmitted)} ek uyarı listelenmedi.`, "hint"));
     if (protectedGroups.length) container.append(section("Korunan veriler", protectedGroups.length), paged(protectedGroups, groupCard));

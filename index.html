@@ -3,63 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
-    <title>Roomit — Depolama analizi</title>
+    <meta name="color-scheme" content="dark" />
+    <title>Roomit — Alanına yakından bak.</title>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
     <div class="app">
-      <header class="topbar">
-        <a class="brand" href="#main" aria-label="Roomit ana ekran"><img src="/src/assets/roomit.svg" width="34" height="34" alt="" />Roomit</a>
-        <span class="local-badge">Yerel analiz · Salt okunur</span>
-      </header>
+      <aside class="sidebar">
+        <a class="brand" href="#main" aria-label="Roomit ana ekran"><img src="/src/assets/roomit.svg" width="38" height="38" alt="" /><span>roomit<small>ALANINA YAKINDAN BAK.</small></span></a>
+        <div class="nav-label">ÇALIŞMA ALANI</div>
+        <nav id="result-tabs" class="result-tabs" aria-label="Sonuç görünümleri">
+          <button type="button" data-view="overview" aria-pressed="true"><span>Genel bakış</span><small>01</small></button>
+          <button type="button" data-view="projects" aria-pressed="false"><span>Projeler</span><small id="project-count">—</small></button>
+          <button type="button" data-view="ai" aria-pressed="false"><span>AI araçları</span><small id="ai-count">—</small></button>
+          <button type="button" data-view="largest" aria-pressed="false"><span>Büyük klasörler</span><small>04</small></button>
+          <button type="button" data-view="details" aria-pressed="false"><span>Tarama ayrıntıları</span><small>05</small></button>
+        </nav>
+        <div class="sidebar-bottom"><div class="local-badge">Yerel ve sana özel</div><p>Dosyaların cihazında kalır.<br />İçerikler açılmaz, dosyalar değiştirilmez.</p><span class="build-label">ROOMIT / GELİŞTİRME SÜRÜMÜ</span></div>
+      </aside>
       <main id="main">
-        <div class="page-heading"><div><h1>Depolamanı tanı.</h1><p>Yazılım projelerini ve AI verilerini, kapladıkları alanla birlikte gör.</p></div></div>
-        <div class="workspace">
-          <aside class="scan-panel" aria-labelledby="inspect-title">
-            <h2 id="inspect-title">Yeni tarama</h2>
-            <p class="muted">Önce taranacak alanı seç.</p>
-            <form id="inspect-form">
-              <fieldset class="scan-modes">
-                <legend>Tarama kapsamı</legend>
-                <label><input type="radio" name="scan-mode" value="folder" checked /><span><strong>Bir klasör</strong><small>Seçtiğin klasör ve alt klasörleri</small></span></label>
-                <label><input type="radio" name="scan-mode" value="computer" /><span><strong>Bütün bilgisayar</strong><small>Bağlı yerel diskler · Öğe sınırı yok</small></span></label>
-              </fieldset>
-              <div id="folder-target">
-                <label for="root">Seçilen klasör</label>
-                <input id="root" name="root" type="text" placeholder="Henüz klasör seçilmedi" readonly />
-                <button id="choose-folder" type="button" class="secondary full-width">Klasör seç…</button>
-              </div>
-              <div id="computer-target" hidden>
-                <p id="computer-roots" class="scope-list" role="status"></p>
-                <button id="refresh-roots" type="button" class="text-button">Diskleri yenile</button>
-                <p class="hint">Tüm erişilebilir yerel dosyalar taranır. Ağ diskleri ve bağlantı yolları kapsam dışıdır.</p>
-              </div>
+        <header class="page-heading"><div><p class="eyebrow">DEPOLAMA İÇGÖRÜLERİ</p><h1 id="page-title">Genel bakış</h1><p>Projelerin, araçların, dosyaların. Hepsi yerli yerinde.</p></div><span class="read-only">Salt okunur analiz</span></header>
+        <section class="scan-panel" aria-labelledby="inspect-title">
+          <div class="scan-heading"><div><h2 id="inspect-title">Nereye bakalım?</h2><p id="scan-caption" class="muted">Bir alan seç. Roomit içindekileri anlamlandırır.</p></div><div class="scan-header-actions"><span class="step-label">01 / TARAMA</span><button id="toggle-scan" type="button" class="secondary" aria-expanded="false" aria-controls="inspect-form" hidden>Alanı değiştir</button></div></div>
+          <form id="inspect-form">
+            <fieldset class="scan-modes">
+              <legend class="sr-only">Tarama kapsamı</legend>
+              <label><input type="radio" name="scan-mode" value="folder" checked /><span><strong>Bir klasör</strong><small>Alt klasörleriyle birlikte</small></span></label>
+              <label><input type="radio" name="scan-mode" value="disk" /><span><strong>Tek disk</strong><small>Seçtiğin diskin tamamı</small></span></label>
+              <label><input type="radio" name="scan-mode" value="computer" /><span><strong>Bütün bilgisayar</strong><small>Bağlı tüm yerel diskler</small></span></label>
+            </fieldset>
+            <div class="target-row">
+              <div id="folder-target" class="target-control"><label for="root" class="sr-only">Seçilen klasör</label><input id="root" name="root" type="text" placeholder="Taramak istediğin klasörü seç" readonly /><button id="choose-folder" type="button" class="secondary">Klasör seç…</button></div>
+              <div id="disk-target" class="target-control" hidden><label for="disk-select" class="sr-only">Taranacak disk</label><select id="disk-select"><option value="">Diskler yükleniyor…</option></select></div>
+              <div id="computer-target" class="target-control" hidden><p id="computer-roots" class="scope-list" role="status">Yerel diskler bulunuyor…</p></div>
               <div class="scan-actions"><button id="inspect-button" type="submit" disabled>Taramayı başlat</button><button id="cancel-button" type="button" class="secondary" hidden>İptal et</button></div>
-              <p id="runtime-note" class="hint">Tarama masaüstü uygulamasında kullanılabilir.</p>
-            </form>
-            <div class="scan-state">
-              <progress id="scan-progress" aria-label="Tarama sürüyor" hidden></progress>
-              <p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p>
-              <p id="current-path" class="current-path" aria-live="off"></p>
             </div>
-            <p class="privacy-note">Dosya içerikleri açılmaz.<br />Hiçbir dosya değiştirilmez.</p>
-          </aside>
-          <section class="report-panel" aria-labelledby="results-title">
-            <div class="results-header"><div><h2 id="results-title">Sonuçlar</h2><p id="result-caption" class="muted">Tarama tamamlandığında özet burada görünecek.</p></div></div>
-            <nav id="result-tabs" class="result-tabs" aria-label="Sonuç görünümleri">
-              <button type="button" data-view="overview" aria-pressed="true">Genel bakış</button>
-              <button type="button" data-view="projects" aria-pressed="false">Projeler</button>
-              <button type="button" data-view="ai" aria-pressed="false">AI araçları</button>
-              <button type="button" data-view="largest" aria-pressed="false">Büyük klasörler</button>
-              <button type="button" data-view="details" aria-pressed="false">Ayrıntılar</button>
-            </nav>
-            <div class="search-row"><label for="result-search" class="sr-only">Sonuçlarda ara</label><input id="result-search" type="search" placeholder="Proje, araç veya klasör ara…" disabled /></div>
-            <div id="results" aria-busy="false"><div class="empty-state"><h3>Daha anlaşılır bir görünüm.</h3><p>Dosyalar tek tek sıralanmak yerine proje ve araç gruplarında toplanır. Ayrıntıları yalnızca istediğinde açarsın.</p><p class="hint">Başlamak için soldan bir klasör veya bütün bilgisayarı seç.</p></div></div>
-          </section>
-        </div>
+            <div class="target-foot"><p id="runtime-note" class="hint">Tarama masaüstü uygulamasında kullanılabilir.</p><button id="refresh-roots" type="button" class="text-button" hidden>Diskleri yenile</button></div>
+            <div id="disk-info" class="disk-info" hidden></div>
+          </form>
+          <div class="scan-state"><progress id="scan-progress" aria-label="Tarama sürüyor" hidden></progress><p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p><p id="current-path" class="current-path" aria-live="off"></p></div>
+        </section>
+        <section class="report-panel" aria-labelledby="results-title">
+          <div class="results-header"><div><p class="eyebrow">02 / KEŞİF</p><h2 id="results-title">Alanının hikâyesi</h2><p id="result-caption" class="muted">İlk taramanla başlayalım.</p></div><div class="search-row"><label for="result-search" class="sr-only">Sonuçlarda ara</label><input id="result-search" type="search" placeholder="Sonuçlarda ara…" disabled /></div></div>
+          <div id="results" aria-busy="false"></div>
+        </section>
+        <footer><span>Dosyaları saymanın ötesinde.</span><span>YAZILIM + AI + DEPOLAMA</span></footer>
       </main>
-      <footer>Roomit <span>Yerel geliştirme sürümü</span></footer>
     </div>
   </body>
 </html>

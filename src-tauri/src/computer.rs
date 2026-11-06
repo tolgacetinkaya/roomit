@@ -1,6 +1,37 @@
 use std::path::PathBuf;
 use sysinfo::{DiskRefreshKind, Disks};
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalDisk {
+    pub path: String,
+    pub name: String,
+    pub total_space: String,
+    pub available_space: String,
+    pub removable: bool,
+}
+
+/// Only volume metadata is read here; discovery never starts a file scan.
+pub(crate) fn local_disks() -> Result<Vec<LocalDisk>, String> {
+    let disks = Disks::new_with_refreshed_list_specifics(DiskRefreshKind::nothing().with_storage());
+    let home = user_home();
+    let roots = plan_roots(disks.iter().map(|disk| disk.mount_point().to_path_buf()).collect(), home.as_deref())?;
+    Ok(roots.iter().filter_map(|root| disks.iter().find(|disk| disk.mount_point() == root).map(|disk| LocalDisk {
+        path: root.to_string_lossy().into_owned(),
+        name: disk.name().to_string_lossy().into_owned(),
+        total_space: disk.total_space().to_string(),
+        available_space: disk.available_space().to_string(),
+        removable: disk.is_removable(),
+    })).collect())
+}
+
+/// Validate against fresh discovery. A removed drive or arbitrary subfolder is
+/// never silently scanned as a whole disk (nor replaced by another disk).
+pub(crate) fn selected_root(requested: &str, roots: &[PathBuf]) -> Result<PathBuf, String> {
+    roots.iter().find(|root| root.as_os_str() == std::ffi::OsStr::new(requested)).cloned()
+        .ok_or_else(|| "Seçilen disk artık bağlı değil veya taranabilir değil. Disk listesini yenileyin.".into())
+}
+
 /// sysinfo includes fixed/removable local volumes on Windows and browsable
 /// local volumes on macOS, including APFS Data. It filters network mounts.
 pub(crate) fn computer_roots() -> Result<Vec<PathBuf>, String> {
@@ -82,5 +113,19 @@ mod tests {
         let roots = computer_roots().unwrap();
         assert!(!roots.is_empty());
         assert!(roots.iter().all(|path| path.is_absolute()));
+        let disks = local_disks().unwrap();
+        assert!(disks.iter().all(|disk| disk.total_space.parse::<u64>().is_ok()
+            && disk.available_space.parse::<u64>().is_ok()));
+    }
+
+    #[test]
+    fn disk_selection_requires_an_exact_current_volume() {
+        let a = if cfg!(windows) { PathBuf::from(r"C:\") } else { PathBuf::from("/") };
+        let b = a.join("other-volume");
+        let roots = vec![a.clone(), b.clone()];
+        assert_eq!(selected_root(&b.to_string_lossy(), &roots).unwrap(), b);
+        assert!(selected_root(&a.join("some-folder").to_string_lossy(), &roots).is_err());
+        assert!(selected_root(&b.to_string_lossy(), &[a]).is_err());
+        assert!(selected_root("", &roots).is_err());
     }
 }
