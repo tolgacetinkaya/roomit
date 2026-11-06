@@ -13,6 +13,7 @@ import type { IconName } from "./icons";
 import { installRevealShortcut, revealShortcut } from "./reveal";
 import { parseMinimumGb } from "./size-filter";
 import { disposeSizeBrowser } from "./size-browser";
+import { installExclusions } from "./exclusions";
 import "./styles.css";
 
 function element<T extends HTMLElement>(selector: string): T {
@@ -50,12 +51,15 @@ let pickingFolder = false;
 let rootsLoading = false;
 let disks: LocalDisk[] = [];
 let diskRequest = 0;
+let exclusions: ReturnType<typeof installExclusions> | undefined;
 const scanMode = (): ScanMode => (modeInputs.find((radio) => radio.checked)?.value || "folder") as ScanMode;
 const target = () => scanTarget(scanMode(), input.value, diskSelect.value, disks, rootsLoading);
 
 function updateControls(): void {
   const native = isTauri();
-  const busy = Boolean(activeScan) || pickingFolder;
+  const scanBusy = Boolean(activeScan) || pickingFolder;
+  exclusions?.update(scanBusy);
+  const busy = scanBusy || Boolean(exclusions?.busy);
   const mode = scanMode();
   folderTarget.hidden = mode !== "folder"; computerTarget.hidden = mode !== "computer";
   diskTarget.hidden = mode !== "disk"; refreshRoots.hidden = mode === "folder";
@@ -65,7 +69,7 @@ function updateControls(): void {
   chooseFolder.disabled = !native || busy;
   refreshRoots.disabled = !native || busy || rootsLoading;
   for (const radio of modeInputs) radio.disabled = !native || busy;
-  button.disabled = !native || busy || !target();
+  button.disabled = !native || busy || !exclusions?.ready || !target();
   element("#runtime-note").textContent = !native ? "Tarayıcı önizlemesi · Tarama masaüstü uygulamasında kullanılabilir."
     : mode === "folder" ? "Seçim taramayı başlatmaz. Alt klasörler de incelenir."
     : mode === "disk" ? "Yalnızca seçilen disk · Öğe ve derinlik sınırı yok"
@@ -241,6 +245,11 @@ if (isTauri()) {
   button.disabled = true; input.disabled = true;
   status.textContent = "Tarayıcı önizlemesi: Gerçek tarama için Roomit’i masaüstünde aç.";
 }
+exclusions = installExclusions(updateControls, () => {
+  status.className = "";
+  status.textContent = lastReport ? "Hariç tutma seçimin kaydedildi. Ekrandaki sonuçlar önceki taramaya ait; yeni seçim için tekrar tara." : "Hariç tutma seçimin kaydedildi.";
+});
+void exclusions.load();
 updateControls();
 renderCurrent();
 cancelButton.addEventListener("click", async () => {
@@ -264,7 +273,7 @@ cancelButton.addEventListener("click", async () => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const selection = target();
-  if (!selection || !isTauri() || activeScan || pickingFolder) return;
+  if (!selection || !isTauri() || activeScan || pickingFolder || !exclusions?.ready) return;
   const { root, mode } = selection;
   const scanId = crypto.randomUUID();
   activeScan = scanId; cancelRequested = false;

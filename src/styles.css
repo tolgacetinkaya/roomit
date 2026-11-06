@@ -205,3 +205,19 @@ footer span:last-child { font-size: 8px; letter-spacing: 1.2px; }
 .size-page-top-controls { display: flex; gap: 8px; margin-left: auto; }
 .size-page-top-controls button { padding: 7px 11px; font-size: 11px; }
 .size-jumps { display: flex; gap: 22px; margin: 16px 0 6px; }
+/* Persistent scope exclusions */
+.exclusion-settings { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.015); }
+.exclusion-settings > summary { padding: 12px 14px; cursor: pointer; font-size: .85rem; }
+#exclusion-count { color: var(--muted); font-size: .8rem; }
+.exclusion-body { padding: 0 14px 14px; }
+.exclusion-heading { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding-top: 10px; }
+.exclusion-heading strong, .automatic-exclusions strong { font-size: .82rem; }
+.exclusion-heading p { margin: 5px 0; }
+.exclusion-list { list-style: none; padding: 0; margin: 12px 0; max-height: 210px; overflow: auto; }
+.exclusion-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: .8rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.exclusion-list li > span { min-width: 0; }
+.exclusion-list button { flex-shrink: 0; font-size: .75rem; }
+.automatic-exclusions { border-top: 1px solid var(--line); padding-top: 12px; }
+.automatic-exclusions summary { cursor: pointer; font-size: .8rem; }
+.scan-scope-note { margin-top: 12px; }
+@media (max-width: 760px) { .exclusion-heading { align-items: flex-start; flex-direction: column; } }

@@ -80,6 +80,7 @@ pub struct ScanStats {
     pub skipped_links: u64,
     pub skipped_special: u64,
     pub skipped_mounts: u64,
+    pub excluded_entries: u64,
     pub errors: u64,
     pub projects_found: u64,
     pub findings_found: u64,
@@ -104,7 +105,7 @@ pub struct ScanProgress {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum RootStatus { Completed, Cancelled, Limited, Failed, NotScanned }
+pub enum RootStatus { Completed, Cancelled, Limited, Failed, NotScanned, Excluded }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

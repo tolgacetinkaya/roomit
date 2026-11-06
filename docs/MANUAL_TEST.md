@@ -111,3 +111,26 @@ or macOS native acceptance is claimed by this implementation pass.
 
 The app's own live temporary results directory is intentionally excluded from the
 scan. Ordinary filesystem mutations/permission errors still yield partial results.
+
+
+## Persistent exclusions and automatic protection
+
+1. Expand **Hariç tutulanlar**, add two folders with **Klasör ekle…**, and cancel a
+   second picker attempt. The saved list must remain intact after cancellation.
+2. Close/reopen Roomit. Both selections should still be listed. Unplug/reconnect
+   a removable drive: its saved exclusion must not disappear.
+3. Scan a test parent containing an excluded subtree and an included sibling.
+   Only the included bytes/results should appear; similar prefix names must stay
+   included. All totals describe the included scope. Check **Tarama ayrıntıları**.
+4. Try selecting an excluded child directly: Roomit should refuse to scan it.
+   Repeat folder/disk/computer modes; exclusion choices apply to all three.
+5. During scanning, add/remove controls are disabled; progress and cancel remain
+   available. After a change, rescan for new results; prior results are labeled old.
+6. **Listeden çıkar** only removes the preference. Verify the folder still exists;
+   rescan and confirm it can now appear unless an automatic rule also protects it.
+7. Expand the automatic list. Windows system/program paths and registered custom
+   install paths must stay out, including direct selection of a child. AI models
+   and project data outside those trees remain eligible.
+8. On Mac, test `/Applications`, a `.app` moved into Downloads, direct selection
+   inside that bundle, and real user data under `/System/Volumes/Data/Users`.
+   System/app contents must stay excluded while ordinary user data is eligible.

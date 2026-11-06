@@ -124,12 +124,13 @@ export function renderResults(report: InspectionReport, grouped: GroupedReport, 
     container.append(section("Tarama ayrıntıları", report.roots.length, undefined, "konum"), node("p", scanSummary(report), "muted"), node("p", report.root, "report-path"));
     for (const root of report.roots) {
       const row = node("div", "", "member-row");
-      const label = root.status === "failed" ? "Erişilemedi" : root.status === "notScanned" ? "Taranmadı" : sizeLabel(root.logicalBytes, root.sizeComplete);
+      const label = root.status === "excluded" ? "Hariç tutuldu" : root.status === "failed" ? "Erişilemedi" : root.status === "notScanned" ? "Taranmadı" : sizeLabel(root.logicalBytes, root.sizeComplete);
       row.append(node("strong", `${root.path} · ${label}`));
       attachReveal(row, [root.path], true);
       if (root.error) row.append(node("p", root.error, "warning")); container.append(row);
     }
     container.append(node("p", "Boyutlar dosya uzunluklarının toplamıdır. Diskte ayrılan veya boşaltılabilecek alanı göstermez; hardlinkler her yol için sayılır.", "hint"));
+    container.append(node("p", `${formatCount(report.stats.excludedEntries || 0)} dosya / alt ağaç hariç tutuldu. Hariç tutulan klasörlerin içindeki öğeler sayılmaz; boyutlar yalnızca taranan kapsamı gösterir.`, "hint"));
     container.append(node("p", "Masaüstü taramalarında öğe ve derinlik sınırı yoktur. Büyük öğeler listesindeki tüm ölçülen sonuçlar sayfa sayfa açılır; yazılım/AI grup özeti ve uyarı sayısı sınırlı tutulur.", "hint"));
     for (const warning of report.warnings) container.append(node("p", warning, "warning"));
     if (report.warningsOmitted) container.append(node("p", `${formatCount(report.warningsOmitted)} ek uyarı listelenmedi.`, "hint"));

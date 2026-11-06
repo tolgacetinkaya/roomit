@@ -20,8 +20,10 @@ pub struct ScanOptions {
     pub same_file_system: bool,
     /// Prefer the branch containing this directory, e.g. the current user's home.
     pub preferred_path: Option<PathBuf>,
-    /// App-owned metadata directories, excluded intentionally from measured data.
+    /// Excluded subtrees/files. Sizes measure only the remaining scan scope.
     pub excluded_paths: Vec<PathBuf>,
+    pub exclude_app_bundles: bool,
+    pub exclude_system_attributes: bool,
 }
 impl Default for ScanOptions {
     fn default() -> Self {
@@ -30,6 +32,7 @@ impl Default for ScanOptions {
             max_largest_entries: 100, max_warnings: 100,
             progress_interval: Duration::from_millis(100),
             same_file_system: false, preferred_path: None, excluded_paths: Vec::new(),
+            exclude_app_bundles: false, exclude_system_attributes: false,
         }
     }
 }
@@ -109,7 +112,12 @@ fn run_scan<'a, F: FnMut(&ScanProgress)>(
         if !plans.iter().any(|(existing, _)| existing == &path) { plans.push((path, error)); }
     }
     options.preferred_path = options.preferred_path.and_then(|path| path.canonicalize().ok());
-    options.excluded_paths = options.excluded_paths.into_iter().filter_map(|path| path.canonicalize().ok()).collect();
+    let exclusions = crate::exclusions::Exclusions::new(&options.excluded_paths, options.exclude_app_bundles);
+    if !computer && (exclusions.contains(&plans[0].0) ||
+        (options.exclude_system_attributes && plans[0].0.parent().is_some() &&
+            fs::symlink_metadata(&plans[0].0).is_ok_and(|m| system_attribute(&m)))) {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Bu klasör hariç tutulan bir konumda. Başka bir klasör seçin veya kullanıcı hariç tutma kuralını kaldırın."));
+    }
     let root_label = if computer { "Bütün bilgisayar".into() } else { display_path(&plans[0].0) };
     let mut scanner = Scanner {
         report: InspectionReport {
@@ -121,12 +129,18 @@ fn run_scan<'a, F: FnMut(&ScanProgress)>(
         root_count: plans.len(), root_index: 0,
         partition_roots: plans.iter().filter(|(_, error)| error.is_none()).map(|(path, _)| path.clone()).collect(),
         root_device: None,
-        options, cancel, on_progress, last_progress: Instant::now(),
+        options, exclusions, cancel, on_progress, last_progress: Instant::now(),
         largest: BinaryHeap::new(), halted: false,
         size_sink: sink, sink_error: None,
     };
     for (index, (root, error)) in plans.into_iter().enumerate() {
         scanner.root_index = index + 1;
+        if scanner.exclusions.contains(&root) {
+            scanner.report.stats.excluded_entries += 1;
+            scanner.report.roots.push(RootReport { path: display_path(&root), status: RootStatus::Excluded,
+                logical_bytes: 0, size_complete: true, error: None });
+            continue;
+        }
         if scanner.should_stop() {
             scanner.report.total_size_complete = false;
             scanner.report.roots.push(RootReport { path: display_path(&root), status: RootStatus::NotScanned,
@@ -184,6 +198,7 @@ impl Frame {
 }
 
 struct Scanner<'a, F> {
+    exclusions: crate::exclusions::Exclusions,
     report: InspectionReport,
     options: ScanOptions,
     cancel: &'a AtomicBool,
@@ -303,14 +318,18 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 }
             };
             let path = entry.path();
+            if self.exclusions.contains(&path) {
+                self.report.stats.excluded_entries += 1;
+                continue;
+            }
             match fs::symlink_metadata(&path) {
+                Ok(metadata) if self.options.exclude_system_attributes && system_attribute(&metadata) => {
+                    self.report.stats.excluded_entries += 1;
+                }
                 Ok(metadata) if is_link(&metadata) => {
                     self.report.stats.skipped_links += 1;
                     frame.complete = false;
                     self.warn(format!("Bağlantı/reparse point atlandı: {}", display_path(&path)));
-                }
-                Ok(metadata) if metadata.is_dir() && self.options.excluded_paths.contains(&path) => {
-                    // The running app's own index is not scanned into itself.
                 }
                 Ok(metadata) if metadata.is_dir() && (
                     self.partition_roots.contains(&path) ||
@@ -426,6 +445,13 @@ fn is_link(metadata: &fs::Metadata) -> bool {
     }
     #[cfg(not(windows))]
     { metadata.file_type().is_symlink() }
+}
+
+fn system_attribute(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    { use std::os::windows::fs::MetadataExt; metadata.file_attributes() & 4 != 0 }
+    #[cfg(not(windows))]
+    { let _ = metadata; false }
 }
 
 fn device_id(metadata: &fs::Metadata) -> Option<u64> {

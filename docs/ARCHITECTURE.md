@@ -4,7 +4,7 @@
 
 Development and AI-tool recognition is primary. Size-threshold search is phase 2
 and has no date/age requirement. Runtime work is local; scanned files are read-only.
-Only app-owned temporary result metadata is written or cleaned up. There is no
+Only app-owned settings and temporary result metadata are written or cleaned up. There is no
 LLM service, hosted API, telemetry, account, publishing, or deletion capability.
 
 ## Layers
@@ -226,7 +226,7 @@ old IDs. Temporary directory deletion happens outside registry locks and scan
 cleanup runs on a blocking worker. Normal replacement/shutdown drops owned files;
 abnormal process termination can leave OS temporary data. The current metadata
 directory is excluded from its own scan, including its APFS Data alias on macOS.
-Only app-created temporary metadata is written/deleted; scanned files are untouched.
+Only app-created settings and temporary metadata are written; cleanup removes only owned temporary metadata. Scanned files are untouched.
 
 `src/size-browser.ts` replaces, rather than appends, each page. There are at most
 50 visible file cards and 50 directory cards. Previous/Next controls are at both
@@ -235,3 +235,39 @@ and keyboard shortcuts still use the actual row path. Filtering/searching never
 reruns the filesystem walk. A cancelled scan publishes a queryable partial index;
 a failed index write publishes no successful index. Native screen/macOS acceptance
 is separate from core/SQLite tests and browser mocked-IPC evidence.
+
+
+## Persistent and automatic exclusions — 2026-11-04
+
+The native `ExclusionStore` reads/writes only a fixed app-config JSON path.
+`get_exclusions` and `change_exclusions` run on blocking workers; writes validate
+all new absolute, existing, non-link directories, deduplicate, flush/sync a
+same-directory temporary file, then atomically persist. Previously saved missing
+paths remain effective when the drive returns. Corrupt/read-failed settings are
+preserved and fail closed. Store locks serialize writes; the scan-registry lock
+prevents editing during a scan. Each scan snapshots choices, refreshes native
+policy, and adds its own config/index directories.
+
+The core compiles lexical and canonical paths into a component-boundary hash set.
+Windows keys ignore case and normalize the extended prefix. Ancestor checks prune
+before metadata measurement/project evidence/index emission. Excluded explicit
+folder roots return an error; excluded computer roots are labeled `excluded` and
+never walked. macOS app-bundle ancestors also block direct nested selection.
+`excludedEntries` counts pruned boundary entries, not all unvisited descendants.
+Intentional exclusions do not mark the remaining scope incomplete: all displayed
+sizes describe that scope. I/O/link/cancel incompleteness keeps its prior meaning.
+
+Windows policy covers standard system/install names on local volumes, environment
+system/program locations, current-user Programs/WindowsApps/Packages, the running
+exe, SYSTEM attributes and both registry views of HKCU/HKLM Uninstall
+`InstallLocation` and App Paths executable-parent directories. Registry values
+are never executed; empty/relative/drive-root registrations are rejected.
+Microsoft documents [InstallLocation](https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key).
+macOS policy covers system/library/install locations, `.app` ancestors anywhere,
+volume service metadata, and APFS Data aliases. `/System` and `/System/Volumes`
+children are pruned individually while preserving Data user paths. Directory
+reads for this policy enumerate only boundary names, not file contents.
+Apple describes [system/application domains](https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html).
+This is a deterministic location policy, not a complete inventory of every
+application-owned file; unregistered/portable/custom paths require user rules.
+No shell, delete/trash command or broad frontend filesystem permission is added.

@@ -129,3 +129,20 @@ page controls and the second page. `unlimited-cancelled.jpg` records scan partia
 state. At 720 x 600, document scrollWidth was 705 and only 100 result cards were
 present. Overrides were reset; the final browser error log was empty. After scan
 cancellation, a new scan and second-page navigation both worked.
+
+
+## Persistent exclusions follow-up — 2026-11-04
+
+Added a collapsed **Hariç tutulanlar** section in the existing graphite/blue scan
+panel. User-selected paths, explicit remove-preference actions and an always-on
+automatic protection section are distinct. The included-scope size explanation
+stays visible when completed-scan settings collapse.
+
+Browser mocked-IPC evidence: add two paths, cancel picker with no change, remove
+one preference, reload retained choices, lock editing during scan, retain previous
+choices on save failure and block scanning on load failure even after choosing a
+folder. Native Rust persistence/traversal tests establish actual filesystem
+behavior; the browser fixture does not. `artifacts/qa/exclusions.jpg` is labeled
+sample data. The 720 x 600 layout had scrollWidth 705 with no horizontal overflow;
+the viewport was reset and the temporary tab/server closed. Native Windows/Mac
+screen acceptance remains separate.

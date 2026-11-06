@@ -2862,12 +2862,14 @@ dependencies = [
  "roomit-core",
  "rusqlite",
  "serde",
+ "serde_json",
  "sysinfo",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tempfile",
+ "winreg",
 ]
 
 [[package]]

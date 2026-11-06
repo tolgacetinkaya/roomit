@@ -40,7 +40,18 @@
             </div>
             <div class="target-foot"><p id="runtime-note" class="hint">Tarama masaüstü uygulamasında kullanılabilir.</p><button id="refresh-roots" type="button" class="text-button" hidden>Diskleri yenile</button></div>
             <div id="disk-info" class="disk-info" hidden></div>
+            <details id="exclusion-settings" class="exclusion-settings">
+              <summary>Hariç tutulanlar <span id="exclusion-count">· Yükleniyor…</span></summary>
+              <div class="exclusion-body">
+                <div class="exclusion-heading"><div><strong>Senin seçtiklerin</strong><p class="hint">Tüm tarama türlerinde geçerli. Uygulamayı kapatınca da saklanır.</p></div><button id="add-exclusion" type="button" class="secondary" disabled>Klasör ekle…</button></div>
+                <ul id="exclusion-list" class="exclusion-list" aria-label="Hariç tutulan klasörler"></ul>
+                <p id="exclusion-status" class="hint" role="status" aria-live="polite">Hariç tutma ayarları yükleniyor…</p>
+                <button id="retry-exclusions" type="button" class="text-button" hidden>Yeniden yükle</button>
+                <div class="automatic-exclusions"><strong>Otomatik koruma · Her zaman açık</strong><p class="hint">Sistem konumları ve tanınan uygulama kurulumları taranmaz. Projeler, bağımlılıklar ve AI kullanıcı verileri incelenebilir. Kayıtsız / taşınabilir uygulamaları listeye ayrıca ekle.</p><details><summary>Otomatik hariç tutulan konumlar</summary><ul id="automatic-exclusion-list" class="exclusion-list"></ul><p id="automatic-exclusion-note" class="hint"></p></details></div>
+              </div>
+            </details>
           </form>
+          <p class="hint scan-scope-note">Sistem ve tanınan uygulama kurulumları kapsam dışında. Boyutlar yalnızca taramaya dahil edilen dosyaları gösterir.</p>
           <div class="scan-state"><progress id="scan-progress" aria-label="Tarama sürüyor" hidden></progress><p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p><p id="current-path" class="current-path" aria-live="off"></p></div>
         </section>
         <section class="report-panel" aria-labelledby="results-title">

@@ -11,6 +11,13 @@ is configured. MIT licensed.
 
 - Pick a folder using the native Windows/macOS dialog; its path stays visible.
 - Scan one folder, one selected local disk, or all detected local disks, without opening file contents.
+- Add multiple folders to **Hariç tutulanlar** using the native picker; choices persist
+  locally across restarts and apply to folder/disk/computer scans. Remove a rule
+  with **Listeden çıkar**; this does not change the folder itself.
+- Automatically prune standard system/install locations, Windows SYSTEM-attribute
+  entries, registered Windows InstallLocation/App Paths and macOS `.app` bundles.
+  Automatic rules cannot be disabled. Unknown portable/unregistered installations
+  require an explicit user exclusion; this is not universal application ownership detection.
 - Compute individual file lengths and directory totals in one iterative traversal.
 - Discover nested .NET, Node.js, Python, Rust and Java/Gradle projects from markers.
 - Identify development outputs/dependencies with reasons and review-required status.
@@ -29,7 +36,7 @@ is configured. MIT licensed.
 - Skip symlinks/reparse points; bound work and report memory; keep totals independent
   of paginated or capped result lists.
 
-There is **no deletion, move-to-trash, exclusion UI, age filter,
+There is **no deletion, move-to-trash, age filter,
 telemetry, or cloud/LLM call**. Custom AI storage locations and arbitrary tool
 versions are not automatically discovered outside the selected directory.
 
@@ -38,7 +45,9 @@ versions are not automatically discovered outside the selected directory.
 Sizes are **logical bytes**, not allocated disk space or reclaimable space.
 Hardlinked files count once per encountered path. Sparse/compressed files and
 filesystem clones may occupy different physical space. Directory totals overlap
-child rows; use the report root total, not a sum of displayed rows. Recognized
+child rows; use the report root total, not a sum of displayed rows.
+Totals measure the included scope, excluding pruned data; they are not full sizes
+of folders containing excluded children. Recognized
 space counts nested findings only once.
 
 Skipped links, inaccessible entries and cancelled scans make sizes partial lower
@@ -71,7 +80,7 @@ in JavaScript. The UI uses decimal units: 1 GB = 1,000,000,000 bytes.
 
 1. Development and AI-tool data recognition, with evidence and impact.
 2. Files/directories at or above a user-entered GB threshold. No age filter.
-3. Shared review, exclusions, Finder/Explorer reveal and OS trash actions.
+3. Shared review and optional OS trash actions (exclusions and Finder/Explorer reveal exist).
 
 See [architecture](docs/ARCHITECTURE.md), [validation](docs/VALIDATION.md), and
 [manual screen checks](docs/MANUAL_TEST.md).
@@ -169,3 +178,18 @@ bounds. Root scan totals still account for all measured files, independently
 of output-list retention. Whole-computer scanning stops on cancellation, access
 failures for particular subtrees, or OS errors, never because of an item/depth
 budget. Existing link/mount partition rules continue to apply.
+
+## Persistent exclusion settings
+
+Choices are saved in `scan-exclusions.json` in Tauri's per-user app configuration
+folder (`dev.roomit.desktop`), independently of the temporary scan index. Saving
+uses an atomic same-directory replacement. Disconnected/missing paths stay saved.
+Unreadable/corrupt settings block scanning instead of silently ignoring choices.
+Only Roomit's own settings and temporary result metadata are written; scanned
+files are untouched. Changes apply to subsequent scans; editing is locked while
+scanning. Windows registry locations are read-only and refreshed each scan.
+
+System/install rules intentionally preserve project directories and AI user data
+outside protected installation trees. Files stored inside an excluded installation
+remain excluded even if they look like project/AI data. On macOS, APFS Data user
+paths remain eligible; system subtrees and their Data aliases are protected.

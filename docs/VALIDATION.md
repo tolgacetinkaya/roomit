@@ -1,3 +1,28 @@
+# Persistent exclusions and automatic system/install scope — 2026-11-04
+
+- **71 automated tests passed**: 33 core, 17 native and 21 frontend; one existing
+  interactive Explorer smoke remains ignored. Full check passed, then the added
+  native policy test passed alongside persistence/error tests. TypeScript/Vite,
+  workspace check and Windows debug/no-bundle compilation passed.
+- New real-filesystem tests cover excluded subtrees/files, component-prefix
+  collisions, Windows case matching and SYSTEM attributes, direct nested root
+  rejection, separately requested excluded roots, app bundle ancestors, exact
+  included byte totals, retained AI/project recognition and no excluded sink rows.
+- Native settings tests reopen a fresh store, preserve disconnected paths, reject
+  invalid additions without losing prior settings, remove/rewrite choices, retain
+  corrupt JSON unchanged, and surface save failures. A read-only native policy
+  test verifies standard system paths and rejects volume-root exclusions.
+- Browser mocked-IPC checks cover multi-folder add, picker cancel, remove, page
+  reload retention, locked controls during scan, visible save failure retaining
+  prior choices, and load failure blocking scan even after selecting a target.
+  Screenshots use clearly labeled sample data; actual persistence/scanning is
+  verified by the Rust tests, not by this browser mock.
+- Existing result paging, size filtering, progress/cancellation and reveal tests
+  remain green. No scanned files are modified and no deletion feature exists.
+- This is location-based protection, not an exhaustive ownership classifier for
+  portable/unregistered applications. macOS source paths/bundle logic are present;
+  a native Mac build and APFS/Finder/device screen acceptance are still pending.
+
 # Unlimited, disk-backed size results — 2026-11-04
 
 - **64 automated tests passed**: 29 core (20 inspection + 9 multi-root), 14 native

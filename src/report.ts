@@ -22,6 +22,7 @@ export interface ScanStats {
   skippedLinks: number;
   skippedSpecial: number;
   skippedMounts: number;
+  excludedEntries?: number;
   errors: number;
   projectsFound: number;
   findingsFound: number;
@@ -31,7 +32,7 @@ export interface ScanStats {
 export interface ScanProgress { stats: ScanStats; currentPath: string; finished: boolean; rootIndex: number; rootCount: number }
 export interface RootReport {
   path: string;
-  status: "completed" | "cancelled" | "limited" | "failed" | "notScanned";
+  status: "completed" | "cancelled" | "limited" | "failed" | "notScanned" | "excluded";
   logicalBytes: string;
   sizeComplete: boolean;
   error: string | null;
@@ -89,6 +90,6 @@ export function scanSummary(report: InspectionReport): string {
     : !report.totalSizeComplete ? "Tarama tamamlandı; atlanan öğeler nedeniyle boyutlar kısmi."
     : "Tarama tamamlandı.";
   const roots = report.scope === "computer"
-    ? ` ${report.roots.filter((root) => root.status !== "failed" && root.status !== "notScanned").length}/${report.roots.length} disk işlendi.` : "";
+    ? ` ${report.roots.filter((root) => !["failed", "notScanned", "excluded"].includes(root.status)).length}/${report.roots.length} disk işlendi.` : "";
   return `${status}${roots} ${formatCount(report.stats.filesScanned)} dosya, ${formatCount(report.stats.directoriesScanned)} klasör. Hiçbir dosya değiştirilmedi.`;
 }
