@@ -1,3 +1,41 @@
+# Native folder picker and computer scope — 2026-11-04
+
+## Automated evidence
+
+- Combined `scripts/check.ps1` passed: 24 core integration tests (17 recursive
+  inspection + 7 multi-root), 5 desktop state/root-discovery tests, and 6 frontend
+  report tests. Total: 35 passing tests.
+- TypeScript/Vite production build and Rust workspace check passed.
+- Windows native build passed (`tauri build --debug --no-bundle`), producing
+  `target/debug/roomit.exe`. The user-test artifact and its SHA-256/source commit
+  are recorded in ignored `artifacts/Roomit-build.json`.
+- Native Windows disk discovery was tested without scanning the computer.
+- Multi-root tests used temporary fixtures, verifying cumulative progress,
+  overlapping-root partitioning, failure isolation, cancellation, shared limits,
+  duplicate roots and preferred user-branch traversal.
+- Native folder dialog and updated screen behavior are awaiting user checks.
+  No screen automation or real whole-computer scan was run for this change.
+- macOS APFS/volume handling and the native Mac picker remain device-untested.
+
+## Behavior and limits
+
+Folder selection uses the official Tauri dialog plugin, directory-only and single
+selection, with only the open permission granted. Cancel preserves the previous
+folder. Changing the scope or selecting a folder does not start a scan.
+
+Computer mode previews local disk roots, refreshes them on start, shares one
+worker/budget/cancel token and lists each root's outcome. Root errors do not stop
+other roots; cancellation or a global entry cap leaves later roots not scanned.
+Unix filesystem boundaries and separate planned roots are pruned to avoid
+walking the same mounted subtree through ancestor paths. Pruned/inaccessible
+areas conservatively keep totals partial. The entry cap remains 1,000,000 across
+all roots. Network disks are excluded by native disk discovery.
+
+Normal OS access applies. No elevation, deletion or publishing was introduced.
+The updated manual acceptance checklist is in `MANUAL_TEST.md`.
+
+---
+
 # Recursive scanning validation — 2026-11-03
 
 ## Current change

@@ -8,7 +8,7 @@ The user will run these checks. This is a checklist, not recorded acceptance.
 1. Run `scripts/dev.ps1` from the repository root on Windows, or open the newly
    built `target/debug/roomit.exe`. A previously running app may be the old build;
    close it yourself before opening the updated executable.
-2. Select a project parent directory by entering its absolute path. Start with a
+2. Choose **Bir klasör**, click **Klasör seç…** and select a project parent directory in the native dialog. Start with a
    modest directory, not the whole drive. Press **Taramayı başlat**.
 3. Observe file/folder counters, a changing path and an indeterminate progress
    indicator. No percentage is claimed because the total work is initially unknown.
@@ -32,7 +32,7 @@ The user will run these checks. This is a checklist, not recorded acceptance.
 - Start a sufficiently large scan, press **İptal et**, then wait for the partial
   report. A synchronous OS directory read may take time to return.
 - Check that partial sizes say **En az … / kısmi**, then start another scan.
-- Enter a missing path and a file path; the error should appear and controls
+- Select a directory and then remove/unmount it before starting; an error should appear and controls
   should become usable again. Old results should not remain under a failed scan.
 - A tree with links, inaccessible directories or depth/entry bounds should
   report skipped items and partial sizes, not claim a complete measurement.
@@ -45,3 +45,18 @@ Windows compilation and automated tests are recorded in `VALIDATION.md`.
 The updated native UI flow and visual state await user checks. macOS build,
 links/permissions, progress, cancellation and native layout require a real Mac;
 a Windows build does not count as that validation.
+
+## New target controls
+
+- Confirm **Klasör seç…** opens the platform's native directory picker, selects
+  folders only, and displays the returned path. Test spaces and Turkish characters.
+- Cancel the dialog: the previous folder should remain selected and no scan starts.
+- Switch to **Bütün bilgisayar**: the local disk list should appear. No scan should
+  start until the start button is pressed. Test **Diskleri yenile** after mounting
+  or removing a local disk if convenient.
+- A computer scan should show cumulative counts and disk index/count. Its result
+  should list completed, partial, failed and not-scanned roots as appropriate.
+- Cancel during a computer scan; later disks should be marked not scanned. Check
+  that returning to folder mode restores the prior selection and works again.
+- On macOS, verify the picker, APFS Data/System partition handling, external local
+  volumes, permissions and cancellation. Protected OS areas can remain partial.

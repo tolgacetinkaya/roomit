@@ -79,6 +79,7 @@ pub struct ScanStats {
     pub entries_seen: u64,
     pub skipped_links: u64,
     pub skipped_special: u64,
+    pub skipped_mounts: u64,
     pub errors: u64,
     pub projects_found: u64,
     pub findings_found: u64,
@@ -97,6 +98,23 @@ pub struct ScanProgress {
     pub stats: ScanStats,
     pub current_path: String,
     pub finished: bool,
+    pub root_index: usize,
+    pub root_count: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RootStatus { Completed, Cancelled, Limited, Failed, NotScanned }
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RootReport {
+    pub path: String,
+    pub status: RootStatus,
+    #[serde(serialize_with = "serialize_bytes")]
+    pub logical_bytes: u64,
+    pub size_complete: bool,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -115,6 +133,7 @@ pub struct InspectionReport {
     pub warnings: Vec<String>,
     pub warnings_omitted: u64,
     pub results_truncated: bool,
+    pub roots: Vec<RootReport>,
 }
 
 // JavaScript numbers cannot represent every u64. Preserve exact byte counts

@@ -4,6 +4,7 @@
   "description": "Local Roomit window; no filesystem-write, shell, or opener plugin permissions.",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "dialog:allow-open"
   ]
 }

@@ -21,16 +21,24 @@ export interface ScanStats {
   entriesSeen: number;
   skippedLinks: number;
   skippedSpecial: number;
+  skippedMounts: number;
   errors: number;
   projectsFound: number;
   findingsFound: number;
   totalLogicalBytes: string;
   recognizedLogicalBytes: string;
 }
-export interface ScanProgress { stats: ScanStats; currentPath: string; finished: boolean }
+export interface ScanProgress { stats: ScanStats; currentPath: string; finished: boolean; rootIndex: number; rootCount: number }
+export interface RootReport {
+  path: string;
+  status: "completed" | "cancelled" | "limited" | "failed" | "notScanned";
+  logicalBytes: string;
+  sizeComplete: boolean;
+  error: string | null;
+}
 export interface InspectionReport {
   root: string;
-  scope: "recursive";
+  scope: "recursive" | "computer";
   status: ScanStatus;
   totalSizeComplete: boolean;
   stats: ScanStats;
@@ -40,6 +48,7 @@ export interface InspectionReport {
   warnings: string[];
   warningsOmitted: number;
   resultsTruncated: boolean;
+  roots: RootReport[];
 }
 export type FindingFilter = "all" | "development" | "ai" | "protected";
 export const categoryLabels: Record<Category, string> = {
@@ -78,5 +87,7 @@ export function scanSummary(report: InspectionReport): string {
     : report.status === "limited" ? "Tarama sınırına ulaşıldı; sonuçlar kısmi."
     : !report.totalSizeComplete ? "Tarama tamamlandı; atlanan öğeler nedeniyle boyutlar kısmi."
     : "Tarama tamamlandı.";
-  return `${status} ${formatCount(report.stats.filesScanned)} dosya, ${formatCount(report.stats.directoriesScanned)} klasör. Hiçbir dosya değiştirilmedi.`;
+  const roots = report.scope === "computer"
+    ? ` ${report.roots.filter((root) => root.status !== "failed" && root.status !== "notScanned").length}/${report.roots.length} disk işlendi.` : "";
+  return `${status}${roots} ${formatCount(report.stats.filesScanned)} dosya, ${formatCount(report.stats.directoriesScanned)} klasör. Hiçbir dosya değiştirilmedi.`;
 }

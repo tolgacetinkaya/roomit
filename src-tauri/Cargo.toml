@@ -21,3 +21,5 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 roomit-core = { path = "../crates/roomit-core" }
+tauri-plugin-dialog = "2"
+sysinfo = { version = "0.37", default-features = false, features = ["disk"] }

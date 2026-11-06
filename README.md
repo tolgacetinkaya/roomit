@@ -9,7 +9,8 @@ is configured. MIT licensed.
 
 ## Current capabilities
 
-- Recursively scan an explicitly selected directory, without opening file contents.
+- Pick a folder using the native Windows/macOS dialog; its path stays visible.
+- Scan one folder or all detected local disks, without opening file contents.
 - Compute individual file lengths and directory totals in one iterative traversal.
 - Discover nested .NET, Node.js, Python, Rust and Java/Gradle projects from markers.
 - Identify development outputs/dependencies with reasons and review-required status.
@@ -36,7 +37,7 @@ Skipped links, inaccessible entries, cancelled scans and depth/entry limits make
 sizes partial lower bounds. The filesystem may change during a scan; this is
 not a snapshot or a proof that an item can safely be removed.
 
-Defaults: 1,000,000 observed entries, 128 directory levels below the root,
+Defaults (shared across disks in computer mode): 1,000,000 observed entries, 128 directory levels below each root,
 10,000 retained findings/projects each, 100 largest entries and 100 retained
 warnings. Hitting a result-list cap does not stop size accounting. Progress is
 throttled to about 100 ms. Only one desktop scan can run at once.
@@ -107,3 +108,25 @@ npm run tauri -- build --debug --no-bundle
 
 Windows output: `target/debug/roomit.exe`. macOS builds and runtime checks require
 a Mac. This implementation has no Windows-versus-Mac speed benchmark claim.
+
+## Folder and computer targets
+
+Use **Klasör seç…** to open the native directory picker. Cancelling keeps the
+previous selection. Selection alone does not start scanning. Manual path typing
+is no longer needed.
+
+**Bütün bilgisayar** previews detected local fixed/removable disk roots. Network
+volumes are not included. The scan starts only when **Taramayı başlat** is pressed;
+roots are refreshed at start. **Diskleri yenile** refreshes the preview.
+
+Computer scans share one worker, cancellation token, entry budget, bounded
+largest-item list and cumulative progress across roots. Failed and unscanned
+roots are listed. The user's home branch/volume is preferred where possible.
+Overlapping requested roots are partitioned to avoid duplicate measurement.
+On Unix, volume crossings are skipped; macOS APFS System and Data are separate
+roots, avoiding traversal through Data firmlinks from the System tree. These
+skips conservatively mark totals partial. Native Mac behavior awaits testing.
+
+Normal OS permissions apply; the app does not request elevation. Inaccessible
+areas, mount boundaries and entry limits yield partial results. Whole-computer
+mode is not a guarantee that every protected/hidden volume can be inspected.

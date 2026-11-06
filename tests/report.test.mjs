@@ -41,3 +41,10 @@ test('cancelled, limited and skipped-entry scans never claim complete totals', (
   assert.match(scanSummary({ ...base, status: 'limited' }), /sınırına ulaşıldı; sonuçlar kısmi/);
   assert.match(scanSummary({ ...base, totalSizeComplete: false }), /atlanan öğeler nedeniyle boyutlar kısmi/);
 });
+
+test('computer summaries distinguish processed disks from failed or unscanned disks', () => {
+  const report = { scope: 'computer', status: 'limited', totalSizeComplete: false,
+    stats: { filesScanned: 12, directoriesScanned: 4 },
+    roots: [{ status: 'completed' }, { status: 'limited' }, { status: 'failed' }, { status: 'notScanned' }] };
+  assert.match(scanSummary(report), /sonuçlar kısmi\. 2\/4 disk işlendi/);
+});

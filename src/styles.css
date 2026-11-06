@@ -24,6 +24,11 @@ h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.5px; line-h
 .muted { color: var(--muted); font-size: 13px; }
 label { display: block; margin: 22px 0 8px; font-size: 12px; font-weight: 650; }
 .input-row { display: flex; gap: 10px; }
+.scan-modes { display: flex; flex-wrap: wrap; gap: 20px; padding: 0; border: 0; margin: 22px 0 12px; }
+.scan-modes legend { margin-bottom: 10px; font-size: 12px; font-weight: 650; }
+.scan-modes label { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; }
+.scan-modes input[type="radio"] { flex: none; width: auto; min-width: auto; padding: 0; accent-color: var(--green); }
+.scan-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; color: var(--ink); background: var(--canvas); font-size: 13px; }
 input::placeholder { color: var(--muted); }
 button { border: 0; border-radius: 9px; padding: 12px 18px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }

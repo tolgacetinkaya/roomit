@@ -16,6 +16,10 @@ pub struct ScanOptions {
     pub max_largest_entries: usize,
     pub max_warnings: usize,
     pub progress_interval: Duration,
+    /// Computer mode partitions volumes; Unix mount crossings are not followed.
+    pub same_file_system: bool,
+    /// Prefer the branch containing this directory, e.g. the current user's home.
+    pub preferred_path: Option<PathBuf>,
 }
 impl Default for ScanOptions {
     fn default() -> Self {
@@ -23,79 +27,98 @@ impl Default for ScanOptions {
             max_entries: 1_000_000, max_depth: 128, max_findings: 10_000,
             max_largest_entries: 100, max_warnings: 100,
             progress_interval: Duration::from_millis(100),
+            same_file_system: false, preferred_path: None,
         }
     }
 }
 
-/// Recursive scan with default bounds, for CLI/library callers.
 pub fn inspect_workspace(root: &Path) -> io::Result<InspectionReport> {
     scan_workspace(root, ScanOptions::default(), &AtomicBool::new(false), |_| {})
 }
 
-/// A single, iterative depth-first walk. File contents are never opened.
-/// Logical file lengths are aggregated bottom-up; directories are not rescanned.
-/// The progress callback runs on the caller's thread. Cancellation returns a
-/// partial report. This read-only walk is best-effort, not a filesystem snapshot.
+/// A read-only, iterative walk of one explicitly selected directory.
 pub fn scan_workspace<F: FnMut(&ScanProgress)>(
     root: &Path, options: ScanOptions, cancel: &AtomicBool, on_progress: F,
 ) -> io::Result<InspectionReport> {
-    if !root.is_absolute() || options.max_entries == 0 {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "Mutlak bir klasör yolu ve pozitif tarama sınırı gerekir."));
-    }
+    run_scan(&[root.to_path_buf()], options, cancel, on_progress, false)
+}
+
+/// Scan several roots with shared limits, cumulative progress, and one bounded
+/// result set. Other requested roots are pruned from ancestor walks, so nested
+/// mounts/roots are not counted twice. Root failures do not abort other roots.
+pub fn scan_locations<F: FnMut(&ScanProgress)>(
+    roots: &[PathBuf], options: ScanOptions, cancel: &AtomicBool, on_progress: F,
+) -> io::Result<InspectionReport> {
+    run_scan(roots, options, cancel, on_progress, true)
+}
+
+fn checked_root(root: &Path) -> io::Result<PathBuf> {
     let metadata = fs::symlink_metadata(root)?;
     if is_link(&metadata) || !metadata.is_dir() {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "Doğrudan bir klasör seçin; bağlantı veya dosya seçmeyin."));
     }
-    let root = root.canonicalize()?;
-    let (context, rule) = rules::root_context(&root);
+    root.canonicalize()
+}
+
+fn run_scan<F: FnMut(&ScanProgress)>(
+    roots: &[PathBuf], mut options: ScanOptions, cancel: &AtomicBool, on_progress: F, computer: bool,
+) -> io::Result<InspectionReport> {
+    if roots.is_empty() || roots.len() > 256 || roots.iter().any(|root| !root.is_absolute()) || options.max_entries == 0 {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "1–256 mutlak klasör yolu ve pozitif tarama sınırı gerekir."));
+    }
+    let mut plans = Vec::new();
+    for root in roots {
+        let (path, error) = match checked_root(root) {
+            Ok(path) => (path, None),
+            Err(error) if !computer => return Err(error),
+            Err(error) => (root.to_path_buf(), Some(error.to_string())),
+        };
+        if !plans.iter().any(|(existing, _)| existing == &path) { plans.push((path, error)); }
+    }
+    options.preferred_path = options.preferred_path.and_then(|path| path.canonicalize().ok());
+    let root_label = if computer { "Bütün bilgisayar".into() } else { display_path(&plans[0].0) };
     let mut scanner = Scanner {
         report: InspectionReport {
-            root: display_path(&root), scope: "recursive", status: ScanStatus::Completed,
+            root: root_label, scope: if computer { "computer" } else { "recursive" }, status: ScanStatus::Completed,
             total_size_complete: true, stats: ScanStats::default(), projects: Vec::new(),
             findings: Vec::new(), largest_entries: Vec::new(), warnings: Vec::new(),
-            warnings_omitted: 0, results_truncated: false,
+            warnings_omitted: 0, results_truncated: false, roots: Vec::new(),
         },
+        root_count: plans.len(), root_index: 0,
+        partition_roots: plans.iter().filter(|(_, error)| error.is_none()).map(|(path, _)| path.clone()).collect(),
+        root_device: None,
         options, cancel, on_progress, last_progress: Instant::now(),
         largest: BinaryHeap::new(), halted: false,
     };
-    scanner.progress(&root, true, false);
-    let root_frame = scanner.open_directory(root.clone(), 0, context, rule, false)?;
-    let mut stack = vec![root_frame];
-    while !stack.is_empty() {
+    for (index, (root, error)) in plans.into_iter().enumerate() {
+        scanner.root_index = index + 1;
         if scanner.should_stop() {
-            let frame = stack.last_mut().unwrap();
-            frame.complete = false;
-            frame.children.clear();
+            scanner.report.total_size_complete = false;
+            scanner.report.roots.push(RootReport { path: display_path(&root), status: RootStatus::NotScanned,
+                logical_bytes: 0, size_complete: false, error: None });
+            continue;
         }
-        let child = stack.last_mut().unwrap().children.pop();
-        if let Some(child) = child {
-            let parent = stack.last().unwrap();
-            let depth = parent.depth + 1;
-            let matched_ancestor = parent.matched_ancestor || parent.rule.is_some();
-            let (context, rule) = rules::directory_rule(&child, parent.context, &parent.evidence);
-            if depth > scanner.options.max_depth {
-                scanner.report.status = ScanStatus::Limited;
-                scanner.warn(format!("Derinlik sınırı nedeniyle alt ağaç atlandı: {}", display_path(&child)));
-                stack.push(Frame::unread(child, depth, context, rule, matched_ancestor));
-            } else {
-                // Only root open failures are fatal; an unreadable child remains
-                // in the report as a partial directory and siblings continue.
-                let frame = scanner.open_directory(child.clone(), depth, context, rule, matched_ancestor)
-                    .unwrap_or_else(|error| {
-                        scanner.report.stats.errors += 1;
-                        scanner.warn(format!("{}: {error}", display_path(&child)));
-                        Frame::unread(child, depth, context, rule, matched_ancestor)
-                    });
-                stack.push(frame);
-            }
+        let result = if let Some(error) = error {
+            Err(io::Error::other(error))
         } else {
-            let frame = stack.pop().unwrap();
-            scanner.record_directory(&frame);
-            if let Some(parent) = stack.last_mut() {
-                parent.bytes = scanner.add_bytes(parent.bytes, frame.bytes);
-                parent.complete &= frame.complete;
-            } else {
-                scanner.report.total_size_complete = frame.complete;
+            scanner.progress(&root, true, false);
+            scanner.walk(&root)
+        };
+        match result {
+            Ok((bytes, complete)) => {
+                let status = if scanner.report.status == ScanStatus::Cancelled { RootStatus::Cancelled }
+                    else if scanner.halted { RootStatus::Limited } else { RootStatus::Completed };
+                scanner.report.total_size_complete &= complete;
+                scanner.report.roots.push(RootReport { path: display_path(&root), status,
+                    logical_bytes: bytes, size_complete: complete, error: None });
+            }
+            Err(error) if !computer => return Err(error),
+            Err(error) => {
+                scanner.report.stats.errors += 1;
+                scanner.report.total_size_complete = false;
+                scanner.warn(format!("Disk/klasör taranamadı: {}: {error}", display_path(&root)));
+                scanner.report.roots.push(RootReport { path: display_path(&root), status: RootStatus::Failed,
+                    logical_bytes: 0, size_complete: false, error: Some(error.to_string()) });
             }
         }
     }
@@ -103,7 +126,7 @@ pub fn scan_workspace<F: FnMut(&ScanProgress)>(
     scanner.report.projects.sort_by(|a, b| a.path.cmp(&b.path));
     scanner.report.largest_entries = scanner.largest.drain().map(|v| v.0).collect();
     scanner.report.largest_entries.sort_by(|a, b| b.logical_bytes.cmp(&a.logical_bytes).then(a.path.cmp(&b.path)));
-    scanner.progress(&root, true, true);
+    scanner.progress(Path::new(""), true, true);
     Ok(scanner.report)
 }
 
@@ -132,8 +155,51 @@ struct Scanner<'a, F> {
     last_progress: Instant,
     largest: BinaryHeap<Reverse<SizedEntry>>,
     halted: bool,
+    partition_roots: Vec<PathBuf>,
+    root_device: Option<u64>,
+    root_index: usize,
+    root_count: usize,
 }
 impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
+    fn walk(&mut self, root: &Path) -> io::Result<(u64, bool)> {
+        self.root_device = device_id(&fs::symlink_metadata(root)?);
+        let (context, rule) = rules::root_context(root);
+        let mut stack = vec![self.open_directory(root.to_path_buf(), 0, context, rule, false)?];
+        let mut root_result = (0, false);
+        while !stack.is_empty() {
+            if self.should_stop() {
+                let frame = stack.last_mut().unwrap();
+                frame.complete = false;
+                frame.children.clear();
+            }
+            if let Some(child) = stack.last_mut().unwrap().children.pop() {
+                let parent = stack.last().unwrap();
+                let depth = parent.depth + 1;
+                let matched_ancestor = parent.matched_ancestor || parent.rule.is_some();
+                let (context, rule) = rules::directory_rule(&child, parent.context, &parent.evidence);
+                let frame = if depth > self.options.max_depth {
+                    self.report.status = ScanStatus::Limited;
+                    self.warn(format!("Derinlik sınırı nedeniyle alt ağaç atlandı: {}", display_path(&child)));
+                    Frame::unread(child, depth, context, rule, matched_ancestor)
+                } else {
+                    self.open_directory(child.clone(), depth, context, rule, matched_ancestor).unwrap_or_else(|error| {
+                        self.report.stats.errors += 1;
+                        self.warn(format!("{}: {error}", display_path(&child)));
+                        Frame::unread(child, depth, context, rule, matched_ancestor)
+                    })
+                };
+                stack.push(frame);
+            } else {
+                let frame = stack.pop().unwrap();
+                self.record_directory(&frame);
+                if let Some(parent) = stack.last_mut() {
+                    parent.bytes = self.add_bytes(parent.bytes, frame.bytes);
+                    parent.complete &= frame.complete;
+                } else { root_result = (frame.bytes, frame.complete); }
+            }
+        }
+        Ok(root_result)
+    }
     fn should_stop(&mut self) -> bool {
         if self.cancel.load(Ordering::Relaxed) {
             self.report.status = ScanStatus::Cancelled;
@@ -158,7 +224,8 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
 
     fn progress(&mut self, path: &Path, force: bool, finished: bool) {
         if force || self.last_progress.elapsed() >= self.options.progress_interval {
-            (self.on_progress)(&ScanProgress { stats: self.report.stats.clone(), current_path: display_path(path), finished });
+            (self.on_progress)(&ScanProgress { stats: self.report.stats.clone(), current_path: display_path(path), finished,
+                root_index: self.root_index, root_count: self.root_count });
             self.last_progress = Instant::now();
         }
     }
@@ -204,6 +271,14 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                     frame.complete = false;
                     self.warn(format!("Bağlantı/reparse point atlandı: {}", display_path(&path)));
                 }
+                Ok(metadata) if metadata.is_dir() && (
+                    self.partition_roots.contains(&path) ||
+                    (self.options.same_file_system && device_id(&metadata) != self.root_device)
+                ) => {
+                    self.report.stats.skipped_mounts += 1;
+                    frame.complete = false;
+                    self.warn(format!("Disk sınırı / ayrı tarama kökü atlandı: {}", display_path(&path)));
+                }
                 Ok(metadata) if metadata.is_dir() => frame.children.push(path.clone()),
                 Ok(metadata) if metadata.is_file() => {
                     let bytes = metadata.len();
@@ -240,7 +315,11 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
         }
         // Reverse so pop() visits lexically earlier directories first. File
         // enumeration remains filesystem ordered, notably for partial scans.
-        frame.children.sort_by(|a, b| b.cmp(a));
+        let preferred = self.options.preferred_path.as_ref();
+        frame.children.sort_by(|a, b| {
+            let priority = |path: &PathBuf| preferred.is_some_and(|preferred| preferred.starts_with(path));
+            priority(a).cmp(&priority(b)).then_with(|| b.cmp(a))
+        });
         self.progress(&frame.path, false, false);
         Ok(frame)
     }
@@ -292,4 +371,11 @@ fn is_link(metadata: &fs::Metadata) -> bool {
     }
     #[cfg(not(windows))]
     { metadata.file_type().is_symlink() }
+}
+
+fn device_id(metadata: &fs::Metadata) -> Option<u64> {
+    #[cfg(unix)]
+    { use std::os::unix::fs::MetadataExt; Some(metadata.dev()) }
+    #[cfg(not(unix))]
+    { let _ = metadata; None }
 }

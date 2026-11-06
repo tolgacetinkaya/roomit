@@ -1,4 +1,5 @@
 import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { categoryLabels, formatBytes, formatCount, matchesFilter, scanSummary, sizeLabel } from "./report";
 import type { Finding, FindingFilter, InspectionReport, ScanProgress } from "./report";
 import "./styles.css";
@@ -16,8 +17,75 @@ const status = element<HTMLParagraphElement>("#status");
 const results = element<HTMLDivElement>("#results");
 const progressBar = element<HTMLProgressElement>("#scan-progress");
 const currentPath = element<HTMLParagraphElement>("#current-path");
+const chooseFolder = element<HTMLButtonElement>("#choose-folder");
+const refreshRoots = element<HTMLButtonElement>("#refresh-roots");
+const folderTarget = element<HTMLDivElement>("#folder-target");
+const computerTarget = element<HTMLDivElement>("#computer-target");
+const rootsLabel = element<HTMLParagraphElement>("#computer-roots");
+const modeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="scan-mode"]'));
 let activeScan: string | null = null;
 let cancelRequested = false;
+let pickingFolder = false;
+let rootsLoading = false;
+let computerRoots: string[] = [];
+let diskRequest = 0;
+const scanMode = (): "folder" | "computer" => modeInputs.find((radio) => radio.checked)?.value === "computer" ? "computer" : "folder";
+
+function updateControls(): void {
+  const native = isTauri();
+  const busy = Boolean(activeScan) || pickingFolder;
+  const computer = scanMode() === "computer";
+  folderTarget.hidden = computer; computerTarget.hidden = !computer;
+  input.disabled = !native || busy;
+  chooseFolder.disabled = !native || busy;
+  refreshRoots.disabled = !native || busy || rootsLoading;
+  for (const radio of modeInputs) radio.disabled = !native || busy;
+  button.disabled = !native || busy || (computer ? rootsLoading || computerRoots.length === 0 : !input.value);
+}
+
+async function loadComputerRoots(): Promise<void> {
+  const request = ++diskRequest;
+  rootsLoading = true; computerRoots = [];
+  rootsLabel.textContent = "Yerel diskler bulunuyor…";
+  updateControls();
+  try {
+    const roots = await invoke<string[]>("computer_scan_roots");
+    if (request !== diskRequest) return;
+    computerRoots = roots;
+    rootsLabel.textContent = roots.length ? roots.join(" · ") : "Taranabilir yerel disk bulunamadı.";
+  } catch (error: unknown) {
+    if (request === diskRequest) rootsLabel.textContent = `Disk listesi alınamadı: ${String(error)}`;
+  } finally {
+    if (request === diskRequest) { rootsLoading = false; updateControls(); }
+  }
+}
+
+chooseFolder.addEventListener("click", async () => {
+  if (activeScan || pickingFolder || !isTauri()) return;
+  pickingFolder = true; updateControls();
+  try {
+    const folder = await open({ directory: true, multiple: false, recursive: true,
+      title: "Roomit — Taranacak klasörü seç", defaultPath: input.value || undefined,
+      canCreateDirectories: false, fileAccessMode: "scoped" });
+    if (folder !== null) {
+      input.value = folder;
+      results.replaceChildren();
+      status.className = "";
+      status.textContent = "Klasör seçildi. Hazır olduğunda taramayı başlat.";
+    }
+  } catch (error: unknown) {
+    status.className = "warning";
+    status.textContent = `Klasör seçici açılamadı: ${String(error)}`;
+  } finally { pickingFolder = false; updateControls(); }
+});
+for (const radio of modeInputs) radio.addEventListener("change", () => {
+  diskRequest += 1; rootsLoading = false;
+  results.replaceChildren(); status.className = "";
+  status.textContent = "Tarama kapsamı seçildi. Hazır olduğunda taramayı başlat.";
+  updateControls();
+  if (scanMode() === "computer") void loadComputerRoots();
+});
+refreshRoots.addEventListener("click", () => { void loadComputerRoots(); });
 
 // Paths, errors and other filesystem-derived values are untrusted text.
 function textNode(tag: string, value: string, className?: string): HTMLElement {
@@ -59,6 +127,20 @@ function renderFinding(finding: Finding): HTMLElement {
 }
 function showReport(report: InspectionReport): void {
   results.append(textNode("p", report.root, "report-path"));
+  if (report.scope === "computer") {
+    const disks = document.createElement("details");
+    disks.open = true;
+    disks.append(textNode("summary", `Disk sonuçları (${report.roots.length})`));
+    disks.append(pagedList(report.roots, (root) => {
+      const row = document.createElement("li");
+      const labels = { completed: root.sizeComplete ? "Tamamlandı" : "Kısmi", cancelled: "İptal edildi", limited: "Sınıra ulaşıldı", failed: "Erişilemedi", notScanned: "Taranmadı" };
+      row.append(textNode("strong", labels[root.status]), textNode("p", root.path, "report-path"));
+      if (root.status !== "failed" && root.status !== "notScanned") row.append(textNode("p", sizeLabel(root.logicalBytes, root.sizeComplete), "muted"));
+      if (root.error) row.append(textNode("p", root.error, "warning"));
+      return row;
+    }));
+    results.append(disks);
+  }
   const metrics = textNode("div", "", "metrics");
   for (const [label, value] of [
     ["Taranan mantıksal boyut", sizeLabel(report.stats.totalLogicalBytes, report.totalSizeComplete)],
@@ -123,11 +205,12 @@ function showReport(report: InspectionReport): void {
 }
 
 if (isTauri()) {
-  element("#runtime-note").textContent = "Seçtiğin klasör ve alt klasörleri taranır. İçerikler açılmaz; dosyalar değiştirilmez.";
+  element("#runtime-note").textContent = "Klasör seçmek veya kapsam değiştirmek taramayı başlatmaz. İçerikler açılmaz; dosyalar değiştirilmez.";
 } else {
   button.disabled = true; input.disabled = true;
   status.textContent = "Tarayıcı önizlemesi: Gerçek tarama için Roomit’i masaüstünde aç.";
 }
+updateControls();
 cancelButton.addEventListener("click", async () => {
   const scanId = activeScan;
   if (!scanId || cancelRequested) return;
@@ -149,24 +232,27 @@ cancelButton.addEventListener("click", async () => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const root = input.value.trim();
-  if (!root || !isTauri() || activeScan) return;
+  const mode = scanMode();
+  if ((mode === "folder" ? !root : !computerRoots.length || rootsLoading) || !isTauri() || activeScan || pickingFolder) return;
   const scanId = crypto.randomUUID();
   activeScan = scanId; cancelRequested = false;
+  updateControls();
   button.disabled = true; input.disabled = true;
   cancelButton.hidden = false; cancelButton.disabled = true;
   progressBar.hidden = false;
   results.replaceChildren(); results.setAttribute("aria-busy", "true");
   status.className = ""; status.textContent = "Tarama başlatılıyor…";
-  currentPath.textContent = root;
+  currentPath.textContent = mode === "computer" ? "Yerel diskler hazırlanıyor…" : root;
   const onProgress = new Channel<ScanProgress>();
   onProgress.onmessage = (progress) => {
     if (activeScan !== scanId) return;
     cancelButton.disabled = progress.finished || cancelRequested;
     currentPath.textContent = progress.currentPath;
-    if (!cancelRequested) status.textContent = `${progress.finished ? "Sonuçlar hazırlanıyor" : "Taranıyor"} · ${formatCount(progress.stats.filesScanned)} dosya · ${formatCount(progress.stats.directoriesScanned)} klasör · ${formatBytes(progress.stats.totalLogicalBytes)}`;
+    const disk = mode === "computer" ? ` · Disk ${progress.rootIndex}/${progress.rootCount}` : "";
+    if (!cancelRequested) status.textContent = `${progress.finished ? "Sonuçlar hazırlanıyor" : "Taranıyor"}${disk} · ${formatCount(progress.stats.filesScanned)} dosya · ${formatCount(progress.stats.directoriesScanned)} klasör · ${formatBytes(progress.stats.totalLogicalBytes)}`;
   };
   try {
-    const report = await invoke<InspectionReport>("inspect_workspace", { root, scanId, onProgress });
+    const report = await invoke<InspectionReport>("inspect_workspace", { root, mode, scanId, onProgress });
     showReport(report);
     status.textContent = scanSummary(report);
     status.className = report.totalSizeComplete && report.status === "completed" ? "" : "warning";
@@ -179,5 +265,6 @@ form.addEventListener("submit", async (event) => {
     progressBar.hidden = true; cancelButton.hidden = true;
     currentPath.textContent = "";
     button.disabled = false; input.disabled = false;
+    updateControls();
   }
 });
