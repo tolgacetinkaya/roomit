@@ -2,7 +2,7 @@
   "app": {
     "windows": [{
       "label": "main",
-      "title": "Roomit 0.4.0",
+      "title": "Roomit 0.4.1",
       "theme": "Dark",
       "backgroundColor": "#181b20",
       "decorations": true,

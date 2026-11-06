@@ -9,7 +9,12 @@ Tauri 2 + TypeScript interface. The project is open source under the MIT license
 
 ## Current capabilities
 
-**Version: 0.4.0 — English interface and signed release updates.**
+**Current source: 0.4.1 — expandable application groups.**
+Live resources shows combined CPU, RAM and GPU usage per app. Expand an app to
+inspect individual processes. Groups and member lists are paged; open groups and
+focused controls survive live updates. See [live resources](docs/LIVE_RESOURCES.md).
+
+The latest published Windows release is **0.4.0**.
 Download the [Windows release](https://github.com/tolgacetinkaya/roomit/releases/tag/v0.4.0)
 or build from source below. Choose the Windows x64 setup for installation and
 future in-app updates, or the standalone EXE to run directly with WebView2

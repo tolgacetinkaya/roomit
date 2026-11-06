@@ -1,30 +1,37 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import catalog from "./ai-catalog.json";
-import { formatBytes, formatCount, sizeLabel } from "./report";
+import { formatBytes, sizeLabel } from "./report";
 import type { InspectionReport } from "./report";
 import type { GroupedReport } from "./groups";
 import { renderStorageMap } from "./storage-map";
 import { toolLogo, toolId } from "./tool-logos";
-import { toolUsage, processPage, gpuText } from "./workspace-model";
+import { toolUsage, gpuText } from "./workspace-model";
 import type { ProcessRow, GpuReading, ProcessSort } from "./workspace-model";
 import {memoryMode,memoryBreakdown,recordUsage,validPercent} from "./resource-history";
 import type {MemoryMode,UsagePoint} from "./resource-history";
 import {renderResourceCards,memoryText} from "./resource-cards";
 import "./resources.css";
 import { revealActions } from "./reveal";
+import {groupProcesses} from "./process-groups";
+import {createProcessTable} from "./process-table";
+import type {ProcessTableState} from "./process-table";
 export type WorkspaceView="control"|"tools"|"activity";
 interface InstalledTool {id:string;name:string;kind:string;installations:string[];dataPaths:string[];evidence:string[]}
 interface Inventory {tools:InstalledTool[];supportedCount:number;warnings:string[]}
 interface NetworkRow {name:string;receivedPerSecond:number|null;sentPerSecond:number|null}
-interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;memoryAvailable?:string;memoryInstalled?:string|null;processes:ProcessRow[];networks:NetworkRow[];gpuStatus:string;gpuAi?:GpuReading;gpuTools?:{toolId:string;reading:GpuReading}[];appNetworkStatus:string}
+interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;memoryAvailable?:string;memoryInstalled?:string|null;processes:ProcessRow[];appGpu?:{appId:string;reading:GpuReading}[];networks:NetworkRow[];gpuStatus:string;gpuAi?:GpuReading;gpuTools?:{toolId:string;reading:GpuReading}[];appNetworkStatus:string}
 const el=(tag:string,text="",cls=""):HTMLElement=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
 const percent=(n:number|null)=>n===null?"Measuring…":`${n.toLocaleString("en-US",{maximumFractionDigits:1})}%`;
 const rate=(n:number|null)=>n===null?"Measuring…":`${formatBytes(Math.max(0,Math.round(n)).toString())}/s`;
 export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tools"|"activity")=>void):{show:(view:string,report:InspectionReport|null,groups:GroupedReport|null)=>void}{
   let current:string="",report:InspectionReport|null=null,groups:GroupedReport|null=null;
   let inventory:Inventory|null=null,snapshot:Snapshot|null=null,inventoryError="",monitorError="",inventoryBusy=false,monitorBusy=false,paused=false;
-  let networkName="",processQuery="",processSort:ProcessSort="memory",aiOnly=false,processIndex=0,timer:ReturnType<typeof setTimeout>|undefined;
+  let networkName="",processQuery="",processSort:ProcessSort="memory",aiOnly=false,timer:ReturnType<typeof setTimeout>|undefined;
   let runningIds="";
+  const processState:ProcessTableState={expanded:new Set(),memberPages:new Map(),page:0};
+  const toolNames=new Map(catalog.map(t=>[t.id,t.name]));
+  let processTable:ReturnType<typeof createProcessTable>|null=null;
+  let processGpuNote:HTMLElement|null=null,networkSelect:HTMLSelectElement|null=null,networkReading:HTMLElement|null=null,networkStatus:HTMLElement|null=null;
   let history:UsagePoint[]=[],pendingBreak=false,displayMode:MemoryMode="both";
   try{displayMode=memoryMode(localStorage.getItem("roomit-ram-display"));}catch{}
   let metrics:HTMLElement|null=null,toolsList:HTMLElement|null=null,processes:HTMLElement|null=null,sampleLabel:HTMLElement|null=null,networkSummary:HTMLElement|null=null;
@@ -69,7 +76,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       card.textContent=`GPU · ${snapshot?(usage.processes?gpuText(gpu):"No running processes"):"Waiting for measurement"}`;
       card.title=monitorError?`Live measurement unavailable: ${monitorError}`:gpu?.reason||(snapshot&&!usage.processes?"No running processes detected for this tool.":"GPU usage is unavailable for this tool. This does not mean zero usage.");
     }
-    if(processes)renderProcesses(true);
+    if(processes)renderProcesses();
   }
   function renderTools():void{
     if(!toolsList)return;
@@ -101,51 +108,35 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     }
     updateLive();
   }
-  function renderProcesses(keepFocus=false):void{
+  function renderProcesses():void{
     if(!processes)return;
-    if(keepFocus && processes.contains(document.activeElement)){
-      const rows=new Map(snapshot?.processes.map(row=>[row.pid,row]));
-      for(const cell of processes.querySelectorAll<HTMLElement>(".process-cpu[data-pid],.process-memory[data-pid]")){
-        const row=rows.get(Number(cell.dataset.pid));
-        cell.textContent=monitorError||!row?"Unavailable":cell.classList.contains("process-cpu")?percent(row.cpuPercent):memoryText(row.memoryBytes,snapshot!.memoryTotal,displayMode);
-      }
-      for(const cell of processes.querySelectorAll<HTMLElement>(".process-gpu[data-pid]")){
-        const row=snapshot?.processes.find(p=>p.pid===Number(cell.dataset.pid));
-        cell.textContent=gpuText(monitorError?undefined:row?.gpu);
-        cell.title=monitorError?`Live measurement unavailable: ${monitorError}`:row?.gpu?.reason||"No current GPU measurement for this process.";
-      }
-      const note=processes.querySelector(".gpu-status-note");if(note)note.textContent=gpuNote();return;
+    if(!snapshot){processes.replaceChildren(el("p",monitorError||"Waiting for process measurements…","hint"));return;}
+    if(!processTable){
+      processes.replaceChildren();
+      processGpuNote=el("p","","gpu-status-note");
+      processTable=createProcessTable(processState);
+      processes.append(processGpuNote,el("p","Select an app to view its processes. Group totals include all members, even when searching by PID. Shared runtimes may appear separately.","process-group-help"),processTable.element);
+      const networks=el("div","","network-list"),label=document.createElement("label");label.textContent="Network adapter ";
+      networkSelect=document.createElement("select");networkSelect.setAttribute("aria-label","Network adapter");
+      networkSelect.onchange=()=>{networkName=networkSelect!.value;updateLive();};label.append(networkSelect);
+      networkReading=el("p","","hint");networkStatus=el("p","","hint");networks.append(label,networkReading,networkStatus);processes.append(networks);
     }
-    processes.replaceChildren();
-    if(!snapshot){processes.append(el("p",monitorError||"Waiting for process measurements…","hint"));return;}
-    processes.append(el("p",gpuNote(),"gpu-status-note"));
-    const all=snapshot.processes;let page=processPage(all,processQuery,aiOnly,processSort,processIndex);
-    while(!page.length&&processIndex>0){processIndex--;page=processPage(all,processQuery,aiOnly,processSort,processIndex);}
-    const table=document.createElement("table");table.className="process-table";
-    const head=document.createElement("thead"),tr=document.createElement("tr");for(const label of ["Process / app","PID","CPU","RAM","GPU"]){const th=document.createElement("th");th.scope="col";th.textContent=label;tr.append(th);}head.append(tr);table.append(head);
-    const tbody=document.createElement("tbody");
-    for(const p of page){const row=document.createElement("tr"),name=document.createElement("td");const title=el("span",p.name,"process-name");
-      if(p.toolId){name.append(toolLogo(p.toolId,20));title.append(el("small",catalog.find(t=>t.id===p.toolId)?.name||p.toolId));}
-      else if(p.name.toLowerCase().includes("chrome"))name.append(toolLogo("chrome",20));
-      else if(p.name.toLowerCase().includes("docker"))name.append(toolLogo("docker",20));
-      name.append(title);row.append(name);
-      for(const [cls,value]of [["",String(p.pid)],["process-cpu",monitorError?"Unavailable":percent(p.cpuPercent)],["process-memory",monitorError?"Unavailable":memoryText(p.memoryBytes,snapshot.memoryTotal,displayMode)]]){const td=document.createElement("td");td.className=cls;td.dataset.pid=String(p.pid);td.textContent=value;row.append(td);}
-      const gpuCell=document.createElement("td");gpuCell.className="process-gpu";gpuCell.dataset.pid=String(p.pid);gpuCell.textContent=gpuText(monitorError?undefined:p.gpu);gpuCell.title=monitorError?`Live measurement unavailable: ${monitorError}`:p.gpu?.reason||"GPU usage is unavailable for this process. This does not mean zero usage.";row.append(gpuCell);tbody.append(row);}
-    table.append(tbody);processes.append(table);
-    if(!page.length)processes.append(el("p","No processes match your search.","hint"));
-    const pager=el("div","","process-pager");
-    const previous=document.createElement("button"),next=document.createElement("button");previous.type=next.type="button";previous.className=next.className="secondary";previous.textContent="Previous";next.textContent="Next";previous.disabled=processIndex===0;next.disabled=processPage(all,processQuery,aiOnly,processSort,processIndex+1).length===0;
-    previous.onclick=()=>{processIndex--;renderProcesses();};next.onclick=()=>{processIndex++;renderProcesses();};pager.append(previous,el("span",`Page ${processIndex+1} · ${formatCount(all.length)} accessible processes`),next);processes.append(pager);
-    const networks=el("div","","network-list");const label=document.createElement("label");label.textContent="Network adapter ";const select=document.createElement("select");select.setAttribute("aria-label","Network adapter");
-    for(const n of snapshot.networks)select.add(new Option(n.name,n.name));select.value=networkName;select.onchange=()=>{networkName=select.value;updateLive();};label.append(select);networks.append(label);
-    const network=snapshot.networks.find(n=>n.name===networkName);networks.append(el("p",network?`Download ${rate(network.receivedPerSecond)} · Upload ${rate(network.sentPerSecond)}`:"No network adapters found.","hint"));
-    networks.append(el("p",snapshot.appNetworkStatus,"hint"),el("p",`GPU: ${snapshot.gpuStatus}. Processes show the busiest engine; GPUs and engines are not added together. Missing counters do not mean zero. Partial values are lower bounds. VRAM is not measured.`,"hint"));processes.append(networks);
+    processGpuNote!.textContent=gpuNote()+" Groups show their busiest GPU engine; child GPU percentages may not add up to the group value.";
+    const gpuReadings=new Map((snapshot.appGpu||[]).map(g=>[g.appId,g.reading]));
+    for(const gpu of snapshot.gpuTools||[])if(!gpuReadings.has(`tool:${gpu.toolId}`))gpuReadings.set(`tool:${gpu.toolId}`,gpu.reading);
+    processTable.update({groups:groupProcesses(snapshot.processes,gpuReadings,toolNames),query:processQuery,aiOnly,sort:processSort,totalMemory:snapshot.memoryTotal,mode:displayMode,error:monitorError});
+    const names=snapshot.networks.map(n=>n.name);
+    if(JSON.stringify([...networkSelect!.options].map(o=>o.value))!==JSON.stringify(names))networkSelect!.replaceChildren(...names.map(name=>new Option(name,name)));
+    networkSelect!.value=networkName;
+    const network=snapshot.networks.find(n=>n.name===networkName);
+    networkReading!.textContent=monitorError?"Network measurement unavailable":network?`Download ${rate(network.receivedPerSecond)} · Upload ${rate(network.sentPerSecond)}`:"No network adapters found.";
+    networkStatus!.textContent=snapshot.appNetworkStatus;
   }
   function gpuNote():string{
     return monitorError?`GPU unavailable: no live measurement. ${monitorError}`:`GPU · ${(snapshot?.gpuStatus||"Waiting for measurement").replace(/\.+$/,"")}. GPU usage is measured on this device, not on cloud model servers. Missing values do not mean zero. Partial percentages are measured lower bounds.`;
   }
   function render():void{
-    container.replaceChildren();metrics=null;toolsList=null;processes=null;sampleLabel=null;networkSummary=null;
+    container.replaceChildren();metrics=null;toolsList=null;processes=null;sampleLabel=null;networkSummary=null;processTable=null;processGpuNote=null;networkSelect=null;networkReading=null;networkStatus=null;
     container.classList.toggle("control-workspace",current==="control");
     if(!["control","tools","activity"].includes(current))return;
     const liveHeader=el("div","","workspace-live-heading");sampleLabel=el("span","","hint");liveHeader.append(sampleLabel);
@@ -166,9 +157,9 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(inventory?.warnings.length)panel.append(el("p",inventory.warnings.join(" "),"warning"));(controlLayout||container).append(panel);renderTools();
     } else {
       const panel=el("section","","activity-panel panel"),heading=el("div","","panel-heading");heading.append(el("h2","Running apps and processes"));
-      const filters=el("div","","activity-filters");const search=document.createElement("input");search.type="search";search.placeholder="Search Chrome, Docker, tool, or PID…";search.setAttribute("aria-label","Search processes");search.value=processQuery;search.oninput=()=>{processQuery=search.value;processIndex=0;renderProcesses();};
-      const sort=document.createElement("select");sort.setAttribute("aria-label","Process sort order");sort.add(new Option("RAM: high to low","memory"));sort.add(new Option("CPU: high to low","cpu"));sort.add(new Option("GPU: high to low","gpu"));sort.value=processSort;sort.onchange=()=>{processSort=sort.value as ProcessSort;processIndex=0;renderProcesses();};
-      const only=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=aiOnly;check.onchange=()=>{aiOnly=check.checked;processIndex=0;renderProcesses();};only.append(check,document.createTextNode("AI only"));filters.append(search,sort,only);
+      const filters=el("div","","activity-filters");const search=document.createElement("input");search.type="search";search.placeholder="Search Chrome, Docker, tool, or PID…";search.setAttribute("aria-label","Search processes");search.value=processQuery;search.oninput=()=>{processQuery=search.value;processState.page=0;renderProcesses();};
+      const sort=document.createElement("select");sort.setAttribute("aria-label","Process sort order");sort.add(new Option("RAM: high to low","memory"));sort.add(new Option("CPU: high to low","cpu"));sort.add(new Option("GPU: high to low","gpu"));sort.value=processSort;sort.onchange=()=>{processSort=sort.value as ProcessSort;processState.page=0;renderProcesses();};
+      const only=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=aiOnly;check.onchange=()=>{aiOnly=check.checked;processState.page=0;renderProcesses();};only.append(check,document.createTextNode("AI only"));filters.append(search,sort,only);
       processes=el("div");panel.append(heading,el("p","CPU is normalized to total device capacity. RAM is process resident memory; shared pages may be counted in several processes. Docker container internals and individual Chrome tabs are not separated.","hint"),filters,processes);container.append(panel);renderProcesses();
     }
     container.append(el("p","Not running does not mean unused. These measurements do not establish past use or whether a file can be safely removed.","hint usage-caveat"));updateLive();

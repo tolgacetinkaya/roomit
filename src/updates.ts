@@ -18,7 +18,7 @@ export function installUpdates(scanBusy:()=>boolean,onBusyChange:()=>void):{busy
     try{
       const found=await invoke<Release|null>("check_for_update");release=found;install.hidden=!found;
       if(found){show(`Roomit ${found.version} is available`);notes.textContent=found.notes;install.hidden=false;install.textContent="Update and restart";}
-      else if(manual){show("You are up to date. Roomit 0.4.0 is the latest release.");}
+      else if(manual){show("You are up to date. No newer release is available.");}
     }catch(error){if(manual){show(String(error));notes.textContent="You can try again from Roomit → Check for updates.";}}
     finally{checking=false;check.disabled=false;check.textContent="Check for updates";}
   }

@@ -16,11 +16,15 @@ impl Default for Sampler {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProcessRow {
     pub pid: u32, pub name: String, pub tool_id: Option<String>, pub cpu_percent: Option<f32>, pub memory_bytes: String,
+    pub app_id: String, pub app_name: String,
     pub gpu: crate::gpu::Reading,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ToolGpu { pub tool_id: String, pub reading: crate::gpu::Reading }
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AppGpu { pub app_id: String, pub reading: crate::gpu::Reading }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NetworkRow { pub name: String, pub received_per_second: Option<f64>, pub sent_per_second: Option<f64> }
@@ -33,6 +37,41 @@ pub(crate) struct Snapshot {
     pub processes: Vec<ProcessRow>, pub networks: Vec<NetworkRow>, pub cpu_count: usize,
     pub gpu_status: String, pub app_network_status: String,
     pub gpu_ai: crate::gpu::Reading, pub gpu_tools: Vec<ToolGpu>,
+    pub app_gpu: Vec<AppGpu>,
+}
+
+// Group by measured identity, never by arbitrary parentage or command text.
+// Only an opaque key is exported; executable paths stay in the native sampler.
+fn application_identity(name: &str, exe: Option<&std::path::Path>, tool: Option<&str>, pid: u32, start: u64, tools: &[Tool]) -> (String,String) {
+    if let Some(id) = tool {
+        let label = tools.iter().find(|tool| tool.id == id).map(|tool| tool.name.clone()).unwrap_or_else(|| id.into());
+        return (format!("tool:{id}"), label);
+    }
+    let Some(exe) = exe.filter(|path|path.is_absolute()) else { return (format!("process:{pid}:{start}"),name.into()) };
+    let path = exe.to_string_lossy().replace('\\',"/");
+    let path = if cfg!(windows) {path.to_lowercase()} else {path};
+    let binary = name.to_lowercase();
+    let binary = binary.trim_end_matches(".exe");
+    let mut identity = path.clone();
+    let mut label = name.strip_suffix(".exe").unwrap_or(name).to_owned();
+    if cfg!(target_os="macos") {
+        if let Some(at) = path.find(".app/") {
+            identity = path[..at+4].into();
+            label = std::path::Path::new(&identity).file_stem().unwrap_or_default().to_string_lossy().into_owned();
+        }
+    }
+    for (marker, binaries, app) in [
+        ("/google/chrome/application/", &["chrome","chrome_crashpad_handler"][..], "Google Chrome"),
+        ("/docker/docker/", &["docker desktop","com.docker.backend","com.docker.build","com.docker.proxy","vpnkit"][..], "Docker Desktop"),
+        ("/android/android studio/", &["studio64","studio","java","javaw","fsnotifier","jcef_helper"][..], "Android Studio"),
+    ] {
+        if binaries.contains(&binary) {
+            if let Some(at) = path.find(marker) { identity = path[..at+marker.len()-1].into(); label = app.into(); break; }
+        }
+    }
+    use std::hash::{Hash,Hasher};
+    let mut hash = std::collections::hash_map::DefaultHasher::new(); identity.hash(&mut hash);
+    (format!("app:{:016x}",hash.finish()),label)
 }
 #[cfg(windows)]
 fn installed_kib_to_bytes(kib:u64)->Option<u64>{kib.checked_mul(1024).filter(|bytes|*bytes>0)}
@@ -135,11 +174,14 @@ impl Sampler {
             }
             if added.is_empty() { break; } owners.extend(added);
         }
-        let mut processes: Vec<_> = self.system.processes().iter().filter(|(pid, _)| pid.as_u32() != 0).map(|(pid,p)| ProcessRow {
+        let mut processes: Vec<_> = self.system.processes().iter().filter(|(pid, _)| pid.as_u32() != 0).map(|(pid,p)| {
+            let (app_id,app_name) = application_identity(&p.name().to_string_lossy(),p.exe(),owners.get(&pid.as_u32()).map(String::as_str),pid.as_u32(),p.start_time(),&tools);
+            ProcessRow {
             pid: pid.as_u32(), name: p.name().to_string_lossy().into_owned(), tool_id: owners.get(&pid.as_u32()).cloned(),
+            app_id, app_name,
             cpu_percent: warmed.then(|| (p.cpu_usage() / cpu_count as f32).clamp(0.0, 100.0)), memory_bytes: p.memory().to_string(),
             gpu: gpu_reading(&[pid.as_u32()]),
-        }).collect();
+        }}).collect();
         processes.sort_by(|a,b| b.memory_bytes.parse::<u64>().unwrap_or(0).cmp(&a.memory_bytes.parse().unwrap_or(0)).then(a.pid.cmp(&b.pid)));
         let networks = self.networks.iter().map(|(name, data)| {
             let rates = network_rates(self.network_baselines.get(name).copied(), (data.total_received(),data.total_transmitted()), seconds);
@@ -150,18 +192,49 @@ impl Sampler {
         for (pid,tool) in &owners {tool_pids.entry(tool.clone()).or_default().push(*pid);}
         let mut gpu_tools: Vec<_> = tool_pids.into_iter().map(|(tool_id,pids)|ToolGpu {tool_id,reading:gpu_reading(&pids)}).collect();
         gpu_tools.sort_by(|a,b|a.tool_id.cmp(&b.tool_id));
+        let mut app_pids: HashMap<String,Vec<u32>> = HashMap::new();
+        for process in &processes { app_pids.entry(process.app_id.clone()).or_default().push(process.pid); }
+        let mut app_gpu: Vec<_> = app_pids.into_iter().map(|(app_id,pids)|AppGpu {app_id,reading:gpu_reading(&pids)}).collect();
+        app_gpu.sort_by(|a,b|a.app_id.cmp(&b.app_id));
         let gpu_ai=gpu_reading(&owners.keys().copied().collect::<Vec<_>>());
         let snapshot = Snapshot { sampled_at_ms: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
             cpu_percent: warmed.then(|| self.system.global_cpu_usage().clamp(0.0, 100.0)), memory_used: self.system.used_memory().to_string(), memory_total: self.system.total_memory().to_string(),
             memory_installed:installed_memory().filter(|bytes|*bytes>=self.system.total_memory()).map(|bytes|bytes.to_string()),
             memory_available:self.system.available_memory().to_string(),
-            processes, networks, cpu_count, gpu_status: gpu_frame.reason.clone(), gpu_ai, gpu_tools,
+            processes, networks, cpu_count, gpu_status: gpu_frame.reason.clone(), gpu_ai, gpu_tools, app_gpu,
             app_network_status: "Network rates are per adapter. Per-app traffic and LAN / internet separation are not measured yet.".into() };
         self.process_starts=process_starts;self.last = Some(Instant::now()); self.cached = Some(snapshot.clone()); snapshot
     }
 }
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn application_keys_group_tools_and_keep_unknown_or_separate_executables_apart() {
+        use std::path::Path;
+        let tools=catalog();
+        let a=application_identity("codex.exe",None,Some("codex"),1,100,&tools);
+        let b=application_identity("ChatGPT.exe",None,Some("codex"),2,101,&tools);
+        assert_eq!(a,b);assert_eq!(a.1,"Codex");
+        assert_ne!(application_identity("java",None,None,1,100,&tools).0,application_identity("java",None,None,2,100,&tools).0);
+        assert_ne!(application_identity("java",None,None,1,100,&tools).0,application_identity("java",None,None,1,101,&tools).0);
+        let base=std::env::temp_dir();let first=base.join("app-a/java.exe");let second=base.join("app-b/java.exe");
+        let key=application_identity("java.exe",Some(&first),None,1,100,&tools).0;
+        assert_eq!(key,application_identity("java.exe",Some(&first),None,2,100,&tools).0);
+        assert_ne!(key,application_identity("java.exe",Some(&second),None,2,100,&tools).0);
+        assert!(!key.contains("app-a"));
+        assert_eq!(application_identity("relative",Some(Path::new("relative/bin")),None,1,100,&tools).0,"process:1:100");
+    }
+    #[cfg(windows)]
+    #[test] fn known_app_helpers_share_their_installation_but_unrelated_java_does_not() {
+        use std::path::Path;
+        let tools=catalog();
+        let app=application_identity("studio64.exe",Some(Path::new("C:/Program Files/Android/Android Studio/bin/studio64.exe")),None,1,1,&tools);
+        let helper=application_identity("java.exe",Some(Path::new("C:/Program Files/Android/Android Studio/jbr/bin/java.exe")),None,2,1,&tools);
+        assert_eq!(app,helper);assert_eq!(app.1,"Android Studio");
+        let other=application_identity("java.exe",Some(Path::new("C:/Java/bin/java.exe")),None,3,1,&tools);
+        assert_ne!(app.0,other.0);
+        let unicode=application_identity("studio64.exe",Some(Path::new("C:/Users/İbrahim/Android/Android Studio/bin/studio64.exe")),None,4,1,&tools);
+        assert_eq!(unicode.1,"Android Studio");
+    }
     #[cfg(windows)]
     #[test] fn installed_ram_kib_conversion_rejects_missing_and_overflow_without_rounding(){
         assert_eq!(installed_kib_to_bytes(134217728),Some(137438953472));
@@ -209,6 +282,9 @@ impl Sampler {
         assert!(first.networks.iter().all(|n| n.received_per_second.is_none()));
         assert!(!first.processes.is_empty());
         let serialized = serde_json::to_value(&first).unwrap(); assert!(serialized["processes"][0].get("cmd").is_none());
+        assert!(first.processes.iter().all(|p|!p.app_id.is_empty()&&!p.app_name.is_empty()));
+        assert_eq!(first.app_gpu.len(),first.processes.iter().map(|p|&p.app_id).collect::<HashSet<_>>().len());
+        for group in &first.app_gpu {assert_eq!(group.reading.total_processes,first.processes.iter().filter(|p|p.app_id==group.app_id).count());}
         assert_eq!(sampler.sample().sampled_at_ms, first.sampled_at_ms);
         std::thread::sleep(std::time::Duration::from_millis(1100));
         let next = sampler.sample(); assert!(next.cpu_percent.is_some());
