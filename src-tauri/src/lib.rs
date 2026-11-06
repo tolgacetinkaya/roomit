@@ -7,6 +7,7 @@ mod watch;
 mod ai;
 mod inventory;
 mod monitor;
+mod gpu;
 
 use std::{
     path::PathBuf,

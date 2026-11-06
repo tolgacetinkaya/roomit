@@ -5,21 +5,21 @@ import type { InspectionReport } from "./report";
 import type { GroupedReport } from "./groups";
 import { renderStorageMap } from "./storage-map";
 import { toolLogo, toolId } from "./tool-logos";
-import { toolUsage, processPage } from "./workspace-model";
-import type { ProcessRow } from "./workspace-model";
+import { toolUsage, processPage, gpuText } from "./workspace-model";
+import type { ProcessRow, GpuReading, ProcessSort } from "./workspace-model";
 import { revealActions } from "./reveal";
 export type WorkspaceView="control"|"tools"|"activity";
 interface InstalledTool {id:string;name:string;kind:string;installations:string[];dataPaths:string[];evidence:string[]}
 interface Inventory {tools:InstalledTool[];supportedCount:number;warnings:string[]}
 interface NetworkRow {name:string;receivedPerSecond:number|null;sentPerSecond:number|null}
-interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;processes:ProcessRow[];networks:NetworkRow[];gpuStatus:string;appNetworkStatus:string}
+interface Snapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;processes:ProcessRow[];networks:NetworkRow[];gpuStatus:string;gpuAi?:GpuReading;gpuTools?:{toolId:string;reading:GpuReading}[];appNetworkStatus:string}
 const el=(tag:string,text="",cls=""):HTMLElement=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
 const percent=(n:number|null)=>n===null?"Ölçülüyor…":`%${n.toLocaleString("tr-TR",{maximumFractionDigits:1})}`;
 const rate=(n:number|null)=>n===null?"Ölçülüyor…":`${formatBytes(Math.max(0,Math.round(n)).toString())}/sn`;
 export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tools"|"activity")=>void):{show:(view:string,report:InspectionReport|null,groups:GroupedReport|null)=>void}{
   let current:string="",report:InspectionReport|null=null,groups:GroupedReport|null=null;
   let inventory:Inventory|null=null,snapshot:Snapshot|null=null,inventoryError="",monitorError="",inventoryBusy=false,monitorBusy=false,paused=false;
-  let networkName="",processQuery="",processSort:"memory"|"cpu"="memory",aiOnly=false,processIndex=0,timer:ReturnType<typeof setTimeout>|undefined;
+  let networkName="",processQuery="",processSort:ProcessSort="memory",aiOnly=false,processIndex=0,timer:ReturnType<typeof setTimeout>|undefined;
   let runningIds="";
   let metrics:HTMLElement|null=null,toolsList:HTMLElement|null=null,processes:HTMLElement|null=null,sampleLabel:HTMLElement|null=null;
   const visible=()=>["control","tools","activity"].includes(current)&&!document.hidden;
@@ -46,13 +46,21 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       const network=available.find(n=>n.name===networkName);
       metrics.replaceChildren(metric("CPU · cihaz",snapshot?percent(snapshot.cpuPercent):"—","Toplam işlemci kapasitesine göre"),
         metric("RAM · cihaz",snapshot?formatBytes(snapshot.memoryUsed):"—",snapshot?`${formatBytes(snapshot.memoryTotal)} toplam bellek`:"İlk ölçüm bekleniyor"),
-        metric("Çalışan AI",snapshot?String(running):"—","Tanınan süreçler ve yardımcıları"),
+        metric("GPU · AI süreçleri",snapshot?gpuText(monitorError?undefined:snapshot.gpuAi):"Ölçüm bekleniyor",`Bu bilgisayarda · ${running} çalışan AI aracı`),
         metric("Ağ · indirme",network?rate(network.receivedPerSecond):"—",network?.name||"Adaptör ölçümü bekleniyor"));
+      const gpuMetric=metrics.children[2] as HTMLElement;gpuMetric.classList.add("gpu-metric");
+      gpuMetric.title=monitorError?`Canlı GPU ölçümü alınamadı: ${monitorError}`:snapshot?.gpuAi?.reason||"GPU ölçümü henüz alınamadı.";
     }
     if(sampleLabel)sampleLabel.textContent=monitorError?`Ölçüm alınamadı: ${monitorError}`:paused?"Canlı ölçüm duraklatıldı.":snapshot?`Son ölçüm ${new Date(snapshot.sampledAtMs).toLocaleTimeString("tr-TR")} · 2 sn aralıkla` : "İlk ölçüm alınıyor…";
     for(const card of container.querySelectorAll<HTMLElement>("[data-tool-usage]")){
       const id=card.dataset.toolUsage!, usage=toolUsage(snapshot?.processes||[],id);
       card.textContent=snapshot?usage.processes?`${usage.processes} süreç · CPU ${percent(usage.cpu)} · RAM ${formatBytes(usage.memory)}`:"Şu anda çalışan süreç görülmedi":"Canlı ölçüm bekleniyor…";
+    }
+    for(const card of container.querySelectorAll<HTMLElement>("[data-tool-gpu]")){
+      const id=card.dataset.toolGpu!, usage=toolUsage(snapshot?.processes||[],id);
+      const gpu=monitorError?undefined:snapshot?.gpuTools?.find(t=>t.toolId===id)?.reading;
+      card.textContent=`GPU · ${snapshot?(usage.processes?gpuText(gpu):"Çalışan süreç yok"):"Ölçüm bekleniyor"}`;
+      card.title=monitorError?`Canlı ölçüm alınamadı: ${monitorError}`:gpu?.reason||(snapshot&&!usage.processes?"Şu anda bu araç için çalışan süreç görülmedi.":"Bu araç için GPU değeri alınamadı; sıfır kullanım anlamına gelmez.");
     }
     if(processes)renderProcesses(true);
   }
@@ -73,6 +81,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       const card=el("article","","installed-tool");card.dataset.toolId=tool.id;const heading=el("div","","installed-tool-heading"),copy=el("div");copy.append(el("h3",tool.name),el("p",tool.kind,"hint"));
       const badge=el("span",tool.evidence.length||tool.installations.length?"Tespit edildi":"Yalnızca veri",tool.evidence.length?"tool-state":"tool-state data-only");heading.append(toolLogo(tool.id),copy,badge);
       const usage=el("p","","tool-live");usage.dataset.toolUsage=tool.id;
+      const gpu=el("p","GPU · Ölçüm bekleniyor","tool-gpu");gpu.dataset.toolGpu=tool.id;
       const measured=groups?.ai.filter(g=>toolId(g.title)===tool.id)||[];
       const storage=measured.reduce((s,g)=>s+BigInt(g.logicalBytes),0n);
       const bytes=el("div","","tool-storage");bytes.append(el("span","Taranan veri"),el("strong",measured.length?sizeLabel(storage.toString(),Boolean(report?.totalSizeComplete)&&!report?.resultsTruncated&&measured.every(g=>g.sizeComplete)):"Henüz ölçülmedi"));
@@ -81,23 +90,34 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(!tool.evidence.length&&!tool.installations.length)details.append(el("p","Veri klasörü kurulum kanıtı değildir; eski bir kurulumdan kalmış olabilir.","hint"));
       const paths=[...new Set([...tool.installations,...tool.dataPaths])];
       for(const path of paths)details.append(el("p",path,"report-path"));
-      details.append(revealActions(paths));card.append(heading,usage,bytes,details);toolsList.append(card);
+      details.append(revealActions(paths));card.append(heading,usage,gpu,bytes,details);toolsList.append(card);
     }
     updateLive();
   }
   function renderProcesses(keepFocus=false):void{
-    if(!processes || (keepFocus && processes.contains(document.activeElement)))return;processes.replaceChildren();
+    if(!processes)return;
+    if(keepFocus && processes.contains(document.activeElement)){
+      for(const cell of processes.querySelectorAll<HTMLElement>(".process-gpu[data-pid]")){
+        const row=snapshot?.processes.find(p=>p.pid===Number(cell.dataset.pid));
+        cell.textContent=gpuText(monitorError?undefined:row?.gpu);
+        cell.title=monitorError?`Canlı ölçüm alınamadı: ${monitorError}`:row?.gpu?.reason||"Bu süreç için güncel GPU ölçümü yok.";
+      }
+      const note=processes.querySelector(".gpu-status-note");if(note)note.textContent=gpuNote();return;
+    }
+    processes.replaceChildren();
     if(!snapshot){processes.append(el("p",monitorError||"Süreç ölçümleri bekleniyor…","hint"));return;}
+    processes.append(el("p",gpuNote(),"gpu-status-note"));
     const all=snapshot.processes;let page=processPage(all,processQuery,aiOnly,processSort,processIndex);
     while(!page.length&&processIndex>0){processIndex--;page=processPage(all,processQuery,aiOnly,processSort,processIndex);}
     const table=document.createElement("table");table.className="process-table";
-    const head=document.createElement("thead"),tr=document.createElement("tr");for(const label of ["Süreç / uygulama","PID","CPU","RAM"]){const th=document.createElement("th");th.scope="col";th.textContent=label;tr.append(th);}head.append(tr);table.append(head);
+    const head=document.createElement("thead"),tr=document.createElement("tr");for(const label of ["Süreç / uygulama","PID","CPU","RAM","GPU"]){const th=document.createElement("th");th.scope="col";th.textContent=label;tr.append(th);}head.append(tr);table.append(head);
     const tbody=document.createElement("tbody");
     for(const p of page){const row=document.createElement("tr"),name=document.createElement("td");const title=el("span",p.name,"process-name");
       if(p.toolId){name.append(toolLogo(p.toolId,20));title.append(el("small",catalog.find(t=>t.id===p.toolId)?.name||p.toolId));}
       else if(p.name.toLowerCase().includes("chrome"))name.append(toolLogo("chrome",20));
       else if(p.name.toLowerCase().includes("docker"))name.append(toolLogo("docker",20));
-      name.append(title);row.append(name);for(const value of [String(p.pid),percent(p.cpuPercent),formatBytes(p.memoryBytes)]){const td=document.createElement("td");td.textContent=value;row.append(td);}tbody.append(row);}
+      name.append(title);row.append(name);for(const value of [String(p.pid),percent(p.cpuPercent),formatBytes(p.memoryBytes)]){const td=document.createElement("td");td.textContent=value;row.append(td);}
+      const gpuCell=document.createElement("td");gpuCell.className="process-gpu";gpuCell.dataset.pid=String(p.pid);gpuCell.textContent=gpuText(monitorError?undefined:p.gpu);gpuCell.title=monitorError?`Canlı ölçüm alınamadı: ${monitorError}`:p.gpu?.reason||"Bu süreç için GPU değeri alınamadı; sıfır kullanım anlamına gelmez.";row.append(gpuCell);tbody.append(row);}
     table.append(tbody);processes.append(table);
     if(!page.length)processes.append(el("p","Aramana uyan süreç yok.","hint"));
     const pager=el("div","","process-pager");
@@ -106,7 +126,10 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     const networks=el("div","","network-list");const label=document.createElement("label");label.textContent="Ağ adaptörü ";const select=document.createElement("select");select.setAttribute("aria-label","Ağ adaptörü");
     for(const n of snapshot.networks)select.add(new Option(n.name,n.name));select.value=networkName;select.onchange=()=>{networkName=select.value;updateLive();};label.append(select);networks.append(label);
     const network=snapshot.networks.find(n=>n.name===networkName);networks.append(el("p",network?`İndirme ${rate(network.receivedPerSecond)} · Gönderme ${rate(network.sentPerSecond)}`:"Ağ adaptörü bulunamadı.","hint"));
-    networks.append(el("p",snapshot.appNetworkStatus,"hint"),el("p",`GPU: ${snapshot.gpuStatus}`,"hint"));processes.append(networks);
+    networks.append(el("p",snapshot.appNetworkStatus,"hint"),el("p",`GPU: ${snapshot.gpuStatus}. Süreçlerde en yoğun motor gösterilir; GPU'lar/motorlar toplanmaz. Eksik sayaçlar sıfır sayılmaz; kısmi değerler alt sınırdır. VRAM ölçülmüyor.`,"hint"));processes.append(networks);
+  }
+  function gpuNote():string{
+    return monitorError?`GPU ölçülemiyor: canlı ölçüm alınamadı. ${monitorError}`:`GPU · ${(snapshot?.gpuStatus||"Ölçüm bekleniyor").replace(/\.+$/,"")}. Bu cihazın GPU kullanımıdır; buluttaki model sunucusunu ölçmez. Eksik değerler sıfır değildir; kısmi yüzdeler ölçülebilen alt sınırı gösterir.`;
   }
   function render():void{
     container.replaceChildren();metrics=null;toolsList=null;processes=null;sampleLabel=null;
@@ -127,7 +150,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     } else {
       const panel=el("section","","activity-panel panel"),heading=el("div","","panel-heading");heading.append(el("h2","Çalışan uygulamalar ve süreçler"));
       const filters=el("div","","activity-filters");const search=document.createElement("input");search.type="search";search.placeholder="Chrome, Docker, araç veya PID ara…";search.setAttribute("aria-label","Süreç ara");search.value=processQuery;search.oninput=()=>{processQuery=search.value;processIndex=0;renderProcesses();};
-      const sort=document.createElement("select");sort.setAttribute("aria-label","Süreç sıralaması");sort.add(new Option("RAM: yüksekten düşüğe","memory"));sort.add(new Option("CPU: yüksekten düşüğe","cpu"));sort.value=processSort;sort.onchange=()=>{processSort=sort.value as "memory"|"cpu";processIndex=0;renderProcesses();};
+      const sort=document.createElement("select");sort.setAttribute("aria-label","Süreç sıralaması");sort.add(new Option("RAM: yüksekten düşüğe","memory"));sort.add(new Option("CPU: yüksekten düşüğe","cpu"));sort.add(new Option("GPU: yüksekten düşüğe","gpu"));sort.value=processSort;sort.onchange=()=>{processSort=sort.value as ProcessSort;processIndex=0;renderProcesses();};
       const only=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=aiOnly;check.onchange=()=>{aiOnly=check.checked;processIndex=0;renderProcesses();};only.append(check,document.createTextNode("Yalnızca AI"));filters.append(search,sort,only);
       processes=el("div");panel.append(heading,el("p","CPU toplam cihaz kapasitesine göredir. RAM süreçlerin yerleşik belleğidir; paylaşılan sayfalar birden fazla süreçte sayılabilir. Docker container içi ve Chrome sekme bazlı ayrım yapılmaz.","hint"),filters,processes);container.append(panel);renderProcesses();
     }

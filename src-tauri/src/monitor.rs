@@ -1,19 +1,26 @@
 use crate::inventory::{catalog, Tool};
 use serde::Serialize;
-use std::{collections::HashMap, sync::{Arc, Mutex}, time::{Instant, SystemTime, UNIX_EPOCH}};
+use std::{collections::{HashMap,HashSet}, sync::{Arc, Mutex}, time::{Instant, SystemTime, UNIX_EPOCH}};
 use sysinfo::{Networks, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 #[derive(Default, Clone)]
 pub(crate) struct Monitor(pub Arc<Mutex<Sampler>>);
-pub(crate) struct Sampler { system: System, networks: Networks, network_baselines: HashMap<String,(u64,u64)>, last: Option<Instant>, cached: Option<Snapshot> }
+pub(crate) struct Sampler {
+    system: System, networks: Networks, network_baselines: HashMap<String,(u64,u64)>,
+    gpu: crate::gpu::Collector, process_starts: HashMap<u32,u64>, last: Option<Instant>, cached: Option<Snapshot>,
+}
 impl Default for Sampler {
-    fn default() -> Self { Self { system: System::new(), networks: Networks::new(), network_baselines: HashMap::new(), last: None, cached: None } }
+    fn default() -> Self { Self { system: System::new(), networks: Networks::new(), network_baselines: HashMap::new(), gpu: Default::default(), process_starts: HashMap::new(), last: None, cached: None } }
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProcessRow {
     pub pid: u32, pub name: String, pub tool_id: Option<String>, pub cpu_percent: Option<f32>, pub memory_bytes: String,
+    pub gpu: crate::gpu::Reading,
 }
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ToolGpu { pub tool_id: String, pub reading: crate::gpu::Reading }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NetworkRow { pub name: String, pub received_per_second: Option<f64>, pub sent_per_second: Option<f64> }
@@ -23,12 +30,16 @@ pub(crate) struct Snapshot {
     pub sampled_at_ms: u64, pub cpu_percent: Option<f32>, pub memory_used: String, pub memory_total: String,
     pub processes: Vec<ProcessRow>, pub networks: Vec<NetworkRow>, pub cpu_count: usize,
     pub gpu_status: String, pub app_network_status: String,
+    pub gpu_ai: crate::gpu::Reading, pub gpu_tools: Vec<ToolGpu>,
 }
 fn network_rates(previous: Option<(u64,u64)>, current:(u64,u64), seconds: Option<f64>) -> (Option<f64>,Option<f64>) {
     match (previous,seconds) {
         (Some((rx,tx)),Some(s)) if (0.2..=15.0).contains(&s) && current.0>=rx && current.1>=tx => (Some((current.0-rx) as f64/s),Some((current.1-tx) as f64/s)),
         _ => (None,None),
     }
+}
+fn stable_process_ids(current:&HashMap<u32,u64>,previous:&HashMap<u32,u64>)->HashSet<u32>{
+    current.iter().filter(|(pid,start)|**start!=0 && previous.get(pid)==Some(start)).map(|(pid,_)|*pid).collect()
 }
 fn same_install_helper(child_name: &str, child_exe: Option<&std::path::Path>, parent_name: &str, parent_exe: Option<&std::path::Path>) -> bool {
     let child = child_name.to_lowercase().trim_end_matches(".exe").to_string();
@@ -41,6 +52,13 @@ fn same_install_helper(child_name: &str, child_exe: Option<&std::path::Path>, pa
 }
 fn process_tool(name: &str, exe: &str, script: &str, tools: &[Tool]) -> Option<String> {
     let name = name.to_lowercase().trim_end_matches(".exe").to_string(); let exe = exe.replace('\\', "/").to_lowercase();
+    // Local model engines may run under a different executable name. Require
+    // both a known worker name and a product-specific installation/data path;
+    // an arbitrary llama-server or child process is not an AI-tool identity.
+    if ["llama-server", "llm-engine-host", "lmstudio-daemon"].contains(&name.as_str()) &&
+        (exe.contains("/.lmstudio/") || exe.contains("/lm studio/") || exe.contains("/lm-studio/")) {return Some("lmstudio".into());}
+    if ["ollama_llama_server", "llama-server"].contains(&name.as_str()) &&
+        (exe.contains("/ollama/") || exe.contains("/.ollama/")) {return Some("ollama".into());}
     if name == "claude" && (exe.contains("/claude_") || exe.contains("/programs/claude/") || exe.contains("/claude.app/")) { return Some("claude".into()); }
     for tool in tools {
         if tool.commands.iter().any(|c| c == &name) { return Some(tool.id.clone()); }
@@ -69,6 +87,17 @@ impl Sampler {
         self.system.refresh_processes_specifics(ProcessesToUpdate::All, true,
             ProcessRefreshKind::nothing().with_cpu().with_memory().with_exe(UpdateKind::OnlyIfNotSet).with_cmd(UpdateKind::OnlyIfNotSet).without_tasks());
         self.networks.refresh(true);
+        let process_starts: HashMap<_,_> = self.system.processes().iter().map(|(pid,p)|(pid.as_u32(),p.start_time())).collect();
+        let stable_pids=if warmed {stable_process_ids(&process_starts,&self.process_starts)}else{HashSet::new()};
+        let gpu_frame = self.gpu.sample();
+        let gpu_reading=|pids:&[u32]|{
+            let mut reading=gpu_frame.reading(pids,&stable_pids);
+            if gpu_frame.status==crate::gpu::Status::Measured && !pids.is_empty() && pids.iter().all(|pid|process_starts.get(pid)==Some(&0)){
+                reading.percent=None;reading.status=crate::gpu::Status::Unavailable;
+                reading.reason="Süreç başlangıç kimliği doğrulanamadığı için GPU değeri bu sürece bağlanamadı.".into();
+            }
+            reading
+        };
         let tools = catalog(); let cpu_count = self.system.cpus().len().max(1);
         let mut owners: HashMap<u32, String> = HashMap::new();
         for (pid, p) in self.system.processes() {
@@ -92,6 +121,7 @@ impl Sampler {
         let mut processes: Vec<_> = self.system.processes().iter().filter(|(pid, _)| pid.as_u32() != 0).map(|(pid,p)| ProcessRow {
             pid: pid.as_u32(), name: p.name().to_string_lossy().into_owned(), tool_id: owners.get(&pid.as_u32()).cloned(),
             cpu_percent: warmed.then(|| (p.cpu_usage() / cpu_count as f32).clamp(0.0, 100.0)), memory_bytes: p.memory().to_string(),
+            gpu: gpu_reading(&[pid.as_u32()]),
         }).collect();
         processes.sort_by(|a,b| b.memory_bytes.parse::<u64>().unwrap_or(0).cmp(&a.memory_bytes.parse().unwrap_or(0)).then(a.pid.cmp(&b.pid)));
         let networks = self.networks.iter().map(|(name, data)| {
@@ -99,15 +129,25 @@ impl Sampler {
             NetworkRow { name: name.clone(), received_per_second: rates.0, sent_per_second: rates.1 }
         }).collect();
         self.network_baselines = self.networks.iter().map(|(name,data)|(name.clone(),(data.total_received(),data.total_transmitted()))).collect();
+        let mut tool_pids: HashMap<String,Vec<u32>> = HashMap::new();
+        for (pid,tool) in &owners {tool_pids.entry(tool.clone()).or_default().push(*pid);}
+        let mut gpu_tools: Vec<_> = tool_pids.into_iter().map(|(tool_id,pids)|ToolGpu {tool_id,reading:gpu_reading(&pids)}).collect();
+        gpu_tools.sort_by(|a,b|a.tool_id.cmp(&b.tool_id));
+        let gpu_ai=gpu_reading(&owners.keys().copied().collect::<Vec<_>>());
         let snapshot = Snapshot { sampled_at_ms: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
             cpu_percent: warmed.then(|| self.system.global_cpu_usage().clamp(0.0, 100.0)), memory_used: self.system.used_memory().to_string(), memory_total: self.system.total_memory().to_string(),
-            processes, networks, cpu_count, gpu_status: "Bu sürümde GPU ölçümü yok; 0 tüketim anlamına gelmez.".into(),
+            processes, networks, cpu_count, gpu_status: gpu_frame.reason.clone(), gpu_ai, gpu_tools,
             app_network_status: "Ağ hızı adaptör bazındadır. Uygulama başına trafik ve LAN / internet ayrımı henüz ölçülmüyor.".into() };
-        self.last = Some(Instant::now()); self.cached = Some(snapshot.clone()); snapshot
+        self.process_starts=process_starts;self.last = Some(Instant::now()); self.cached = Some(snapshot.clone()); snapshot
     }
 }
 #[cfg(test)] mod tests {
     use super::*;
+    #[test] fn reused_new_and_unknown_process_start_times_are_not_gpu_identities() {
+        let previous=HashMap::from([(1,100),(2,200),(3,0)]);
+        let current=HashMap::from([(1,101),(2,200),(3,0),(4,400)]);
+        assert_eq!(stable_process_ids(&current,&previous),HashSet::from([2]));
+    }
     #[test] fn network_rates_need_a_baseline_and_do_not_treat_resets_as_traffic() {
         assert_eq!(network_rates(None,(1_000_000,100),Some(2.0)),(None,None));
         assert_eq!(network_rates(Some((100,50)),(10,1),Some(2.0)),(None,None));
@@ -132,6 +172,13 @@ impl Sampler {
         assert!(process_tool("node", "", "prompt mentioning opencode", &tools).is_none());
         assert_eq!(process_tool("Claude.exe", "C:/Program Files/WindowsApps/Claude_1.0/Claude.exe", "", &tools).as_deref(), Some("claude"));
     }
+    #[test] fn local_model_workers_need_both_known_binary_and_product_path() {
+        let tools=catalog();
+        assert_eq!(process_tool("llama-server.exe","C:/Users/test/.lmstudio/extensions/backends/cuda/llama-server.exe","",&tools).as_deref(),Some("lmstudio"));
+        assert_eq!(process_tool("ollama_llama_server.exe","C:/Programs/Ollama/lib/ollama_llama_server.exe","",&tools).as_deref(),Some("ollama"));
+        assert!(process_tool("llama-server.exe","C:/work/custom/llama-server.exe","",&tools).is_none());
+        assert!(process_tool("chrome.exe","C:/Users/test/.lmstudio/chrome.exe","",&tools).is_none());
+    }
     #[test] fn real_sampler_warms_up_and_never_exports_commands() {
         let mut sampler = Sampler::default(); let first = sampler.sample(); assert!(first.cpu_percent.is_none());
         assert!(first.networks.iter().all(|n| n.received_per_second.is_none()));
@@ -142,5 +189,7 @@ impl Sampler {
         let next = sampler.sample(); assert!(next.cpu_percent.is_some());
         assert!(next.processes.iter().all(|p| p.cpu_percent.is_some_and(|v| (0.0..=100.0).contains(&v))));
         assert!(next.networks.iter().all(|n| n.received_per_second.is_some()));
+        assert!(next.processes.iter().all(|p|p.gpu.percent.is_none_or(|value|value.is_finite()&&(0.0..=100.0).contains(&value))));
+        println!("Native monitor GPU: measured process readings={}, tool states={:?}",next.processes.iter().filter(|p|p.gpu.percent.is_some()).count(),next.gpu_tools.iter().map(|tool|(&tool.tool_id,tool.reading.status,tool.reading.percent)).collect::<Vec<_>>());
     }
 }

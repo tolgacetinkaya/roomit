@@ -234,3 +234,21 @@ scan. Ordinary filesystem mutations/permission errors still yield partial result
    GPU/app traffic remain explicitly unavailable; no zero-usage inference.
 7. Confirm no terminal appears when launching the delivery exe. macOS needs its
    own build, picker/Finder, process and network-device acceptance run.
+
+## GPU measurements (0.2.0)
+
+1. Close an older Roomit window and open `artifacts/current/Roomit.exe`. Window
+   title/sidebar must show **0.2.0**, without an extra terminal window.
+2. In **Araçlarım**, wait for two sampling intervals. Active tool cards show GPU
+   percent, partial lower bound or an explicit missing/unsupported reading. Hover
+   the GPU label for coverage/reason. A non-running tool says no running process.
+3. In **Canlı kaynaklar**, filter AI and sort by GPU. Compare a known PID with the
+   OS monitor over comparable intervals and engines. A valid idle reading may
+   be 0%; an absent counter must remain **Ölçülemiyor**. VRAM/cloud GPU is not shown.
+4. Pause over 15 seconds and resume: GPU waits for a new interval. Reopen/switch
+   views and verify GPU values update without resetting filters/search or
+   starting a disk scan. Missing access/provider failures must not keep an old
+   percentage presented as live.
+5. For local models, use an already-authorized workload; do not start a GPU load
+   merely to populate the display. Unknown/custom worker paths can remain outside
+   tool attribution. macOS must explicitly report this provider unsupported.

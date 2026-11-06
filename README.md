@@ -9,6 +9,11 @@ is configured. MIT licensed.
 
 ## Current capabilities
 
+**Current Windows build: 0.2.0 (GPU).** Open
+`G:\special-repos\roomit\artifacts\current\Roomit.exe` after closing an older
+Roomit window. The title and sidebar show 0.2.0. Older executables at the root
+of `artifacts` are historical development builds.
+
 - **AI kontrol merkezi** combines live resource panels, detected AI tools with
   local brand logos, and an interactive AI storage map. **Araçlarım** shows all
   discoveries and their evidence; the control center's list scrolls without
@@ -33,6 +38,12 @@ is configured. MIT licensed.
   Search Chrome/Docker/PID, filter AI processes, sort and page 50 rows at a time.
   Pause/resume is available; leaving the workspace pauses polling. Network rates
   need two samples and reset/disconnected counters never become fabricated traffic.
+- Windows GPU Engine counters now measure local GPU usage in tool cards and the
+  process table (including GPU sorting). Processes sharing an engine are summed;
+  the busiest engine across adapters is reported, never a sum of every engine.
+  Missing/unsupported counters say **Ölçülemiyor**; new measurements warm up and
+  partially covered tool groups show **En az … · kısmi**. A valid measured zero
+  remains distinct. This measures the local GPU, not cloud inference or VRAM.
 - Pick a folder using the native Windows/macOS dialog; its path stays visible.
 - Scan one folder, one selected local disk, or all detected local disks, without opening file contents.
 - Add multiple folders to **Hariç tutulanlar** using the native picker; choices persist
@@ -72,12 +83,14 @@ There is **no deletion, move-to-trash, age filter,
 telemetry, or cloud/LLM call**. Custom AI storage locations and arbitrary tool
 versions are not automatically discovered outside the selected directory.
 
-Per-app GPU/network attribution, LAN-versus-internet separation, container internals,
+Per-app network attribution, LAN-versus-internet separation, container internals,
 browser tabs, and long-term use/unused-file determination are **not implemented**.
 The UI reports those limits explicitly. CPU is normalized to total device capacity;
 process RAM may include shared pages. Only recognized process identities and known
 helpers in the same installation are attributed to an AI tool; launching another
 application does not make that application part of the parent's usage.
+Per-process GPU measurement on macOS is not implemented in this build and is
+reported as unsupported. macOS native build/device acceptance remains pending.
 
 ## Size semantics and limits
 

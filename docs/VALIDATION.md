@@ -1,3 +1,33 @@
+# Windows GPU measurement, version 0.2.0 — 2026-11-06
+
+- **117 tests passed**: 33 core, 49 native, 35 frontend; one existing interactive
+  reveal smoke ignored. Full frontend/core/workspace/native check passed. The
+  final presentation refinement is verified by the subsequent frontend/native
+  build. The delivery executable is PE subsystem 2 (Windows GUI), hash-matched
+  to the build output; manifest identifies source commit, version and path.
+- Real Windows PDH probe (normal user, outside the tool filesystem sandbox):
+  first sample WarmingUp, second Measured, **861 valid engine readings** and four
+  invalid PID counters in that observation. A real integrated monitor observation
+  produced **31 process GPU readings**: Codex/Claude had explicitly partial
+  coverage; Claude Code had NoCounter/None. These are transient observations,
+  not guaranteed counts, GPU workload benchmarks or GUI acceptance evidence.
+- The restricted tool sandbox could not read performance counter name strings;
+  it correctly returned unknown. Repeating the read-only probe with normal
+  Windows registry access produced the real readings above. No machine settings,
+  permissions, drivers or user workloads were changed to make measurement work.
+- Tests cover mixed adapters/engines, shared-engine tool aggregation, measured
+  zero versus unavailable, partial/invalid data, duplicate instances, reused/new
+  PID identities, pause baseline reset and product-bound local-model workers.
+  Frontend tests cover GPU labels, malformed numeric input and unknown-last sort.
+- Browser mocked-IPC tests cover mixed measured zero/missing/partial states,
+  warmup, unsupported/unavailable providers, GPU sorting, AI filtering, and an
+  IPC failure after a successful reading (old GPU percentages become unknown).
+  The sample-data screenshot is `artifacts/qa/gpu-processes.jpg`. Real counter
+  reads are validated separately from the browser fixture.
+- This turn does not claim native GUI, VRAM, cloud GPU or macOS GPU acceptance.
+  No deletion, automatic disk scan or publication added. The one current Windows
+  delivery path is `artifacts/current/Roomit.exe`; older artifacts remain intact.
+
 # AI control center, discovery and interactive map — 2026-11-05
 
 - **107 automated tests passed**: 33 core, 41 native, 33 frontend; one existing

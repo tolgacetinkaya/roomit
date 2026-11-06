@@ -41,6 +41,39 @@ reset or disconnected interfaces produce unknown rates. The user selects an
 adapter; virtual/VPN interfaces are not summed into a misleading device total.
 There is no per-app traffic or LAN/internet distinction in this phase.
 
+### Windows GPU (0.2.0)
+
+`gpu/windows.rs` owns a language-neutral PDH `GPU Engine(*) / Utilization Percentage`
+query in the monitor sampler mutex. It uses native DLL calls; no shell, external
+CLI, driver installation, elevated helper or GPU workload is launched. The first
+interval warms up; a pause over 15 seconds resets the baseline. Failed queries
+retry after 10 seconds, returning explicit unknown status rather than cached values.
+Native buffers are aligned, bounded to 16 MiB, checked for valid string ranges and
+retried at most three times if instance counts change during retrieval.
+
+`gpu.rs` validates instance PID/adapter/engine identity and finite valid-status
+percentages. Stable nonzero process start times guard PID reuse. Missing/invalid
+counters stay unknown. Per-process engine counters are indexed so process rows
+do not repeatedly scan the entire array. Duplicate identities are conservatively
+deduplicated and marked partial. Shared-engine process values sum first; only the
+busiest engine is selected across engines/adapters. Tool groups with incomplete
+coverage expose measured lower bounds and a coverage explanation. A numeric zero
+requires valid measured data; an absent counter is never an implicit zero.
+
+Local model workers are recognized only by known binary names plus product-specific
+LM Studio/Ollama paths. Arbitrary worker binaries and child applications are not
+charged to those tools. These are recognized local process measurements, not a
+universal process-ownership guarantee or cloud-model GPU measurement.
+
+The UI shows GPU per tool, per process and across recognized AI processes, with
+GPU sorting and visible unknown/partial labels. IPC failures clear displayed GPU
+percentages; unsupported platforms report unavailability. macOS per-process GPU
+and VRAM remain outside this implementation.
+
+API references: [PDH language-neutral counters](https://learn.microsoft.com/en-us/windows/win32/api/pdh/nf-pdh-pdhaddenglishcounterw),
+[wildcard arrays](https://learn.microsoft.com/en-us/windows/win32/api/pdh/nf-pdh-pdhgetformattedcounterarrayw),
+[Microsoft's GPU engine aggregation explanation](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/).
+
 ## Storage map
 
 `map-model.ts` builds tool/location boundaries after existing nested de-duplication.
@@ -56,7 +89,7 @@ readable and request manual rescanning to add the new parent metadata.
 
 - Extend detection to more catalogs, custom installations, plugins and isolated
   environments with visible evidence/coverage rather than a universal claim.
-- Add platform-specific per-process GPU and app-network providers. Missing access
+- Extend GPU coverage to macOS and add app-network providers. Missing access
   or unsupported counters must stay unknown, never zero. No driver, privileged
   packet tracing or permission expansion is enabled in this phase.
 - Add a tool-specific temporary/cache taxonomy and optional longitudinal usage
