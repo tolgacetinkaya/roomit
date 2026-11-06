@@ -3106,7 +3106,7 @@ dependencies = [
 
 [[package]]
 name = "roomit"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "base64 0.22.1",
  "minisign-verify",
@@ -3128,7 +3128,7 @@ dependencies = [
 
 [[package]]
 name = "roomit-core"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "serde",
  "serde_json",

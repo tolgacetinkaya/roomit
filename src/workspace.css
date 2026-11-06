@@ -65,6 +65,11 @@ main { max-width:1600px; }
 .installed-tool-heading p { font-size:10px; margin:3px 0 0; }
 .tool-state { align-self:flex-start; color:#a5c6ff; background:#213752; border:1px solid #355171; border-radius:5px; padding:4px 6px; font-size:9px; white-space:nowrap; }
 .tool-state.data-only { color:#c1c9d5; border-color:#414d5d; background:#25303e; }
+.tool-activity-summary { grid-column:1/-1; margin:0 0 10px; color:#a9c9fc; font-size:12px; }
+.installed-tools .installed-tool.is-running { background:#182b44; border:1px solid #416eac; box-shadow:inset 3px 0 #5999ff; padding:16px; }
+.control-workspace .installed-tools .installed-tool.is-running { margin:4px 0; padding:13px 10px; }
+.tool-state.running-state { color:#d2e5ff; background:#234b79; border-color:#5287cb; }
+.running-state::before { content:""; display:inline-block; width:6px; height:6px; margin-right:5px; border-radius:50%; background:#79b4ff; }
 .tool-live { font-size:10px; color:#adbed7; margin:15px 0 12px; line-height:1.6; }
 .tool-storage { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0; border-top:1px solid #2b374b; font-size:11px; }
 .tool-storage span { color:#9fb1cd; }

@@ -6,6 +6,7 @@ import type { GroupedReport } from "./groups";
 import { renderStorageMap } from "./storage-map";
 import { toolLogo, toolId } from "./tool-logos";
 import { toolUsage, gpuText } from "./workspace-model";
+import {activityState,prioritizeTools,runningToolIds} from "./tool-activity";
 import type { ProcessRow, GpuReading, ProcessSort } from "./workspace-model";
 import {memoryMode,memoryBreakdown,recordUsage,validPercent} from "./resource-history";
 import type {MemoryMode,UsagePoint} from "./resource-history";
@@ -29,7 +30,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
   let networkName="",processQuery="",processSort:ProcessSort="memory",timer:ReturnType<typeof setTimeout>|undefined;
   let scope=processScope(null);
   try{scope=processScope(localStorage.getItem("roomit-process-scope"));}catch{}
-  let runningIds="";
+  let renderedToolState="";
   const processState:ProcessTableState={expanded:new Set(),memberPages:new Map(),page:0};
   const toolNames=new Map(catalog.map(t=>[t.id,t.name]));
   let processTable:ReturnType<typeof createProcessTable>|null=null;
@@ -51,14 +52,14 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(at>(history[history.length-1]?.at||0)){
         history=recordUsage(history,{at,cpu:validPercent(snapshot.cpuPercent),ram:ram?.usedPercent??null,gpu:gpu&&(gpu.status==="measured"||gpu.status==="partial")?validPercent(gpu.percent):null,gpuPartial:gpu?.status==="partial",breakBefore:pendingBreak});pendingBreak=false;
       }
-      const nextIds=[...new Set(snapshot.processes.filter(p=>p.toolId).map(p=>p.toolId!))].sort().join("|");
-      if(nextIds!==runningIds){runningIds=nextIds;renderTools();}updateLive();}
+      updateLive();}
     catch(e){if(visible()&&!paused){monitorError=String(e);history=recordUsage(history,{at:Date.now(),cpu:null,ram:null,gpu:null,gpuPartial:false,breakBefore:true});updateLive();}}finally{monitorBusy=false;if(visible()&&!paused)timer=setTimeout(()=>void poll(),2000);}
   }
-  document.addEventListener("visibilitychange",()=>{clearTimeout(timer);if(!visible())pendingBreak=true;else void poll();});
+  document.addEventListener("visibilitychange",()=>{clearTimeout(timer);if(!visible())pendingBreak=true;else {updateLive();void poll();}});
   let resizeFrame=0;window.addEventListener("resize",()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(()=>updateLive());});
   function updateLive():void{
     if(!visible())return;
+    if(toolsList&&renderedToolState!==toolStateKey()){renderTools();return;}
     if(metrics){
       const running=snapshot?new Set(snapshot.processes.filter(p=>p.toolId).map(p=>p.toolId)).size:0;
       const available=snapshot?.networks||[];
@@ -80,22 +81,33 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     }
     if(processes)renderProcesses();
   }
+  const toolState=()=>activityState(Boolean(snapshot),paused,Boolean(monitorError),pendingBreak);
+  const toolStateKey=()=>JSON.stringify([toolState(),[...runningToolIds(snapshot?.processes||[])].sort()]);
   function renderTools():void{
     if(!toolsList)return;
+    renderedToolState=toolStateKey();
+    const active=document.activeElement instanceof HTMLElement&&toolsList.contains(document.activeElement)?document.activeElement:null;
+    const focusedCard=active?.closest<HTMLElement>("article[data-tool-id]");
+    const focusIndex=focusedCard&&active?[...focusedCard.querySelectorAll<HTMLElement>("button,summary,a,input,select")].indexOf(active):-1;
     const opened=new Set(Array.from(toolsList.querySelectorAll<HTMLElement>("article[data-tool-id]")).filter(card=>card.querySelector<HTMLDetailsElement>("details")?.open).map(card=>card.dataset.toolId));
     toolsList.replaceChildren();toolsList.setAttribute("aria-busy",String(inventoryBusy));
-    if(inventoryError){toolsList.append(el("p",`Tool discovery failed: ${inventoryError}`,"warning"));return;}
-    if(!inventory){toolsList.append(el("p",isTauri()?"Discovering installed AI tools…":"Tool discovery is available in the desktop app.","hint"));return;}
-    const detected=new Map(inventory.tools.map(t=>[t.id,t]));
+    if(inventoryError)toolsList.append(el("p",`Tool discovery failed: ${inventoryError}. Running tools may still be shown from process measurements.`,"warning"));
+    if(!inventory&&!snapshot){toolsList.append(el("p",isTauri()?"Discovering installed AI tools…":"Tool discovery is available in the desktop app.","hint"));return;}
+    const detected=new Map((inventory?.tools||[]).map(t=>[t.id,t]));
     for(const id of new Set(snapshot?.processes.filter(p=>p.toolId).map(p=>p.toolId!)||[])){
       if(!detected.has(id)){const tool=catalog.find(t=>t.id===id);if(tool)detected.set(id,{id,name:tool.name,kind:tool.kind,installations:[],dataPaths:[],evidence:["Running processes"]});}
     }
-    const tools=[...detected.values()].sort((a,b)=>Number(Boolean(b.evidence.length))-Number(Boolean(a.evidence.length))||a.name.localeCompare(b.name,"en"));
+    const state=toolState(),running=runningToolIds(snapshot?.processes||[]);
+    const tools=prioritizeTools([...detected.values()],running,state);
+    const runningCount=state==="live"?tools.filter(t=>running.has(t.id)).length:0;
+    toolsList.append(el("p",state==="live"?`${runningCount} running now · ${tools.length-runningCount} other tools`:state==="paused"?"Monitoring paused · running status is not live":state==="unavailable"?"Running status unavailable · waiting for a successful measurement":"Checking which tools are running…","tool-activity-summary"));
     const display=tools;
     if(!tools.length)toolsList.append(el("p","No installations or data folders matched the supported catalog. Custom or portable installations may not be detected.","hint"));
     for(const tool of display){
       const card=el("article","","installed-tool");card.dataset.toolId=tool.id;const heading=el("div","","installed-tool-heading"),copy=el("div");copy.append(el("h3",tool.name),el("p",tool.kind,"hint"));
-      const badge=el("span",tool.evidence.length||tool.installations.length?"Detected":"Data only",tool.evidence.length?"tool-state":"tool-state data-only");heading.append(toolLogo(tool.id),copy,badge);
+      const isRunning=state==="live"&&running.has(tool.id);card.classList.toggle("is-running",isRunning);
+      const badge=el("span",isRunning?"Running now":state==="paused"?"Paused":state==="unavailable"?"Status unavailable":state==="waiting"?"Checking status":tool.evidence.length||tool.installations.length?"Detected":"Data only",isRunning?"tool-state running-state":"tool-state data-only");
+      badge.title=isRunning?"A process is running on this device. This does not necessarily mean an AI request is being processed.":"Installation evidence and live running status are separate.";heading.append(toolLogo(tool.id),copy,badge);
       const usage=el("p","","tool-live");usage.dataset.toolUsage=tool.id;
       const gpu=el("p","GPU · Waiting for measurement","tool-gpu");gpu.dataset.toolGpu=tool.id;
       const measured=groups?.ai.filter(g=>toolId(g.title)===tool.id)||[];
@@ -108,6 +120,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       for(const path of paths)details.append(el("p",path,"report-path"));
       details.append(revealActions(paths));card.append(heading,usage,gpu,bytes,details);toolsList.append(card);
     }
+    if(focusedCard&&focusIndex>=0){const restored=[...toolsList.querySelectorAll<HTMLElement>("article[data-tool-id]")].find(card=>card.dataset.toolId===focusedCard.dataset.toolId);restored?.querySelectorAll<HTMLElement>("button,summary,a,input,select")[focusIndex]?.focus({preventScroll:true});}
     updateLive();
   }
   function renderProcesses():void{
@@ -151,7 +164,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     const controlLayout=current==="control"?el("div","","control-layout"):null;
     if(controlLayout){controlLayout.append(renderStorageMap(groups,report?.sizeIndexId, Boolean(report && (!report.totalSizeComplete || report.status!=="completed" || report.resultsTruncated))));container.append(controlLayout);}
     if(current!=="activity"){
-      const panel=el("section","","tool-inventory panel"),heading=el("div","","panel-heading"),title=el("div");title.append(el("h2","Your AI tools"),el("p","Desktop apps and terminal tools, together.","hint"));
+      const panel=el("section","","tool-inventory panel"),heading=el("div","","panel-heading"),title=el("div");title.append(el("h2","Your AI tools"),el("p","Running apps and CLI tools appear first. Running means a detected process, not necessarily an active AI request.","hint"));
       const refresh=document.createElement("button");refresh.type="button";refresh.className="secondary";refresh.textContent="Refresh discovery";refresh.disabled=!isTauri();refresh.onclick=()=>void discover();heading.append(title,refresh);panel.append(heading);
       const disclosure=document.createElement("details");disclosure.className="catalog-note";const summary=document.createElement("summary");summary.textContent=`Discovery scope · ${inventory?.supportedCount||catalog.length} tools`;disclosure.append(summary,el("p",`${catalog.map(t=>t.name).join(" · ")}. Checks PATH, known app locations, and installation records. Custom installations, plugins, WSL, container internals, and AI websites are not automatically discovered.`,"hint"));panel.append(disclosure);
       toolsList=el("div","","installed-tools");panel.append(toolsList);
