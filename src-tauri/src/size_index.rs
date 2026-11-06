@@ -37,8 +37,17 @@ impl IndexWriter {
         #[cfg(not(target_os = "macos"))]
         { vec![path] }
     }
+    #[cfg(test)]
     pub fn new() -> Result<Self, String> {
         let directory = tempfile::Builder::new().prefix("roomit-results-").tempdir().map_err(|e| e.to_string())?;
+        Self::in_directory(directory)
+    }
+    pub fn new_in(parent: &std::path::Path) -> Result<Self, String> {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        let directory = tempfile::Builder::new().prefix("scan-").tempdir_in(parent).map_err(|e| e.to_string())?;
+        Self::in_directory(directory)
+    }
+    fn in_directory(directory: TempDir) -> Result<Self, String> {
         let connection = Connection::open(directory.path().join("results.sqlite")).map_err(|e| e.to_string())?;
         connection.execute_batch("PRAGMA journal_mode=DELETE; PRAGMA synchronous=NORMAL;
             PRAGMA cache_size=-4096; PRAGMA temp_store=FILE; PRAGMA mmap_size=0;
@@ -53,7 +62,7 @@ impl IndexWriter {
         // Close before allowing the temporary directory to be deleted on Windows.
         let Self { connection, directory, .. } = self;
         drop(connection);
-        Ok(IndexSnapshot { id, database: directory.path().join("results.sqlite"), _directory: directory })
+        Ok(IndexSnapshot { id, database: directory.path().join("results.sqlite"), directory: Some(directory), persistent_root: None, retired: AtomicBool::new(false) })
     }
 }
 impl SizeSink for IndexWriter {
@@ -75,18 +84,33 @@ impl SizeSink for IndexWriter {
 
 pub(crate) struct IndexSnapshot {
     pub id: String,
-    database: PathBuf,
-    _directory: TempDir,
+    pub(super) database: PathBuf,
+    pub(super) directory: Option<TempDir>,
+    pub(super) persistent_root: Option<PathBuf>,
+    pub(super) retired: AtomicBool,
+}
+impl Drop for IndexSnapshot {
+    fn drop(&mut self) {
+        if self.retired.load(Ordering::Relaxed) {
+            if let Some(root) = &self.persistent_root { crate::saved_scan::cleanup_generation(&self.database, root); }
+        }
+    }
 }
 #[derive(Clone, Default)]
 pub(crate) struct ResultIndexes(Arc<Mutex<Option<Arc<IndexSnapshot>>>>);
 impl ResultIndexes {
+    #[cfg(test)]
     pub fn clear(&self) -> Result<(), String> {
         let old = self.0.lock().map_err(|_| "Sonuç dizini kilitlenemedi.")?.take();
         drop(old); Ok(())
     }
     pub fn publish(&self, snapshot: IndexSnapshot) -> Result<(), String> {
+        let database = snapshot.database.clone();
+        let persistent = snapshot.persistent_root.is_some();
         let old = self.0.lock().map_err(|_| "Sonuç dizini kilitlenemedi.")?.replace(Arc::new(snapshot));
+        if let Some(old) = &old {
+            if persistent && old.database != database { old.retired.store(true, Ordering::Relaxed); }
+        }
         drop(old); Ok(())
     }
     pub fn get(&self, id: &str) -> Result<Arc<IndexSnapshot>, String> {
@@ -165,10 +189,11 @@ impl IndexSnapshot {
             };
             let has_previous = first.as_ref().map(|cursor| exists(cursor, "<")).transpose()?.unwrap_or(false);
             let has_next = last.as_ref().map(|cursor| exists(cursor, ">")).transpose()?.unwrap_or(false);
-            let entries = values.into_iter().map(|(cursor, complete)| SizedEntry {
-                logical_bytes: u64::MAX - cursor.sort_key.parse::<u64>().expect("index keys are produced by size_key"),
-                path: cursor.path, kind: if kind == 0 { EntryKind::File } else { EntryKind::Directory }, size_complete: complete,
-            }).collect();
+            let entries = values.into_iter().map(|(cursor, complete)| {
+                let key = cursor.sort_key.parse::<u64>().map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))?;
+                Ok(SizedEntry { logical_bytes: u64::MAX - key,
+                    path: cursor.path, kind: if kind == 0 { EntryKind::File } else { EntryKind::Directory }, size_complete: complete })
+            }).collect::<rusqlite::Result<_>>()?;
             Ok(SizePage { entries, total, first, last, has_previous, has_next })
         })();
         result.map_err(|error| if cancel.load(Ordering::Relaxed) { "Sonuç yükleme iptal edildi.".into() } else { format!("Sonuçlar okunamadı: {error}") })

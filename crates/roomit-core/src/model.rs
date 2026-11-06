@@ -1,7 +1,7 @@
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::cmp::Ordering;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Category {
     BuildOutput,
@@ -13,33 +13,33 @@ pub enum Category {
     ProtectedData,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Disposition { ReviewRequired, Protected }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum EntryKind { File, Directory }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Finding {
     pub path: String,
     pub kind: EntryKind,
     pub category: Category,
     pub disposition: Disposition,
-    pub tool: &'static str,
-    pub rule_id: &'static str,
-    pub reason: &'static str,
-    #[serde(serialize_with = "serialize_bytes")]
+    pub tool: String,
+    pub rule_id: String,
+    pub reason: String,
+    #[serde(serialize_with = "serialize_bytes", deserialize_with = "deserialize_bytes")]
     pub logical_bytes: u64,
     pub size_complete: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SizedEntry {
-    #[serde(serialize_with = "serialize_bytes")]
+    #[serde(serialize_with = "serialize_bytes", deserialize_with = "deserialize_bytes")]
     pub logical_bytes: u64,
     pub path: String,
     pub kind: EntryKind,
@@ -60,18 +60,18 @@ impl PartialOrd for SizedEntry {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub path: String,
-    pub ecosystems: Vec<&'static str>,
+    pub ecosystems: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ScanStatus { Completed, Cancelled, Limited }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanStats {
     pub files_scanned: u64,
@@ -86,14 +86,14 @@ pub struct ScanStats {
     pub findings_found: u64,
     /// Sum of regular file lengths, counting each encountered directory entry.
     /// Not allocated disk space, hardlink deduplication, or reclaimable bytes.
-    #[serde(serialize_with = "serialize_bytes")]
+    #[serde(serialize_with = "serialize_bytes", deserialize_with = "deserialize_bytes")]
     pub total_logical_bytes: u64,
     /// Union of recognized paths: a nested finding is not summed twice.
-    #[serde(serialize_with = "serialize_bytes")]
+    #[serde(serialize_with = "serialize_bytes", deserialize_with = "deserialize_bytes")]
     pub recognized_logical_bytes: u64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanProgress {
     pub stats: ScanStats,
@@ -103,26 +103,26 @@ pub struct ScanProgress {
     pub root_count: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RootStatus { Completed, Cancelled, Limited, Failed, NotScanned, Excluded }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RootReport {
     pub path: String,
     pub status: RootStatus,
-    #[serde(serialize_with = "serialize_bytes")]
+    #[serde(serialize_with = "serialize_bytes", deserialize_with = "deserialize_bytes")]
     pub logical_bytes: u64,
     pub size_complete: bool,
     pub error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InspectionReport {
     pub root: String,
-    pub scope: &'static str,
+    pub scope: String,
     pub status: ScanStatus,
     pub total_size_complete: bool,
     pub stats: ScanStats,
@@ -141,4 +141,8 @@ pub struct InspectionReport {
 // across IPC/JSON, while Rust callers continue to use numeric counters.
 fn serialize_bytes<S: serde::Serializer>(bytes: &u64, serializer: S) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(&bytes.to_string())
+}
+
+fn deserialize_bytes<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+    String::deserialize(deserializer)?.parse().map_err(serde::de::Error::custom)
 }

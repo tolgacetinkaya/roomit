@@ -220,4 +220,11 @@ footer span:last-child { font-size: 8px; letter-spacing: 1.2px; }
 .automatic-exclusions { border-top: 1px solid var(--line); padding-top: 12px; }
 .automatic-exclusions summary { cursor: pointer; font-size: .8rem; }
 .scan-scope-note { margin-top: 12px; }
+.snapshot-banner, .restore-state { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px 20px; margin-top: 18px; border: 1px solid #35558b; border-radius: 12px; background: #172137; }
+.snapshot-banner > div { min-width: 0; }
+.snapshot-banner strong { font-size: 13px; }
+.snapshot-banner button, .restore-state button { flex-shrink: 0; }
+.snapshot-banner .hint { margin: 4px 0; }
+.restore-state p { font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .snapshot-banner, .restore-state { flex-direction: column; align-items: flex-start; } }
 @media (max-width: 760px) { .exclusion-heading { align-items: flex-start; flex-direction: column; } }

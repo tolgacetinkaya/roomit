@@ -146,3 +146,21 @@ behavior; the browser fixture does not. `artifacts/qa/exclusions.jpg` is labeled
 sample data. The 720 x 600 layout had scrollWidth 705 with no horizontal overflow;
 the viewport was reset and the temporary tab/server closed. Native Windows/Mac
 screen acceptance remains separate.
+
+
+## Saved scan and freshness follow-up — 2026-11-04
+
+The current local scan survives app shutdown. A persistent blue banner shows the
+scan start date, distinguishes restored results, labels partial/cancelled scans,
+and states that files may have changed. **Yeniden tara** uses the same scope and
+fresh disk availability. The banner does not imply detected filesystem changes.
+
+Browser mocked-IPC evidence: scan/reload restored groups with zero new walks;
+5 GB + path search found model-10071 in the saved catalog; a failed rescan kept
+the old report; a missing Z: drive caused no fallback scan; save/load failures
+were explicit; a cancelled saved scan remained partial. The 720 x 600 viewport
+had scrollWidth 705, banner visible and no new scan. Browser warning/error log
+was empty, override reset and own tab/server closed. `artifacts/qa/saved-results.jpg`
+shows clearly labeled sample data. Real native SQLite reopen/replacement and
+retained exact bytes are separately verified in the automated tests. Native UI
+and Mac device acceptance are still pending.

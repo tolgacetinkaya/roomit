@@ -1,3 +1,28 @@
+# Last scan persistence and stale-result notice — 2026-11-04
+
+- **77 automated tests passed**: 33 core, 21 native, 23 frontend; one pre-existing
+  interactive file-manager smoke ignored. Full check (frontend build/tests, core
+  tests, workspace check and native tests) passed. Windows debug/no-bundle build
+  passed and delivery is hash-matched to the native output.
+- A fresh native store reopens the typed report and a **10,073-row** size index
+  after all previous store/snapshot objects drop. It preserves exact u64::MAX,
+  inclusive 5 GB filtering, a match beyond 10,000, bounded 50-row pages, Unicode
+  paths, recognized project findings, cancellation and incomplete-size flags.
+- Native tests verify current-generation survival on shutdown, replacement waiting
+  for a live reader before owned cleanup, interrupted staging and failed-save
+  preservation of the old record, missing/invalid/corrupt snapshot errors without
+  creating/replacing files, and refusing cleanup outside the owned root.
+- Frontend tests cover cancelled/partial titles and valid/invalid scan dates.
+  The notice warns of possible changes; no change detection/watcher is claimed.
+- Browser mocked-IPC checks: initial scan then reload shows saved groups/date with
+  zero new scans; the saved index filters to a result beyond 10,000; rescan errors
+  retain old visible results; a missing disk never falls back to another scope;
+  save/load errors and cancelled saved records are explicit. Browser persistence
+  is a fixture; real SQLite reopening correctness is established above.
+- Scanned files remain unchanged. Existing progress, cancel, size paging/filtering,
+  exclusions and reveal checks stay green. Native desktop screen acceptance and
+  Mac build/APFS/Finder device verification are still pending.
+
 # Persistent exclusions and automatic system/install scope — 2026-11-04
 
 - **71 automated tests passed**: 33 core, 17 native and 21 frontend; one existing

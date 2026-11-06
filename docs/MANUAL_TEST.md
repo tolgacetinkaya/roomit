@@ -134,3 +134,22 @@ scan. Ordinary filesystem mutations/permission errors still yield partial result
 8. On Mac, test `/Applications`, a `.app` moved into Downloads, direct selection
    inside that bundle, and real user data under `/System/Volumes/Data/Users`.
    System/app contents must stay excluded while ordinary user data is eligible.
+
+
+## Last saved scan and freshness
+
+1. Use this build to complete a scan, close Roomit and reopen the same exe. The
+   previous groups and full file/folder lists should appear without a new walk.
+   Older builds did not save their in-memory scans; perform one new scan first.
+2. Check **Kaydedilen tarama sonuçları**, the scan start date and the notice that
+   files may have changed. Apply the GB filter, search and page past 10,000 entries
+   without rescanning. Reveal and its shortcut should still validate live paths.
+3. Change files outside Roomit. Saved results remain historical; this version does
+   not detect edits automatically. Press **Yeniden tara** to measure the current
+   state using current exclusions. Ensure the date refreshes.
+4. Cancel a scan, reopen and verify explicit cancelled/partial labels. Disconnect
+   a scanned disk, reopen and inspect the saved data. Rescan should ask for an
+   available target, with no automatic fallback to all disks.
+5. Verify failure states in a disposable test profile: a broken saved record
+   shows a recovery message, and a failed new scan/save preserves the previous
+   disk record. Do not modify a user's actual saved data for this test.

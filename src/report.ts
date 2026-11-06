@@ -47,6 +47,8 @@ export interface InspectionReport {
   findings: Finding[];
   largestEntries: SizedEntry[];
   sizeIndexId: string;
+  scannedAtMs?: number;
+  persistenceError?: string | null;
   warnings: string[];
   warningsOmitted: number;
   resultsTruncated: boolean;

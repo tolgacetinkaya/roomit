@@ -24,6 +24,11 @@ is configured. MIT licensed.
 - Identify Codex, Claude Code, Cursor and Ollama directories; protect AI data,
   instructions, recognized settings/model stores, Git data and environment files.
 - Live progress, cancellation and clearly labeled partial results.
+- Restore the last saved scan on startup, including grouped results and the entire
+  paged size index. Search and GB filtering work without scanning again.
+- A visible scan date and **Yeniden tara** action explain that saved results may
+  be out of date. This version does not watch filesystem changes or detect edits
+  made while Roomit was closed. Cancelled scans remain explicitly partial.
 - Show result paths in Windows Explorer / macOS Finder with **Klasörde göster**.
   On a focused card/row, use **Ctrl+Enter** (Windows) or **Command+Enter** (Mac).
   Multi-location AI groups ask which location to reveal.
@@ -55,7 +60,7 @@ bounds. All desktop scopes (folder, one disk, computer) have no entry/depth cuto
 The library retains configurable traversal budgets for other callers. A live
 filesystem scan is not an atomic snapshot or proof that an item can be removed.
 
-The desktop streams every measured file/subdirectory into an app-owned temporary
+The desktop streams every measured file/subdirectory into an app-owned local
 SQLite index. The size view has **no 10,000-result cap** and requests only 50 rows
 per file/directory page. Changing GB size or search queries the existing index;
 there is no rescan. Progress, scan cancellation and result-loading cancellation
@@ -64,8 +69,12 @@ root is summarized separately; links and the running app's own result directory
 are excluded. The latter also has a macOS APFS Data alias exclusion.
 
 Scanned user files remain unchanged. The index stores paths, types and sizes on
-the local device; normal scan replacement/app shutdown removes it. Available
-temporary disk space bounds storage, and write failures are shown explicitly.
+the local device. Successful scans (including cancelled/partial results) persist
+under Tauri's per-user app local data folder in `last-scan`. Normal app shutdown
+keeps the current result; a successful replacement retires the previous index
+once its readers finish. Failed scans/saves preserve the previous saved result.
+Write failures are displayed, and unsaved current results are labeled temporary.
+Available local disk space bounds storage.
 No full-result array is kept in the UI. SQLite page caches are configured to
 4 MiB per connection; this is not a total process-memory guarantee.
 
@@ -193,3 +202,20 @@ System/install rules intentionally preserve project directories and AI user data
 outside protected installation trees. Files stored inside an excluded installation
 remain excluded even if they look like project/AI data. On macOS, APFS Data user
 paths remain eligible; system subtrees and their Data aliases are protected.
+
+## Saved results and freshness
+
+The report and complete SQLite index are stored together in one versioned local
+generation. A small `current.json` pointer changes atomically only after the data
+commits. New scans do not overwrite the old generation in place. Startup reads
+only the saved report/schema; result rows are still loaded in 50-row pages.
+Corrupt/missing/unsupported records show a recovery message and are preserved.
+No saved result means the normal empty screen; nothing is scanned automatically.
+
+Snapshots contain paths, classifications and sizes, not scanned file contents.
+Their timestamp is the scan's start time. The always-visible notice describes a
+possible change, not a detected change. **Yeniden tara** uses the saved scope and
+current exclusions; a missing disk prompts for a target instead of scanning all
+disks. Existing reveal actions validate the path against the live filesystem.
+An older exe's in-memory results cannot be recovered after that exe closes; the
+new persistence begins with scans performed using this build.

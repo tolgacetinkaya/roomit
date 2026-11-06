@@ -14,6 +14,7 @@ import { installRevealShortcut, revealShortcut } from "./reveal";
 import { parseMinimumGb } from "./size-filter";
 import { disposeSizeBrowser } from "./size-browser";
 import { installExclusions } from "./exclusions";
+import { snapshotTitle, snapshotDate } from "./snapshot";
 import "./styles.css";
 
 function element<T extends HTMLElement>(selector: string): T {
@@ -49,6 +50,8 @@ let activeScan: string | null = null;
 let cancelRequested = false;
 let pickingFolder = false;
 let rootsLoading = false;
+let restoring = isTauri();
+let preparingRescan = false;
 let disks: LocalDisk[] = [];
 let diskRequest = 0;
 let exclusions: ReturnType<typeof installExclusions> | undefined;
@@ -57,7 +60,7 @@ const target = () => scanTarget(scanMode(), input.value, diskSelect.value, disks
 
 function updateControls(): void {
   const native = isTauri();
-  const scanBusy = Boolean(activeScan) || pickingFolder;
+  const scanBusy = Boolean(activeScan) || pickingFolder || restoring || preparingRescan;
   exclusions?.update(scanBusy);
   const busy = scanBusy || Boolean(exclusions?.busy);
   const mode = scanMode();
@@ -70,6 +73,8 @@ function updateControls(): void {
   refreshRoots.disabled = !native || busy || rootsLoading;
   for (const radio of modeInputs) radio.disabled = !native || busy;
   button.disabled = !native || busy || !exclusions?.ready || !target();
+  element<HTMLButtonElement>("#retry-last-scan").disabled = !native || busy;
+  element<HTMLButtonElement>("#rescan-snapshot").disabled = !native || busy || !exclusions?.ready;
   element("#runtime-note").textContent = !native ? "Tarayıcı önizlemesi · Tarama masaüstü uygulamasında kullanılabilir."
     : mode === "folder" ? "Seçim taramayı başlatmaz. Alt klasörler de incelenir."
     : mode === "disk" ? "Yalnızca seçilen disk · Öğe ve derinlik sınırı yok"
@@ -177,11 +182,20 @@ let lastReport: InspectionReport | null = null;
 let grouped: GroupedReport | null = null;
 let currentView: ResultView = "overview";
 let settingsExpanded = false;
+let restoredReport = false;
 toggleScan.addEventListener("click", () => { settingsExpanded = !settingsExpanded; renderCurrent(); });
 function navigate(view: ResultView): void { currentView = view; renderCurrent(); }
 function renderCurrent(): void {
   clearTimeout(searchTimer);
   disposeSizeBrowser();
+  element("#snapshot-banner").hidden = !lastReport;
+  if (lastReport) {
+    element("#snapshot-title").textContent = snapshotTitle(lastReport, restoredReport);
+    element("#snapshot-date").textContent = snapshotDate(lastReport.scannedAtMs);
+    element("#snapshot-save-error").hidden = !lastReport.persistenceError;
+    element("#snapshot-save-error").textContent = lastReport.persistenceError
+      ? `Bu tarama kaydedilemedi; yalnızca uygulama açıkken kullanılabilir. Önceki kayıt korundu. ${lastReport.persistenceError}` : "";
+  }
   sizeForm.hidden = currentView !== "largest";
   form.hidden = Boolean(lastReport) && !settingsExpanded;
   toggleScan.hidden = !lastReport;
@@ -231,10 +245,50 @@ function renderCurrent(): void {
 function clearReport(): void {
   lastReport = null; grouped = null; search.value = ""; currentView = "overview"; renderCurrent();
 }
-function showReport(report: InspectionReport): void {
+function showReport(report: InspectionReport, restored = false): void {
+  restoredReport = restored;
   settingsExpanded = false;
   lastReport = report; grouped = groupReport(report); currentView = minimumBytes > 0n ? "largest" : "overview"; renderCurrent();
 }
+async function loadLastScan(): Promise<void> {
+  if (!isTauri() || activeScan || pickingFolder) return;
+  restoring = true; updateControls();
+  try {
+    const report = await invoke<InspectionReport | null>("load_last_scan");
+    element("#restore-state").hidden = true;
+    if (report) {
+      const mode = report.scope === "recursive" ? "folder" : report.scope;
+      for (const radio of modeInputs) radio.checked = radio.value === mode;
+      if (mode === "folder") input.value = report.root;
+      showReport(report, true);
+      status.className = ""; status.textContent = "Son kayıt açıldı. Yeniden tarama yapılmadı.";
+      if (mode !== "folder") {
+        await loadComputerRoots();
+        if (mode === "disk") { diskSelect.value = disks.some(disk => disk.path === report.root) ? report.root : ""; renderDisks(); }
+      }
+    }
+  } catch (error) {
+    element("#restore-state").hidden = false;
+    element("#restore-message").textContent = `Kayıtlı sonuçlar açılamadı; kayıt dosyaları korundu. Yeni tarama yapabilir veya yeniden açmayı deneyebilirsin. ${String(error)}`;
+  } finally { restoring = false; updateControls(); }
+}
+element("#retry-last-scan").addEventListener("click", () => void loadLastScan());
+element("#rescan-snapshot").addEventListener("click", async () => {
+  if (!lastReport || activeScan || restoring || preparingRescan || pickingFolder || !exclusions?.ready) return;
+  preparingRescan = true;
+  const report = lastReport;
+  const mode = report.scope === "recursive" ? "folder" : report.scope;
+  settingsExpanded = true; renderCurrent();
+  for (const radio of modeInputs) radio.checked = radio.value === mode;
+  if (mode === "folder") input.value = report.root;
+  else {
+    await loadComputerRoots();
+    if (mode === "disk") { diskSelect.value = disks.some(disk => disk.path === report.root) ? report.root : ""; renderDisks(); }
+  }
+  preparingRescan = false; updateControls();
+  if (target()) form.requestSubmit();
+  else { status.className = "warning"; status.textContent = "Önceki tarama diski şu an kullanılamıyor. Taranacak alanı seç."; }
+});
 for (const tab of viewButtons) tab.addEventListener("click", () => navigate(tab.dataset.view as ResultView));
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderCurrent, 120); });
@@ -250,6 +304,7 @@ exclusions = installExclusions(updateControls, () => {
   status.textContent = lastReport ? "Hariç tutma seçimin kaydedildi. Ekrandaki sonuçlar önceki taramaya ait; yeni seçim için tekrar tara." : "Hariç tutma seçimin kaydedildi.";
 });
 void exclusions.load();
+void loadLastScan();
 updateControls();
 renderCurrent();
 cancelButton.addEventListener("click", async () => {
@@ -273,9 +328,10 @@ cancelButton.addEventListener("click", async () => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const selection = target();
-  if (!selection || !isTauri() || activeScan || pickingFolder || !exclusions?.ready) return;
+  if (!selection || !isTauri() || activeScan || pickingFolder || restoring || preparingRescan || !exclusions?.ready) return;
   const { root, mode } = selection;
   const scanId = crypto.randomUUID();
+  const previousReport = lastReport; const previouslyRestored = restoredReport;
   activeScan = scanId; cancelRequested = false;
   updateControls();
   button.disabled = true; input.disabled = true;
@@ -295,9 +351,11 @@ form.addEventListener("submit", async (event) => {
   try {
     const report = await invoke<InspectionReport>("inspect_workspace", { root, mode, scanId, onProgress });
     showReport(report);
+    element("#restore-state").hidden = true;
     status.textContent = scanSummary(report);
     status.className = report.totalSizeComplete && report.status === "completed" ? "" : "warning";
   } catch (error: unknown) {
+    if (previousReport) showReport(previousReport, previouslyRestored);
     status.className = "warning";
     status.textContent = `Tarama tamamlanamadı: ${String(error)}`;
   } finally {

@@ -4,7 +4,7 @@
 
 Development and AI-tool recognition is primary. Size-threshold search is phase 2
 and has no date/age requirement. Runtime work is local; scanned files are read-only.
-Only app-owned settings and temporary result metadata are written or cleaned up. There is no
+Only app-owned settings and scan-result metadata are written or cleaned up. There is no
 LLM service, hosted API, telemetry, account, publishing, or deletion capability.
 
 ## Layers
@@ -32,7 +32,7 @@ queued after local project evidence is known. Completed child totals propagate
 to their parent. No file contents, hashes or AI transcripts are opened.
 
 File entries are not retained as a full in-memory inventory. Every measured size
-record streams to the native temporary index. A legacy summary min-heap keeps
+record streams to the native local index. A legacy summary min-heap keeps
 100 entries; development/AI summaries retain at most 10,000 findings/projects.
 Library traversal defaults remain 1,000,000 entries / 128 levels, while all desktop
 scopes explicitly disable those budgets. Pending directory queues can grow with
@@ -194,7 +194,7 @@ independent. Desktop folder, disk and computer options have no traversal budgets
 library defaults remain configurable/bounded for external callers.
 
 `src-tauri/src/size_index.rs` writes every record into a uniquely app-created
-temporary SQLite directory. Inserts use cached statements and 1,000-row
+staging SQLite directory in the app local data folder. Inserts use cached statements and 1,000-row
 transactions. The `WITHOUT ROWID` primary B-tree is `(kind, sort_key, path)`;
 `sort_key` is the 20-character zero-padded decimal `u64::MAX - logical_bytes`.
 This preserves exact u64 size order without SQLite signed-integer overflow or
@@ -223,10 +223,12 @@ Apply/navigation so it cannot restart a cancelled result load.
 The registry holds one current snapshot. Arc ownership keeps old readers' files
 alive until those readers finish; replacing/clearing the current index rejects
 old IDs. Temporary directory deletion happens outside registry locks and scan
-cleanup runs on a blocking worker. Normal replacement/shutdown drops owned files;
-abnormal process termination can leave OS temporary data. The current metadata
+cleanup runs on a blocking worker. A committed snapshot survives shutdown.
+A successful replacement retires old app-owned data only after its readers finish.
+Failed/uncommitted staging files are temporary and cleaned up on normal failure;
+abnormal process termination can leave orphaned staging data. The current metadata
 directory is excluded from its own scan, including its APFS Data alias on macOS.
-Only app-created settings and temporary metadata are written; cleanup removes only owned temporary metadata. Scanned files are untouched.
+Only app-created settings and result metadata are written; cleanup removes only owned retired/staging metadata. Scanned files are untouched.
 
 `src/size-browser.ts` replaces, rather than appends, each page. There are at most
 50 visible file cards and 50 directory cards. Previous/Next controls are at both
@@ -271,3 +273,44 @@ Apple describes [system/application domains](https://developer.apple.com/library
 This is a deterministic location policy, not a complete inventory of every
 application-owned file; unregistered/portable/custom paths require user rules.
 No shell, delete/trash command or broad frontend filesystem permission is added.
+
+
+## Last-scan persistence and freshness — 2026-11-04
+
+`SavedScanStore` lives in `app_local_data_dir()/last-scan`; it is automatically
+excluded from all scans, alongside the settings path. `IndexWriter::new_in`
+streams directly into an app-owned random `scan-<suffix>` staging directory,
+avoiding a second full-database copy. Finishing closes the index transaction.
+Saving opens that database read/write, adds one typed report JSON row in a FULL
+synchronous transaction and sets user_version=1. The database and a same-directory
+pointer temporary file are synced before atomic `current.json` replacement.
+Only then is the generation retained beyond process shutdown.
+
+The report and index form one generation; no separated JSON summary can point at
+an unrelated index. The core report now has owned strings and typed Deserialize,
+including exact decimal-string u64 byte fields. The external JSON shape is
+unchanged. Startup validates the pointer/version/path, rejects links/reparse
+points, opens SQLite read-only without CREATE, validates report types and the
+index schema, then publishes the snapshot. No filesystem scan or full index read
+is needed. Invalid index byte keys return query errors rather than panicking.
+
+Index publication swaps Arc snapshots; a successful persistent replacement marks
+the old snapshot retired. Its directory is removed only after the final reader
+drops, with app-root/canonical-parent/generated-name checks. Current persistent
+snapshots survive Drop/shutdown. Failed saves publish session-only results with
+`persistenceError` while retaining the old disk record; failed walks leave the old
+index available. Crashes can leave unreferenced staging/old data, which is not
+broadly swept. Current persistence has one user-facing saved scan, not history.
+
+`load_last_scan` and saves run on blocking workers, with the existing scan registry
+preventing a restore/edit race during scans. The UI starts with controls locked
+while restoring, then loads groups and paged size requests normally. Restored
+scope is retained; **Yeniden tara** re-discovers disk availability and cannot fall
+back to computer scanning. Failed new scans can redisplay the previous report.
+The timestamp is the scan start; partial/cancelled labels survive reopening.
+
+A persistent banner states that files may have changed and results are not live.
+It offers rescan, never claims an observed change, and adds no recursive watcher,
+background scan, date-based file rule or deletion capability. Exclusion changes
+are still reported as applying to the next scan. Native Windows/Mac screen and
+real Mac filesystem acceptance remain separate from automated/mock evidence.

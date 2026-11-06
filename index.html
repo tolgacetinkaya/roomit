@@ -19,7 +19,7 @@
           <button type="button" data-view="largest" aria-pressed="false"><span>Büyük öğeler</span><small>04</small></button>
           <button type="button" data-view="details" aria-pressed="false"><span>Tarama ayrıntıları</span><small>05</small></button>
         </nav>
-        <div class="sidebar-bottom"><div class="local-badge">Yerel ve sana özel</div><p>Dosyaların cihazında kalır.<br />İçerikler açılmaz, dosyalar değiştirilmez.<br />Sonuçlar uygulama açıkken geçici olarak saklanır.</p><span class="build-label">ROOMIT / GELİŞTİRME SÜRÜMÜ</span></div>
+        <div class="sidebar-bottom"><div class="local-badge">Yerel ve sana özel</div><p>Dosyaların cihazında kalır.<br />İçerikler açılmaz, dosyalar değiştirilmez.<br />Son tarama sonuçları bu cihazda saklanır.</p><span class="build-label">ROOMIT / GELİŞTİRME SÜRÜMÜ</span></div>
       </aside>
       <main id="main">
         <header class="page-heading"><div><p class="eyebrow">DEPOLAMA İÇGÖRÜLERİ</p><h1 id="page-title">Genel bakış</h1><p>Projelerin, araçların, dosyaların. Hepsi yerli yerinde.</p></div><span class="read-only">Salt okunur analiz</span></header>
@@ -53,6 +53,11 @@
           </form>
           <p class="hint scan-scope-note">Sistem ve tanınan uygulama kurulumları kapsam dışında. Boyutlar yalnızca taramaya dahil edilen dosyaları gösterir.</p>
           <div class="scan-state"><progress id="scan-progress" aria-label="Tarama sürüyor" hidden></progress><p id="status" role="status" aria-live="polite">Henüz tarama yapılmadı.</p><p id="current-path" class="current-path" aria-live="off"></p></div>
+        </section>
+        <div id="restore-state" class="restore-state" hidden><p id="restore-message" role="status"></p><button id="retry-last-scan" type="button" class="secondary">Kaydı yeniden aç</button></div>
+        <section id="snapshot-banner" class="snapshot-banner" aria-label="Son taramanın güncelliği" hidden>
+          <div><strong id="snapshot-title"></strong><p id="snapshot-date" class="hint"></p><p class="hint">Dosyalar ve klasörler taramadan sonra değişmiş olabilir. Bu sonuçlar canlı güncellenmez; güncel durumu görmek için yeniden tara.</p><p id="snapshot-save-error" class="warning" hidden></p></div>
+          <button id="rescan-snapshot" type="button" class="secondary">Yeniden tara</button>
         </section>
         <section class="report-panel" aria-labelledby="results-title">
           <div class="results-header"><div><p class="eyebrow">02 / KEŞİF</p><h2 id="results-title">Alanının hikâyesi</h2><p id="result-caption" class="muted">İlk taramanla başlayalım.</p></div><div class="search-row"><label for="result-search" class="sr-only">Sonuçlarda ara</label><input id="result-search" type="search" placeholder="Sonuçlarda ara…" disabled /></div></div>

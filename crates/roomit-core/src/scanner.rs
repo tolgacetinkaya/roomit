@@ -121,7 +121,7 @@ fn run_scan<'a, F: FnMut(&ScanProgress)>(
     let root_label = if computer { "Bütün bilgisayar".into() } else { display_path(&plans[0].0) };
     let mut scanner = Scanner {
         report: InspectionReport {
-            root: root_label, scope: if computer { "computer" } else { "recursive" }, status: ScanStatus::Completed,
+            root: root_label, scope: if computer { "computer" } else { "recursive" }.into(), status: ScanStatus::Completed,
             total_size_complete: true, stats: ScanStats::default(), projects: Vec::new(),
             findings: Vec::new(), largest_entries: Vec::new(), warnings: Vec::new(),
             warnings_omitted: 0, results_truncated: false, roots: Vec::new(),
@@ -369,7 +369,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
             if !ecosystems.is_empty() {
                 self.report.stats.projects_found += 1;
                 if self.report.projects.len() < self.options.max_findings {
-                    self.report.projects.push(Project { path: display_path(&frame.path), ecosystems });
+                    self.report.projects.push(Project { path: display_path(&frame.path), ecosystems: ecosystems.into_iter().map(String::from).collect() });
                 } else { self.report.results_truncated = true; }
             }
         }
@@ -401,7 +401,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
         if self.report.findings.len() < self.options.max_findings {
             self.report.findings.push(Finding {
                 path: display_path(path), kind, category: rule.category, disposition: rule.disposition,
-                tool: rule.tool, rule_id: rule.id, reason: rule.reason, logical_bytes: bytes, size_complete: complete,
+                tool: rule.tool.into(), rule_id: rule.id.into(), reason: rule.reason.into(), logical_bytes: bytes, size_complete: complete,
             });
         } else { self.report.results_truncated = true; }
     }
