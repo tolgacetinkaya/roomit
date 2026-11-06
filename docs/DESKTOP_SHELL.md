@@ -1,4 +1,4 @@
-# Integrated desktop shell — 0.3.0
+# Integrated desktop shell — 0.4.1
 
 The supplied Codex screenshot is a structural reference: continuous dark chrome,
 compact grouped navigation and a distinct scrolling workspace. Roomit keeps its
@@ -16,7 +16,11 @@ chat, project trees, editor tabs or nonfunctional File/Edit menus.
   minimize, toggle-maximize, close and start-dragging. Existing getter/event
   permissions suffice for resize/maximized-state updates. No file-write, shell
   or opener permissions were added.
-- Sidebar visibility is stored under `roomit-sidebar-collapsed`. Ctrl+B or
+- Sidebar width is stored under `roomit-sidebar-collapsed`. A collapsed sidebar
+  stays visible as a 64px icon rail, including every navigation action and New
+  scan. Hidden labels retain accessible names; pointer and keyboard focus show
+  tooltips, including current result counts. Existing collapsed preferences use
+  this rail automatically. Ctrl+B or
   Command+B toggles it outside editable fields; the button always remains
   accessible. Menu closes on Escape/outside click and routes to existing views.
 - A menu/sidebar scan action opens the existing configuration, without starting
@@ -39,3 +43,9 @@ and the installed Tauri 2 API/config schema. macOS retains the native titlebar
 functions described by that guide instead of removing the system chrome.
 
 No deletion, automatic rescan, history reset or publication was added.
+
+0.4.1 icon-rail validation: TypeScript/Vite build and all 50 frontend tests pass.
+Browser fixture checks cover 1280×860 and 720×600, icon navigation, keyboard
+tooltips, Ctrl+B, persistence, editable-field shortcut exclusion and preserved
+expanded process groups. Preview data is simulated; macOS device acceptance is
+still pending. Screenshot capture failed with a browser capture timeout.

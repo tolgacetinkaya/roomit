@@ -10,7 +10,7 @@
   <body>
     <header class="titlebar" aria-label="Window and workspace">
       <div class="titlebar-start">
-        <button id="sidebar-toggle" class="chrome-button" type="button" aria-label="Hide sidebar" aria-expanded="true" aria-controls="app-sidebar" title="Hide sidebar (Ctrl+B)"></button>
+        <button id="sidebar-toggle" class="chrome-button" type="button" aria-label="Collapse sidebar" aria-expanded="true" aria-controls="app-sidebar" title="Collapse sidebar (Ctrl+B)"></button>
         <details id="app-menu" class="app-menu">
           <summary><span>Roomit</span><img src="/node_modules/@phosphor-icons/core/assets/regular/caret-down.svg" class="ui-icon" width="12" height="12" alt="" /></summary>
           <div class="app-menu-content">
@@ -20,7 +20,7 @@
             <button type="button" data-shell-view="activity">Live resources</button>
             <hr />
             <button type="button" id="menu-new-scan">New scan…</button>
-            <button type="button" id="menu-sidebar">Hide sidebar</button>
+            <button type="button" id="menu-sidebar">Collapse sidebar</button>
             <hr />
             <button type="button" id="menu-check-updates">Check for updates</button>
             <small>Roomit 0.4.1 · On this device</small>
@@ -34,7 +34,7 @@
     <div class="app">
       <aside id="app-sidebar" class="sidebar" aria-label="Workspace navigation">
         <a class="brand" href="#main" aria-label="Roomit home"><img src="/src/assets/roomit.svg" width="32" height="32" alt="" /><span>roomit<small>Your AI workspace</small></span></a>
-        <button id="sidebar-new-scan" type="button" class="sidebar-new-scan">New scan</button>
+        <button id="sidebar-new-scan" type="button" class="sidebar-new-scan"><span>New scan</span></button>
         <nav id="result-tabs" class="result-tabs" aria-label="Result views">
           <div class="nav-label">AI WORKSPACE</div>
           <button type="button" data-view="control" aria-pressed="true"><span>AI control center</span></button>
@@ -47,7 +47,7 @@
           <button type="button" data-view="largest" aria-pressed="false"><span>Large items</span></button>
           <button type="button" data-view="details" aria-pressed="false"><span>Scan details</span></button>
         </nav>
-        <div class="sidebar-bottom"><div class="local-badge">This device</div><p>Your data stays here.<br />Your files stay unchanged.</p><span class="build-label">ROOMIT 0.4.1 · RELEASE</span></div>
+        <div class="sidebar-bottom"><div class="local-badge" title="Your data stays on this device"><span>This device</span></div><p>Your data stays here.<br />Your files stay unchanged.</p><span class="build-label">ROOMIT 0.4.1 · RELEASE</span></div>
       </aside>
       <main id="main" tabindex="-1">
         <section id="update-banner" class="update-banner" aria-label="App updates" hidden>
