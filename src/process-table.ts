@@ -10,7 +10,7 @@ import {formatCount} from "./report";
 import "./process-table.css";
 
 export interface ProcessTableState {expanded:Set<string>;memberPages:Map<string,number>;page:number;filterKey?:string}
-interface Input {groups:AppGroup[];query:string;aiOnly:boolean;sort:ProcessSort;totalMemory:string;mode:MemoryMode;error:string}
+interface Input {groups:AppGroup[];query:string;scope:import("./process-groups").ProcessScope;sort:ProcessSort;totalMemory:string;mode:MemoryMode;error:string}
 interface Cells {row:HTMLTableRowElement;cpu:HTMLTableCellElement;ram:HTMLTableCellElement;gpu:HTMLTableCellElement}
 interface Child extends Cells {name:HTMLElement}
 interface Group extends Cells {head:HTMLTableSectionElement;body:HTMLTableSectionElement;toggle:HTMLButtonElement;label:HTMLElement;count:HTMLTableCellElement;children:Map<number,Child>;footer:HTMLTableRowElement;previous:HTMLButtonElement;next:HTMLButtonElement;range:HTMLElement;value:AppGroup}
@@ -65,7 +65,7 @@ export function createProcessTable(state:ProcessTableState):{element:HTMLElement
   function paint():void {
     if(!latest)return;const input=latest;
     const active=document.activeElement instanceof HTMLElement&&root.contains(document.activeElement)?document.activeElement:null;
-    const selection=groupPage(input.groups,input.query,input.aiOnly,input.sort,state.page);state.page=selection.page;
+    const selection=groupPage(input.groups,input.query,input.scope,input.sort,state.page);state.page=selection.page;
     const alive=new Set(input.groups.map(group=>group.id));
     for(const id of state.expanded)if(!alive.has(id)){state.expanded.delete(id);state.memberPages.delete(id);}
     for(const id of state.memberPages.keys())if(!alive.has(id))state.memberPages.delete(id);
@@ -101,5 +101,5 @@ export function createProcessTable(state:ProcessTableState):{element:HTMLElement
     pageLabel.textContent=`Page ${state.page+1} of ${selection.pages} · ${formatCount(selection.total)} application groups · ${formatCount(input.groups.reduce((n,g)=>n+g.processes.length,0))} accessible processes`;
     if(active&&document.activeElement!==active){if(active.isConnected)active.focus({preventScroll:true});else (root.querySelector<HTMLButtonElement>(".process-group-toggle")||root).focus({preventScroll:true});}
   }
-  return {element:root,update(input){const key=JSON.stringify([input.query,input.aiOnly,input.sort]);if(key!==filterKey){state.page=0;state.memberPages.clear();filterKey=key;state.filterKey=key;}latest=input;paint();}};
+  return {element:root,update(input){const key=JSON.stringify([input.query,input.scope,input.sort]);if(key!==filterKey){state.page=0;state.memberPages.clear();filterKey=key;state.filterKey=key;}latest=input;paint();}};
 }

@@ -1,6 +1,6 @@
 export type GpuStatus="measured"|"partial"|"warmingUp"|"noCounter"|"unavailable"|"unsupported"|"noProcess";
 export interface GpuReading {percent:number|null;status:GpuStatus;reason:string;measuredProcesses:number;totalProcesses:number}
-export interface ProcessRow { pid:number; name:string; toolId:string|null; cpuPercent:number|null; memoryBytes:string;gpu?:GpuReading;appId?:string;appName?:string }
+export interface ProcessRow { pid:number; name:string; toolId:string|null; cpuPercent:number|null; memoryBytes:string;gpu?:GpuReading;appId?:string;appName?:string;appCategory?:"ai"|"development"|"other" }
 export type ProcessSort="memory"|"cpu"|"gpu";
 const memoryNumber=new Intl.NumberFormat("en-US");
 // RAM follows binary units. Disk sizes and the user's decimal GB filter use

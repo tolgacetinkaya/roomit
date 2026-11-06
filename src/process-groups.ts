@@ -4,6 +4,8 @@ export interface AppGroup {
   id:string;name:string;toolId:string|null;processes:ProcessRow[];
   cpuPercent:number|null;memoryBytes:string;gpu?:GpuReading;
 }
+export type ProcessScope="workspace"|"ai"|"all";
+export function processScope(value:unknown):ProcessScope {return value==="ai"||value==="all"?value:"workspace";}
 export const GROUP_PAGE_SIZE=50;
 export const MEMBER_PAGE_SIZE=50;
 export const processGroupId=(row:ProcessRow):string=>row.appId|| (row.toolId?`tool:${row.toolId}`:`process:${row.pid}`);
@@ -30,9 +32,9 @@ export function groupProcesses(rows:readonly ProcessRow[],readings:ReadonlyMap<s
   }
   return [...groups.values()];
 }
-export function groupPage(groups:readonly AppGroup[],query:string,aiOnly:boolean,sort:ProcessSort,page:number):{groups:AppGroup[];total:number;page:number;pages:number} {
+export function groupPage(groups:readonly AppGroup[],query:string,scope:ProcessScope,sort:ProcessSort,page:number):{groups:AppGroup[];total:number;page:number;pages:number} {
   const key=query.trim().toLocaleLowerCase("en");
-  const matched=groups.filter(g=>(!aiOnly||g.toolId)&&(!key||[g.name,g.toolId||"",...g.processes.map(p=>`${p.name} ${p.pid}`)].some(text=>text.toLocaleLowerCase("en").includes(key))));
+  const matched=groups.filter(g=>(scope==="all"||g.toolId||scope==="workspace"&&g.processes.some(p=>p.appCategory==="ai"||p.appCategory==="development"))&&(!key||[g.name,g.toolId||"",...g.processes.map(p=>`${p.name} ${p.pid}`)].some(text=>text.toLocaleLowerCase("en").includes(key))));
   matched.sort((a,b)=>order(a,b,sort)||a.name.localeCompare(b.name,"en")||a.id.localeCompare(b.id));
   const pages=Math.max(1,Math.ceil(matched.length/GROUP_PAGE_SIZE)),index=Math.max(0,Math.min(page,pages-1));
   return {groups:matched.slice(index*GROUP_PAGE_SIZE,(index+1)*GROUP_PAGE_SIZE),total:matched.length,page:index,pages};

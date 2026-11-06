@@ -12,7 +12,7 @@ import type {MemoryMode,UsagePoint} from "./resource-history";
 import {renderResourceCards,memoryText} from "./resource-cards";
 import "./resources.css";
 import { revealActions } from "./reveal";
-import {groupProcesses} from "./process-groups";
+import {groupProcesses,processScope} from "./process-groups";
 import {createProcessTable} from "./process-table";
 import type {ProcessTableState} from "./process-table";
 export type WorkspaceView="control"|"tools"|"activity";
@@ -26,7 +26,9 @@ const rate=(n:number|null)=>n===null?"Measuring…":`${formatBytes(Math.max(0,Ma
 export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tools"|"activity")=>void):{show:(view:string,report:InspectionReport|null,groups:GroupedReport|null)=>void}{
   let current:string="",report:InspectionReport|null=null,groups:GroupedReport|null=null;
   let inventory:Inventory|null=null,snapshot:Snapshot|null=null,inventoryError="",monitorError="",inventoryBusy=false,monitorBusy=false,paused=false;
-  let networkName="",processQuery="",processSort:ProcessSort="memory",aiOnly=false,timer:ReturnType<typeof setTimeout>|undefined;
+  let networkName="",processQuery="",processSort:ProcessSort="memory",timer:ReturnType<typeof setTimeout>|undefined;
+  let scope=processScope(null);
+  try{scope=processScope(localStorage.getItem("roomit-process-scope"));}catch{}
   let runningIds="";
   const processState:ProcessTableState={expanded:new Set(),memberPages:new Map(),page:0};
   const toolNames=new Map(catalog.map(t=>[t.id,t.name]));
@@ -124,7 +126,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     processGpuNote!.textContent=gpuNote()+" Groups show their busiest GPU engine; child GPU percentages may not add up to the group value.";
     const gpuReadings=new Map((snapshot.appGpu||[]).map(g=>[g.appId,g.reading]));
     for(const gpu of snapshot.gpuTools||[])if(!gpuReadings.has(`tool:${gpu.toolId}`))gpuReadings.set(`tool:${gpu.toolId}`,gpu.reading);
-    processTable.update({groups:groupProcesses(snapshot.processes,gpuReadings,toolNames),query:processQuery,aiOnly,sort:processSort,totalMemory:snapshot.memoryTotal,mode:displayMode,error:monitorError});
+    processTable.update({groups:groupProcesses(snapshot.processes,gpuReadings,toolNames),query:processQuery,scope,sort:processSort,totalMemory:snapshot.memoryTotal,mode:displayMode,error:monitorError});
     const names=snapshot.networks.map(n=>n.name);
     if(JSON.stringify([...networkSelect!.options].map(o=>o.value))!==JSON.stringify(names))networkSelect!.replaceChildren(...names.map(name=>new Option(name,name)));
     networkSelect!.value=networkName;
@@ -156,11 +158,11 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(current==="control"){const all=document.createElement("button");all.type="button";all.className="text-button";all.textContent="View all tools and locations";all.onclick=()=>navigate("tools");panel.append(all);}
       if(inventory?.warnings.length)panel.append(el("p",inventory.warnings.join(" "),"warning"));(controlLayout||container).append(panel);renderTools();
     } else {
-      const panel=el("section","","activity-panel panel"),heading=el("div","","panel-heading");heading.append(el("h2","Running apps and processes"));
+      const panel=el("section","","activity-panel panel"),heading=el("div","","panel-heading");const title=el("h2",scope==="all"?"Running apps and processes":scope==="ai"?"Running AI apps":"Running AI & development apps");heading.append(title);
       const filters=el("div","","activity-filters");const search=document.createElement("input");search.type="search";search.placeholder="Search Chrome, Docker, tool, or PID…";search.setAttribute("aria-label","Search processes");search.value=processQuery;search.oninput=()=>{processQuery=search.value;processState.page=0;renderProcesses();};
       const sort=document.createElement("select");sort.setAttribute("aria-label","Process sort order");sort.add(new Option("RAM: high to low","memory"));sort.add(new Option("CPU: high to low","cpu"));sort.add(new Option("GPU: high to low","gpu"));sort.value=processSort;sort.onchange=()=>{processSort=sort.value as ProcessSort;processState.page=0;renderProcesses();};
-      const only=document.createElement("label"),check=document.createElement("input");check.type="checkbox";check.checked=aiOnly;check.onchange=()=>{aiOnly=check.checked;processState.page=0;renderProcesses();};only.append(check,document.createTextNode("AI only"));filters.append(search,sort,only);
-      processes=el("div");panel.append(heading,el("p","CPU is normalized to total device capacity. RAM is process resident memory; shared pages may be counted in several processes. Docker container internals and individual Chrome tabs are not separated.","hint"),filters,processes);container.append(panel);renderProcesses();
+      const filter=document.createElement("select");filter.setAttribute("aria-label","Process scope");filter.add(new Option("AI & development","workspace"));filter.add(new Option("AI only","ai"));filter.add(new Option("All processes","all"));filter.value=scope;filter.onchange=()=>{scope=processScope(filter.value);title.textContent=scope==="all"?"Running apps and processes":scope==="ai"?"Running AI apps":"Running AI & development apps";try{localStorage.setItem("roomit-process-scope",scope);}catch{}processState.page=0;renderProcesses();};filters.append(search,sort,filter);
+      processes=el("div");panel.append(heading,el("p","AI & development includes recognized AI apps, CLI tools, IDEs, editors and Docker Desktop. Unrecognized apps are available under All processes. Device charts above always show their labeled device/AI totals. CPU is normalized to total device capacity. RAM is process resident memory; shared pages may be counted in several processes. Docker container internals and individual Chrome tabs are not separated.","hint"),filters,processes);container.append(panel);renderProcesses();
     }
     container.append(el("p","Not running does not mean unused. These measurements do not establish past use or whether a file can be safely removed.","hint usage-caveat"));updateLive();
   }

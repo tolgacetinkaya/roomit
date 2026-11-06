@@ -273,7 +273,7 @@ function renderCurrent(): void {
   element("#reveal-hint").hidden = !lastReport;
   element("#reveal-hint").textContent = `Focus an item and press ${revealShortcut} to reveal its location.`;
   const titles: Record<ResultView, string> = { control: "Your AI workspace", tools: "Your AI tools", activity: "Live resources", overview: "Overview", projects: "Projects", ai: "AI storage map", largest: "Large items", details: "Scan details" };
-  const descriptions: Record<ResultView, string> = { control: "Your tools, live resources, and the AI data they leave behind.", tools: "Discover desktop apps and CLI tools in one place.", activity: "Live usage for AI tools, Chrome, Docker, and other processes.", overview: "An overview of your latest scan.", projects: "Dependencies and build outputs, grouped by project.", ai: "Explore the space used by models, history, and AI data folders.", largest: "Explore files and folders by size.", details: "Review scanned locations and skipped areas." };
+  const descriptions: Record<ResultView, string> = { control: "Your tools, live resources, and the AI data they leave behind.", tools: "Discover desktop apps and CLI tools in one place.", activity: "Live usage for AI apps, terminal tools, IDEs and code editors.", overview: "An overview of your latest scan.", projects: "Dependencies and build outputs, grouped by project.", ai: "Explore the space used by models, history, and AI data folders.", largest: "Explore files and folders by size.", details: "Review scanned locations and skipped areas." };
   element("#page-title").textContent = titles[currentView];
   shell.setTitle(titles[currentView]);
   element("#page-description").textContent = descriptions[currentView];

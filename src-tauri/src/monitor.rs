@@ -16,7 +16,7 @@ impl Default for Sampler {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProcessRow {
     pub pid: u32, pub name: String, pub tool_id: Option<String>, pub cpu_percent: Option<f32>, pub memory_bytes: String,
-    pub app_id: String, pub app_name: String,
+    pub app_id: String, pub app_name: String, pub app_category: &'static str,
     pub gpu: crate::gpu::Reading,
 }
 #[derive(Clone, Serialize)]
@@ -68,6 +68,10 @@ fn application_identity(name: &str, exe: Option<&std::path::Path>, tool: Option<
         if binaries.contains(&binary) {
             if let Some(at) = path.find(marker) { identity = path[..at+marker.len()-1].into(); label = app.into(); break; }
         }
+    }
+    if let Some((root, product)) = crate::development::identity(name, &path) {
+        // Keep the existing Docker grouping where the vendor path is known.
+        if label != "Docker Desktop" { identity = root; label = product; }
     }
     use std::hash::{Hash,Hasher};
     let mut hash = std::collections::hash_map::DefaultHasher::new(); identity.hash(&mut hash);
@@ -176,9 +180,12 @@ impl Sampler {
         }
         let mut processes: Vec<_> = self.system.processes().iter().filter(|(pid, _)| pid.as_u32() != 0).map(|(pid,p)| {
             let (app_id,app_name) = application_identity(&p.name().to_string_lossy(),p.exe(),owners.get(&pid.as_u32()).map(String::as_str),pid.as_u32(),p.start_time(),&tools);
+            let app_category = if owners.contains_key(&pid.as_u32()) { "ai" }
+                else if p.exe().is_some_and(|exe| crate::development::identity(&p.name().to_string_lossy(), &exe.to_string_lossy()).is_some()) { "development" }
+                else { "other" };
             ProcessRow {
             pid: pid.as_u32(), name: p.name().to_string_lossy().into_owned(), tool_id: owners.get(&pid.as_u32()).cloned(),
-            app_id, app_name,
+            app_id, app_name, app_category,
             cpu_percent: warmed.then(|| (p.cpu_usage() / cpu_count as f32).clamp(0.0, 100.0)), memory_bytes: p.memory().to_string(),
             gpu: gpu_reading(&[pid.as_u32()]),
         }}).collect();

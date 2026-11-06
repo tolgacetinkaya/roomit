@@ -9,6 +9,7 @@ mod inventory;
 mod monitor;
 mod gpu;
 mod updates;
+mod development;
 
 use std::{
     path::PathBuf,
