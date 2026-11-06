@@ -9,10 +9,21 @@ is configured. MIT licensed.
 
 ## Current capabilities
 
-**Current Windows build: 0.2.0 (GPU).** Open
-`G:\special-repos\roomit\artifacts\current\Roomit.exe` after closing an older
-Roomit window. The title and sidebar show 0.2.0. Older executables at the root
+**Current Windows build: 0.3.0 (integrated desktop shell).** Open
+`G:\special-repos\roomit\artifacts\current\Roomit-0.3.0.exe` after closing an older
+Roomit window. The sidebar and Roomit menu show 0.3.0. Older executables at the root
 of `artifacts` are historical development builds.
+The older `artifacts/current/Roomit.exe` was open/locked during this delivery and
+was preserved; the current manifest points to the versioned 0.3.0 executable.
+
+- The Windows titlebar is integrated into the interface, with custom minimize,
+  maximize/restore, close and drag controls. The Roomit menu and grouped sidebar
+  keep AI resources and file inspection distinct. Toggle the sidebar with its
+  top-left button or Ctrl+B / Command+B; the preference persists locally.
+  macOS uses a native overlay titlebar and keeps its system window controls.
+  Browser layout/interaction checks passed; native window-control acceptance
+  is pending because the Computer Use launch approval timed out. See
+  `docs/DESKTOP_SHELL.md` and `design-qa.md` for evidence and limits.
 
 - **AI kontrol merkezi** combines live resource panels, detected AI tools with
   local brand logos, and an interactive AI storage map. **Araçlarım** shows all

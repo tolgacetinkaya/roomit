@@ -1,3 +1,23 @@
+# Integrated desktop shell, version 0.3.0 — 2026-11-06
+
+- Full existing check suite passed: 33 core, 49 native and 35 frontend tests
+  (117 total; one ignored native reveal smoke). Initial restricted run could not
+  create its test junction; the normal-user-access rerun passed.
+- Windows Tauri debug build completed; final source includes the view-navigation
+  scroll correction. TypeScript/Vite passed in the final build. GUI subsystem
+  and delivered executable hash/version are recorded in the current manifest.
+- Browser mocked-IPC checks: grouped navigation, Roomit menu and Escape,
+  sidebar toggle/keyboard/persistence, no automatic scan from New scan,
+  AI process filter and GPU sort. 1280×860 and 720×600 captured; no console errors.
+- `design-qa.md` passed for browser layout/interaction. Screenshots and native
+  acceptance limitations are listed there and in `docs/DESKTOP_SHELL.md`.
+- Native app launch through Computer Use waited for app approval and timed out;
+  no real native window control/drag/resize acceptance is claimed. macOS uses
+  its native overlay controls in config, but native build/device checks are pending.
+- Delivery is `artifacts/current/Roomit-0.3.0.exe`, version 0.3.0; the prior
+  `Roomit.exe` was open/locked and was not replaced or stopped. No deletion,
+  automatic scan, saved-results reset or publication added.
+
 # Windows GPU measurement, version 0.2.0 — 2026-11-06
 
 - **117 tests passed**: 33 core, 49 native, 35 frontend; one existing interactive

@@ -1,202 +1,78 @@
-# Roomit design QA — 2026-11-04
+# Roomit 0.3.0 — desktop shell QA
 
 final result: passed
 
-Scope: browser-rendered interface and mocked IPC interactions. This is a
-functional desktop redesign, not a pixel clone of Sensei. Native executable
-interaction and macOS acceptance are separate pending checks.
+Scope: **browser visual and interaction acceptance** for the requested Codex-like
+shell adaptation. This is not native window-control or macOS acceptance.
 
-## Sources and evidence
+## Comparison evidence
 
-- Visual source: https://cindori.com/_next/image?q=90&url=%2Fimages%2Fsensei%2Fdashboard-large.png&w=2408
-- Source capture: `artifacts/qa/sensei-reference.jpg` (1280 x 720).
-- Implementation: `artifacts/qa/roomit-overview.jpg` (1265 x 712 visible screenshot).
-- Combined comparison: `artifacts/qa/design-comparison.jpg` (2560 x 764).
-- Focused interaction evidence: `artifacts/qa/project-details.jpg` and
-  `artifacts/qa/roomit-cancelled.jpg`.
-- Responsive captures: `artifacts/qa/roomit-1120.jpg`, `roomit-720.jpg`.
-- Browser: in-app browser. Default viewport 1280 x 720, also explicitly checked
-  1120 x 820 and minimum 720 x 600 CSS viewports; overrides reset afterward.
-  The browser screenshot surface fits overridden viewports within its canvas;
-  responsive acceptance uses DOM geometry as well as the visible capture.
-- Source and default implementation use the same 1280 x 720 browser surface.
-  Scrollbar/screenshot visible-area differences are retained, not stretched.
-  The reference depicts a Mac app inside a marketing image; Roomit is an
-  unframed live web surface. No 1:1 pixel-match claim is made.
-- State: completed single-disk scan, mocked data visibly labeled ORNEK in the
-  header. The source is a hardware dashboard; only its navigation/card layout
-  is the approved inspiration. All Roomit values are fixture data, not actual
-  user disk measurements. The ignored `.local/qa` harness is never bundled.
+- Source visual truth: user attachment
+  `C:/Users/Tolga/AppData/Local/Temp/codex-clipboard-c95b1352-3e63-42c8-9f29-141b846836ed.png`
+  (3838×2082 pixels). Opened together with the implementation in the same image
+  comparison input. Source file remains outside the repository.
+- Implementation: `artifacts/qa/shell-control.png`, 1280×860 pixels, CSS viewport
+  1280×860 at 1×; restored sample scan, AI control center, sidebar open, menu closed.
+- Additional evidence: `artifacts/qa/shell-menu.png` (1280×860),
+  `artifacts/qa/shell-narrow.png` (720×600), and
+  `artifacts/qa/shell-activity.png` (1280×860, AI filter/GPU ordering, scrolled).
+- The reference is a different app/content state, supplied for layout direction,
+  not an exact screen clone. Pixel-for-pixel typography/content/state comparison
+  would be misleading. Compare relative region proportions and chrome hierarchy:
+  source sidebar is roughly one-sixth of width, Roomit sidebar 224/1280; a shallow
+  topbar and independent content pane are preserved. No raster upscaling used.
+- Focused evidence: dropdown/menu and 720px captures were inspected separately
+  for readable controls, labels and clipping, in addition to the full-view
+  source/implementation comparison. No source brand assets were copied.
 
 ## Findings and comparison history
 
-1. P2: The expanded scan setup pushed report groups below the first screen.
-   Fixed by automatically collapsing setup to a compact location/status summary
-   once a report arrives. `Alani degistir` reopens it without rescanning.
-   The combined board and final overview show visible metrics and the first
-   project row above the fold. No actionable P0/P1/P2 finding remains.
-2. The earlier green palette was replaced after user feedback with the selected
-   graphite/electric-blue direction. Final palette is intentional, not drift.
-3. A transient Vite edit reload hit an old ignored harness HTML without the new
-   toggle element. Regenerating the harness HTML and reloading fixed it. Final
-   interaction checks ran after this reload; it is not a production exception.
+1. [P2, fixed] Initial capture showed blue OS controls and sidebar scan button.
+   Existing broad primary-button selectors overrode the neutral chrome. Primary
+   colors moved into base button styles, preserving component-specific colors.
+   The control/menu captures show the resulting neutral chrome and blue primary
+   action only.
+2. [P2, fixed] Initial 720px capture retained the previous setup scroll position,
+   leaving the next view's heading partially obscured. New-view navigation now
+   resets only the main pane scroll. Recapture `shell-narrow.png` reports main
+   scrollTop 0 and heading y=64, below the 44px titlebar. Filter/page state is kept.
+3. Final comparison found no remaining actionable P0/P1/P2 browser layout issues.
+   Horizontal overflow check: at 720×600, main client/scroll widths both 530;
+   titlebar scroll width 720. At 1280×860 collapsed, main widths both 1270.
 
-## Required surfaces
+## Required fidelity surfaces
 
-- Typography: native Segoe UI / Apple system family; distinct heading, metric,
-  navigation, metadata and path sizes. Turkish labels render correctly. Long
-  paths wrap in details and truncate in live progress.
-- Layout: fixed left navigation, wide work surface, compact completed-scan panel,
-  aligned three-card metrics. At 720 CSS px, document scrollWidth is 705 px;
-  no horizontal overflow. Vertical scrolling is intentional. Small windows stack
-  metrics, preserve navigation and keep setup actions reachable.
-- Colors: neutral graphite surfaces, restrained blue selection/CTA/size emphasis,
-  muted gray metadata and amber partial/error state. Keyboard focus has a blue
-  outline. Selection also has border/radio/pressed state, not color alone.
-- Assets: existing Roomit vector logo recolored; genuine MIT Phosphor SVG assets.
-  No screenshot content or hardware imagery was copied into the product.
-  Vite emits separate local image files to comply with the native strict CSP.
-- Copy: actual folder/disk/computer scope, logical-byte labels, protected AI data,
-  partial results and read-only status. No deletion or reclaimed-space promise.
+- Typography: existing Segoe UI/system stack retained; 11–12px navigation,
+  25px headings and restrained weights support the reference's desktop density.
+  Narrow-window labels wrap without hiding navigation or window buttons.
+- Spacing/layout: 44px titlebar, grouped 224px sidebar (180px at narrow widths),
+  independent scrolling main/sidebar, compact 36px rows; selected navigation
+  stays clear. The product's map and resource widgets remain intentionally.
+- Colors/tokens: graphite surfaces with restrained electric blue; no new theme
+  or copied Codex purple. Subtle pane dividers replace heavy outer chrome.
+- Assets: original Roomit logo, local product logos and installed Phosphor SVG
+  icons. No generated raster assets were needed; no screenshot used as UI.
+- Copy: Roomit-specific AI/file categories; real functional commands only.
+  Sample IPC values are explicitly marked “ÖRNEK VERİ” in the wide preview.
 
-## Interactions checked with mocked IPC
+## Interaction and validation
 
-- Disk discovery alone does not scan. Selecting G: enables start and displays
-  its own capacity; start receives exactly mode=disk and root=G:\.
-- Active scan shows progress/cancel and disables scope/refresh controls.
-- Cancel returns a partial report, lower-bound metrics and working controls.
-- Completed report compacts setup; reopening it preserves selected disk.
-- Projects navigation, debounced search for roomit and lazy group expansion show
-  the expected target directory and its logical size.
-- Unit/native tests separately verify actual root discovery, selection validation,
-  traversal, cancellation and byte accounting. No real whole-disk scan was run.
+- Sidebar toggle, Ctrl+B and persistence across reload passed.
+- Roomit menu open, Escape close and menu-to-resources navigation passed.
+- New scan opens setup with zero scan invocations; navigation starts no scan.
+- Existing AI-only filtering and GPU ordering passed in the revised shell.
+- Final browser console errors: none. Temporary viewport override reset.
+- Existing automated suite: 117 passed, one ignored native reveal smoke.
+  Initial sandbox run could not create a Windows junction; the full rerun under
+  normal user access passed. Final native build includes presentation/scroll fixes.
 
-## Remaining checks
+## Remaining acceptance gaps
 
-- Windows native screen/picker acceptance by user; native UI launch via Computer
-  Use was unavailable (`Computer Use was not approved to use roomit-design-test`).
-  Browser verification was completed instead. No claim of native screen QA.
-- Real macOS build/device acceptance for picker, volumes/APFS and layout.
-- P3: optional future density preferences. No additional change needed for this scope.
+- Real Windows window controls, dragging/resizing and native frame appearance:
+  Computer Use app launch approval timed out. Do not infer native acceptance
+  from browser mocks, compiled permissions or an executable's GUI subsystem.
+- Native macOS overlay and traffic-light layout: build/device untested.
+- P3: tune density after feedback on the native desktop at the user's DPI scale.
 
-Implementation checklist: visual pass, responsive pass, core interaction pass,
-47 automated tests, Windows executable build and hash comparison.
-
-## Reveal follow-up — 2026-11-04
-
-This is a scoped functional addition, not a new visual direction. The existing
-passed palette/layout review remains historical. Cards now carry a separate
-visible reveal action outside their collapsed details content; nested file rows
-have their own action. The keyboard hint is visible above results. Browser
-fixture interaction evidence covers button target, nested keyboard target,
-multiple locations and recovery after a failed request. Native Windows smoke
-opened the fixture directory; Finder/native Roomit UI acceptance remains pending.
-
-Reveal evidence: `artifacts/qa/reveal-locations.jpg` shows the multi-location
-chooser and direct action on a collapsed card; `reveal-error.jpg` records a
-visible missing-path message. A subsequent valid action succeeded and the
-browser error log was empty. These screenshots use labeled sample data.
-
-## Minimum-size follow-up — 2026-11-04
-
-Scoped feature addition in the existing graphite/blue workspace. **Büyük öğeler**
-now has an accessible minimum GB field, explicit Apply/Clear controls, validation,
-filter summary and separate file/folder counts and lists. Unit/core checks cover
-exact byte boundaries; the in-app browser fixture verified 5 GB and comma input
-without rescanning, plus validation and clearing. Screenshot:
-`artifacts/qa/size-filter-5gb.jpg`. This is sample-data evidence, not a real scan.
-
-Additional size-filter evidence: a 999 GB filter produced both empty states;
-5 GB plus path search retained only the matching ISO. Its reveal action worked
-in the mock adapter. At 720 x 600 CSS px, document scrollWidth was 705 px and
-all filter controls remained reachable (`artifacts/qa/size-filter-720.jpg`).
-Scan invocation count stayed at one throughout. Final browser error log was empty.
-
-## Unlimited result paging follow-up — 2026-11-04
-
-The size view now reads all matches from a local temporary catalog, with 50 rows
-per kind/page and no retained-result cutoff. File/directory counts are exact for
-the measured catalog. Next/Previous replace cards; top/bottom controls and section
-jumps remain usable. Browser fixture evidence verifies 10,123 matches of each
-kind while rendering at most 100 cards, a second page starting at row 50, backwards
-navigation, search beyond row 10,000, delayed-query rejection and query/scan cancel.
-The last manual Apply/navigation cancels a pending search debounce; a cancelled
-query stays cancelled. Native/core data and performance evidence is in VALIDATION.
-This browser evidence uses sample data and does not certify native frame rates.
-
-Browser evidence: `artifacts/qa/unlimited-results.jpg` shows 10,123 matches with
-page controls and the second page. `unlimited-cancelled.jpg` records scan partial
-state. At 720 x 600, document scrollWidth was 705 and only 100 result cards were
-present. Overrides were reset; the final browser error log was empty. After scan
-cancellation, a new scan and second-page navigation both worked.
-
-
-## Persistent exclusions follow-up — 2026-11-04
-
-Added a collapsed **Hariç tutulanlar** section in the existing graphite/blue scan
-panel. User-selected paths, explicit remove-preference actions and an always-on
-automatic protection section are distinct. The included-scope size explanation
-stays visible when completed-scan settings collapse.
-
-Browser mocked-IPC evidence: add two paths, cancel picker with no change, remove
-one preference, reload retained choices, lock editing during scan, retain previous
-choices on save failure and block scanning on load failure even after choosing a
-folder. Native Rust persistence/traversal tests establish actual filesystem
-behavior; the browser fixture does not. `artifacts/qa/exclusions.jpg` is labeled
-sample data. The 720 x 600 layout had scrollWidth 705 with no horizontal overflow;
-the viewport was reset and the temporary tab/server closed. Native Windows/Mac
-screen acceptance remains separate.
-
-
-## Saved scan and freshness follow-up — 2026-11-04
-
-The current local scan survives app shutdown. A persistent blue banner shows the
-scan start date, distinguishes restored results, labels partial/cancelled scans,
-and states that files may have changed. **Yeniden tara** uses the same scope and
-fresh disk availability. The banner does not imply detected filesystem changes.
-
-Browser mocked-IPC evidence: scan/reload restored groups with zero new walks;
-5 GB + path search found model-10071 in the saved catalog; a failed rescan kept
-the old report; a missing Z: drive caused no fallback scan; save/load failures
-were explicit; a cancelled saved scan remained partial. The 720 x 600 viewport
-had scrollWidth 705, banner visible and no new scan. Browser warning/error log
-was empty, override reset and own tab/server closed. `artifacts/qa/saved-results.jpg`
-shows clearly labeled sample data. Real native SQLite reopen/replacement and
-retained exact bytes are separately verified in the automated tests. Native UI
-and Mac device acceptance are still pending.
-
-
-## While-open change monitoring follow-up — 2026-11-04
-
-The existing scan banner now turns amber and shows **Sonuçlar güncel değil** when
-an included native change is observed. It leaves grouped/size results historical
-and does not call scan commands. Incomplete monitoring has a distinct
-**Güncellik doğrulanamıyor** state. Restored data keeps its offline caveat.
-
-Browser mocked-IPC checks retained a 5 GB filter, search model-10071 and its row
-when stale arrived; the scan count remained zero. View navigation retained the
-warning. Only clicking **Yeniden tara** raised the count to one and cleared the
-old warning. A simulated monitoring outage was visible, and a later observed
-change still took precedence. Native notification correctness is separately
-verified by real Windows file operations in the automated suite.
-
-`artifacts/qa/live-change-warning.jpg` is clearly labeled sample data. At 720 x
-600, scrollWidth was 705, the warning remained present and scan count stayed one.
-The console was clean, the override was reset and the own test tab/server closed.
-Native Roomit full-screen acceptance and real Mac FSEvents checks remain pending.
-
-
-## AI scope/navigation fix — 2026-11-05
-
-Removed unconditional overview/largest assignments from scan-clear/report-publish.
-The AI view now exposes **AI klasörlerini tara** and a scope note explaining the
-known user-data roots and that not all detected data is temporary. The setup uses
-four scope cards with a two-column layout below 1100px.
-
-Browser fixture validated selected AI view at scan start/completion/cancellation,
-mode=ai with zero disk-list requests, and reopening the saved cancelled AI result
-in AI view with zero scans/disk-list calls. Native tests separately establish the
-root planner and persistent AI scope. `artifacts/qa/ai-targeted-scan.jpg` is sample
-UI evidence, not user disk data. At 720 x 600, width was 705 with no horizontal
-overflow; the AI action stayed visible. Console was clean, viewport reset and own
-test tab/server closed. Native desktop/Mac screen acceptance is still pending.
+Implementation checklist: browser comparison fixes applied; console checked;
+existing suite passed; native build produced; native acceptance explicitly pending.

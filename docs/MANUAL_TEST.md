@@ -252,3 +252,16 @@ scan. Ordinary filesystem mutations/permission errors still yield partial result
 5. For local models, use an already-authorized workload; do not start a GPU load
    merely to populate the display. Unknown/custom worker paths can remain outside
    tool attribution. macOS must explicitly report this provider unsupported.
+# Integrated desktop shell — 0.3.0
+
+Open `artifacts/current/Roomit-0.3.0.exe`; confirm Roomit 0.3.0 in the menu/sidebar.
+Use the context strip to drag the window; double click to maximize/restore.
+Check edge resizing, minimize, taskbar restoration and close. Confirm the menus
+and window buttons do not drag. These native actions still need manual acceptance.
+
+Toggle the sidebar with the top-left button or Ctrl+B / Command+B and reopen the
+app to verify persistence. Escape and outside click close the Roomit menu.
+Navigate between live resources and the control center; headings should start
+below the titlebar. Test 720×600 and a large window. New scan should open setup
+without scanning. Existing saved results, exclusions and GPU states must remain.
+On macOS, verify native traffic lights, drag, resize and maximize with the overlay.

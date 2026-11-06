@@ -4,27 +4,50 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Roomit 0.2.0 — AI çalışma alanın</title>
+    <title>Roomit 0.3.0 — AI çalışma alanın</title>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
+    <header class="titlebar" aria-label="Pencere ve çalışma alanı">
+      <div class="titlebar-start">
+        <button id="sidebar-toggle" class="chrome-button" type="button" aria-label="Kenar çubuğunu gizle" aria-expanded="true" aria-controls="app-sidebar" title="Kenar çubuğunu gizle (Ctrl+B)"></button>
+        <details id="app-menu" class="app-menu">
+          <summary><span>Roomit</span><img src="/node_modules/@phosphor-icons/core/assets/regular/caret-down.svg" class="ui-icon" width="12" height="12" alt="" /></summary>
+          <div class="app-menu-content">
+            <p>Çalışma alanı</p>
+            <button type="button" data-shell-view="control">AI kontrol merkezi</button>
+            <button type="button" data-shell-view="tools">AI araçlarım</button>
+            <button type="button" data-shell-view="activity">Canlı kaynaklar</button>
+            <hr />
+            <button type="button" id="menu-new-scan">Yeni tarama…</button>
+            <button type="button" id="menu-sidebar">Kenar çubuğunu gizle</button>
+            <small>Roomit 0.3.0 · Bu bilgisayarda</small>
+          </div>
+        </details>
+      </div>
+      <div class="titlebar-context" data-window-drag><span data-window-drag>Bu bilgisayar</span><img src="/node_modules/@phosphor-icons/core/assets/regular/caret-right.svg" class="ui-icon" width="12" height="12" alt="" data-window-drag /><strong id="shell-view-title" data-window-drag>AI çalışma alanın</strong></div>
+      <div class="titlebar-end"><span class="shell-local">Yerel çalışma alanı</span><div class="window-controls" aria-label="Pencere kontrolleri"><button id="window-minimize" class="chrome-button" type="button" aria-label="Pencereyi küçült" title="Küçült"></button><button id="window-maximize" class="chrome-button" type="button" aria-label="Pencereyi büyüt" title="Büyüt"></button><button id="window-close" class="chrome-button" type="button" aria-label="Pencereyi kapat" title="Kapat"></button></div></div>
+    </header>
+    <p id="shell-status" class="shell-status" role="status" hidden></p>
     <div class="app">
-      <aside class="sidebar">
-        <a class="brand" href="#main" aria-label="Roomit ana ekran"><img src="/src/assets/roomit.svg" width="38" height="38" alt="" /><span>roomit<small>AI ALANINI GÖR.</small></span></a>
-        <div class="nav-label">AI ÇALIŞMA ALANIN</div>
+      <aside id="app-sidebar" class="sidebar" aria-label="Çalışma alanı menüsü">
+        <a class="brand" href="#main" aria-label="Roomit ana ekran"><img src="/src/assets/roomit.svg" width="32" height="32" alt="" /><span>roomit<small>AI çalışma alanın</small></span></a>
+        <button id="sidebar-new-scan" type="button" class="sidebar-new-scan">Yeni tarama</button>
         <nav id="result-tabs" class="result-tabs" aria-label="Sonuç görünümleri">
+          <div class="nav-label">AI ÇALIŞMA ALANI</div>
           <button type="button" data-view="control" aria-pressed="true"><span>AI kontrol merkezi</span></button>
           <button type="button" data-view="tools" aria-pressed="false"><span>Araçlarım</span><small id="installed-count">—</small></button>
           <button type="button" data-view="activity" aria-pressed="false"><span>Canlı kaynaklar</span></button>
           <button type="button" data-view="ai" aria-pressed="false"><span>AI depolama haritası</span><small id="ai-count">—</small></button>
+          <div class="nav-label">DOSYA İNCELEME</div>
           <button type="button" data-view="overview" aria-pressed="false"><span>Genel bakış</span></button>
           <button type="button" data-view="projects" aria-pressed="false"><span>Projeler</span><small id="project-count">—</small></button>
           <button type="button" data-view="largest" aria-pressed="false"><span>Büyük öğeler</span></button>
           <button type="button" data-view="details" aria-pressed="false"><span>Tarama ayrıntıları</span></button>
         </nav>
-        <div class="sidebar-bottom"><div class="local-badge">Yerel ve sana özel</div><p>Sonuçların yalnızca bu cihazda.<br />Dosyaların değiştirilmez.</p><span class="build-label">ROOMIT 0.2.0 / GPU · GELİŞTİRME</span></div>
+        <div class="sidebar-bottom"><div class="local-badge">Bu bilgisayar</div><p>Verilerin burada kalır.<br />Dosyaların değiştirilmez.</p><span class="build-label">ROOMIT 0.3.0 · GELİŞTİRME</span></div>
       </aside>
-      <main id="main">
+      <main id="main" tabindex="-1">
         <header class="page-heading"><div><p class="eyebrow">YEREL AI KONTROL MERKEZİN</p><h1 id="page-title">AI çalışma alanın</h1><p id="page-description">Araçların, canlı kaynakların ve geride kalan AI verilerin.</p></div><div class="heading-actions"><span class="read-only">Salt okunur</span><button id="quick-ai-scan" type="button">AI verilerini tara</button><button id="new-scan" type="button" class="secondary">Yeni tarama</button></div></header>
         <section id="ai-scan-panel" class="ai-scan-panel" aria-labelledby="ai-start-title">
           <div class="ai-start-copy"><p class="eyebrow">AI ODAKLI TARAMA</p><h2 id="ai-start-title">AI araçların. Kaynakların.<br />Hepsi tek bir yerde.</h2><p class="ai-start-description">Roomit, bilgisayarındaki AI araçlarını ve bıraktıkları verileri anlaman için tasarlandı. Modelleri, geçmişi ve büyük veri klasörlerini keşfet.</p><div class="ai-start-actions"><button id="scan-ai" type="button">AI klasörlerini tara</button><button id="configure-scan" type="button" class="secondary">Klasör veya disk seç</button></div><p class="hint ai-start-trust">Tüm diskler taranmaz. Dosyaların değiştirilmez.</p></div>

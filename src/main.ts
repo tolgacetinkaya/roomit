@@ -19,6 +19,8 @@ import { installFreshness } from "./freshness";
 import "./styles.css";
 import "./workspace.css";
 import { installWorkspace } from "./workspace";
+import { installShell } from "./shell";
+import "./shell.css";
 
 function element<T extends HTMLElement>(selector: string): T {
   const result = document.querySelector<T>(selector);
@@ -87,6 +89,8 @@ function updateControls(): void {
   element<HTMLButtonElement>("#scan-ai").disabled = !native || busy || !exclusions?.ready;
   element<HTMLButtonElement>("#quick-ai-scan").disabled = !native || busy || !exclusions?.ready;
   element<HTMLButtonElement>("#new-scan").disabled = busy;
+  element<HTMLButtonElement>("#sidebar-new-scan").disabled = busy;
+  element<HTMLButtonElement>("#menu-new-scan").disabled = busy;
   element<HTMLButtonElement>("#configure-scan").disabled = busy;
   element("#runtime-note").textContent = !native ? "Tarayıcı önizlemesi · Tarama masaüstü uygulamasında kullanılabilir."
     : mode === "ai" ? "Yalnızca bilinen AI veri konumları · Özel disk/klasör konumları kapsam dışı"
@@ -201,6 +205,7 @@ let lastReport: InspectionReport | null = null;
 let grouped: GroupedReport | null = null;
 let currentView: ResultView = "control";
 const workspace = installWorkspace(element("#workspace-panel"), navigate);
+const shell = installShell(navigate, () => element<HTMLButtonElement>("#new-scan").click());
 let settingsExpanded = false;
 let restoredReport = false;
 let navigationRevision = 0;
@@ -239,7 +244,11 @@ function renderScanLayout(): void {
   element("#scan-elapsed").hidden = !running;
   element(".report-panel").hidden = ["control", "tools", "activity"].includes(currentView) || (!lastReport && (currentView === "ai" || running || expanded));
 }
-function navigate(view: ResultView): void { navigationRevision++; currentView = view; renderCurrent(); }
+function navigate(view: ResultView): void {
+  const changed = view !== currentView;
+  navigationRevision++; currentView = view; renderCurrent();
+  if (changed) element("#main").scrollTop = 0;
+}
 function renderCurrent(): void {
   clearTimeout(searchTimer);
   disposeSizeBrowser();
@@ -263,6 +272,7 @@ function renderCurrent(): void {
   const titles: Record<ResultView, string> = { control: "AI çalışma alanın", tools: "AI araçların", activity: "Canlı kaynaklar", overview: "Genel bakış", projects: "Projeler", ai: "AI depolama haritası", largest: "Büyük öğeler", details: "Tarama ayrıntıları" };
   const descriptions: Record<ResultView, string> = { control: "Araçların, canlı kaynakların ve geride kalan AI verilerin.", tools: "Masaüstü uygulamaları ve CLI araçlarını birlikte keşfet.", activity: "AI araçları, Chrome, Docker ve diğer süreçlerin canlı kullanımı.", overview: "Son taramanın tamamına bir bakış.", projects: "Bağımlılıklar ve derleme çıktıları, ait oldukları projede.", ai: "Modellerin, geçmişin ve AI veri klasörlerinin kapladığı alanı keşfet.", largest: "Boyutlarına göre dosya ve klasörleri keşfet.", details: "Nerelerin tarandığını ve atlanan alanları incele." };
   element("#page-title").textContent = titles[currentView];
+  shell.setTitle(titles[currentView]);
   element("#page-description").textContent = descriptions[currentView];
   element("#results-title").textContent = currentView === "overview" ? "Tarama özeti" : currentView === "ai" ? "AI depolama alanın" : titles[currentView];
   element("#result-sort-label").hidden = currentView !== "ai" && currentView !== "projects";

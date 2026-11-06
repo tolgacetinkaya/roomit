@@ -50,8 +50,8 @@ p { margin: 7px 0; }
 #root, #result-search, select { min-width: 0; width: 100%; background: #121419; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; font-size: 12px; }
 #root { text-overflow: ellipsis; }
 input::placeholder { color: #939aaa; }
-button { border: 1px solid transparent; border-radius: 8px; padding: 11px 16px; background: var(--accent); color: #ffffff; cursor: pointer; font-size: 12px; font-weight: 650; }
-button:hover:enabled { background: #6491ff; }
+button { border: 1px solid transparent; border-radius: 8px; padding: 11px 16px; background: var(--button-fill); color: #ffffff; cursor: pointer; font-size: 12px; font-weight: 650; }
+button:hover:enabled { background: var(--button-hover); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .secondary { background: #242832; border-color: #3a414f; color: var(--ink); white-space: nowrap; }
 .secondary:hover:enabled { background: #303745; }
@@ -365,6 +365,4 @@ footer { margin-top: 24px; font-size: 11px; }
 .ai-tool-list .group-row { gap: 12px; }
 .ai-tool-list .group-label strong { overflow-wrap: anywhere; }
 .ai-tool-list .group-right strong { font-size: 21px; }
-button:not(.secondary):not(.text-button):not([data-view]) { background: var(--button-fill); }
-button:not(.secondary):not(.text-button):not([data-view]):hover:enabled { background: var(--button-hover); }
 @media (max-width: 1100px) { .ai-tool-list > .group-list { grid-template-columns: 1fr; } }
