@@ -29,6 +29,7 @@ pub(crate) struct NetworkRow { pub name: String, pub received_per_second: Option
 pub(crate) struct Snapshot {
     pub sampled_at_ms: u64, pub cpu_percent: Option<f32>, pub memory_used: String, pub memory_total: String,
     pub memory_installed: Option<String>,
+    pub memory_available: String,
     pub processes: Vec<ProcessRow>, pub networks: Vec<NetworkRow>, pub cpu_count: usize,
     pub gpu_status: String, pub app_network_status: String,
     pub gpu_ai: crate::gpu::Reading, pub gpu_tools: Vec<ToolGpu>,
@@ -153,6 +154,7 @@ impl Sampler {
         let snapshot = Snapshot { sampled_at_ms: SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
             cpu_percent: warmed.then(|| self.system.global_cpu_usage().clamp(0.0, 100.0)), memory_used: self.system.used_memory().to_string(), memory_total: self.system.total_memory().to_string(),
             memory_installed:installed_memory().filter(|bytes|*bytes>=self.system.total_memory()).map(|bytes|bytes.to_string()),
+            memory_available:self.system.available_memory().to_string(),
             processes, networks, cpu_count, gpu_status: gpu_frame.reason.clone(), gpu_ai, gpu_tools,
             app_network_status: "Ağ hızı adaptör bazındadır. Uygulama başına trafik ve LAN / internet ayrımı henüz ölçülmüyor.".into() };
         self.process_starts=process_starts;self.last = Some(Instant::now()); self.cached = Some(snapshot.clone()); snapshot
@@ -211,7 +213,8 @@ impl Sampler {
         std::thread::sleep(std::time::Duration::from_millis(1100));
         let next = sampler.sample(); assert!(next.cpu_percent.is_some());
         if let Some(installed)=&next.memory_installed {assert!(installed.parse::<u64>().unwrap()>=next.memory_total.parse::<u64>().unwrap());}
-        println!("Native RAM bytes: installed={:?}; OS-visible={}; used={}",next.memory_installed,next.memory_total,next.memory_used);
+        assert!(next.memory_available.parse::<u64>().unwrap()<=next.memory_total.parse::<u64>().unwrap());
+        println!("Native RAM bytes: installed={:?}; OS-visible={}; used={}; available={}",next.memory_installed,next.memory_total,next.memory_used,next.memory_available);
         assert!(next.processes.iter().all(|p| p.cpu_percent.is_some_and(|v| (0.0..=100.0).contains(&v))));
         assert!(next.networks.iter().all(|n| n.received_per_second.is_some()));
         assert!(next.processes.iter().all(|p|p.gpu.percent.is_none_or(|value|value.is_finite()&&(0.0..=100.0).contains(&value))));

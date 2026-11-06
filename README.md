@@ -9,12 +9,22 @@ is configured. MIT licensed.
 
 ## Current capabilities
 
-**Current Windows build: 0.3.1 (RAM units and capacity correction).** Open
-`G:\special-repos\roomit\artifacts\current\Roomit-0.3.1.exe` after closing an older
-Roomit window. The sidebar and Roomit menu show 0.3.1. Older executables at the root
+**Current Windows build: 0.4.0 (live resource charts).** Open
+`G:\special-repos\roomit\artifacts\current\Roomit-0.4.0.exe` after closing an older
+Roomit window. The sidebar and Roomit menu show 0.4.0. Older executables at the root
 of `artifacts` are historical development builds.
 The older `artifacts/current/Roomit.exe` was open/locked during this delivery and
-was preserved; the current manifest points to the versioned 0.3.1 executable.
+was preserved; the current manifest points to the versioned 0.4.0 executable.
+
+- CPU, RAM and recognized-AI GPU cards include live two-minute charts on a fixed
+  0–100% scale. History uses actual sequential samples, stays bounded in memory
+  and is not persisted. Missing measurements and pause/hidden intervals are gaps;
+  partial GPU coverage is dashed and remains an explicit lower bound.
+- The RAM card separates used, available and OS-visible total memory, retaining
+  installed capacity separately. Available RAM includes reusable cache. The
+  **RAM gösterimi** selector chooses GiB/MiB, percent or both, applies to device,
+  tool and process values, and persists locally. RAM percentages use OS-visible
+  total as their denominator. See `docs/LIVE_RESOURCES.md`.
 
 - RAM uses binary GiB/MiB throughout device, tool and process displays. On Windows,
   installed firmware capacity is shown separately from OS-visible total memory;

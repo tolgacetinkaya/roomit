@@ -1,3 +1,31 @@
+# Live resource charts, version 0.4.0 — 2026-11-06
+
+- Full check suite passed: 33 core, 50 native and 42 frontend tests (125 total),
+  with one existing ignored reveal smoke. TypeScript/Vite and cargo check passed.
+- New regression checks cover used/available partitioning against OS total,
+  binary capacity percentages, retained settings fallback, bounded history,
+  duplicate/out-of-order timestamps, missing versus zero, pause/missed-sample
+  gaps and partial GPU coverage transitions.
+- Real native read-only monitor probe: installed 137438953472 bytes, OS-visible
+  137123209216, used 33675788288 and available 103447420928 in that observation.
+  Used + available equals OS-visible total. CPU/RAM and 28 GPU process readings
+  were available in this transient probe; this is not a workload benchmark.
+- Browser mocked IPC: measured chart point counts progressed, capacity/percent/
+  both modes changed RAM and process fields, selection survived reload, pause
+  held resource calls at 18 across the observation interval. Missing GPU stayed
+  explicit; after an IPC failure CPU/RAM/GPU/tool usage became unavailable.
+- 1280×860 and 720×600 layouts were checked. Narrow main client/scroll widths
+  both 530px; canvas widths were nonzero and RAM values fit. Screenshot evidence:
+  `artifacts/qa/resources-live.png` and `artifacts/qa/resources-narrow.png`.
+  The wide capture is scrolled to the graph/process view; the narrow capture
+  shows the full RAM breakdown. Final chart descriptions reported 60 real
+  fixture measurements retained per series, and the browser console was empty.
+- Native Windows Tauri build, version/hash match and GUI subsystem are recorded
+  in the delivery manifest. No native GUI launch or macOS device acceptance is
+  claimed this turn. Existing native window-control acceptance gaps remain.
+- Delivery: `artifacts/current/Roomit-0.4.0.exe`. No deletion, scan auto-start,
+  saved-results reset, publication or background benchmark was added.
+
 # RAM units and installed capacity, version 0.3.1 — 2026-11-06
 
 - Full suite passed: 33 core, 50 native, 37 frontend (120 tests), with the one
