@@ -26,9 +26,12 @@ is configured. MIT licensed.
 - Live progress, cancellation and clearly labeled partial results.
 - Restore the last saved scan on startup, including grouped results and the entire
   paged size index. Search and GB filtering work without scanning again.
-- A visible scan date and **Yeniden tara** action explain that saved results may
-  be out of date. This version does not watch filesystem changes or detect edits
-  made while Roomit was closed. Cancelled scans remain explicitly partial.
+- Monitor the last scan's folder/disk/computer scope while Roomit is open.
+  Included file/folder changes show **Sonuçlar güncel değil** without changing
+  results or starting a scan. **Yeniden tara** remains a manual action.
+- A visible scan date and separate offline notice explain that edits made while
+  Roomit was closed are unknown. Cancelled scans remain explicitly partial.
+  Interrupted/incomplete monitoring shows **Güncellik doğrulanamıyor**.
 - Show result paths in Windows Explorer / macOS Finder with **Klasörde göster**.
   On a focused card/row, use **Ctrl+Enter** (Windows) or **Command+Enter** (Mac).
   Multi-location AI groups ask which location to reveal.
@@ -213,9 +216,30 @@ Corrupt/missing/unsupported records show a recovery message and are preserved.
 No saved result means the normal empty screen; nothing is scanned automatically.
 
 Snapshots contain paths, classifications and sizes, not scanned file contents.
-Their timestamp is the scan's start time. The always-visible notice describes a
-possible change, not a detected change. **Yeniden tara** uses the saved scope and
+Their timestamp is the scan's start time. While the app is open, native filesystem
+notifications detect included changes and latch a stale warning until a new scan.
+Notifications do not update sizes or results. Offline changes are still unknown;
+restored results retain a separate possible-change notice. **Yeniden tara** uses the saved scope and
 current exclusions; a missing disk prompts for a target instead of scanning all
 disks. Existing reveal actions validate the path against the live filesystem.
 An older exe's in-memory results cannot be recovered after that exe closes; the
 new persistence begins with scans performed using this build.
+
+## Change monitoring
+
+Windows uses overlapped ReadDirectoryChangesW with one recursive handle per scan
+root plus non-recursive parent watches to detect root rename/replacement. macOS
+uses notify's FSEvents backend. No periodic file enumeration or content hashing
+is used. The UI reads the small monitoring status every two seconds and changes
+only the notice, preserving open filters/pages. This is best-effort monitoring:
+permissions, disconnected roots or dropped event batches produce an explicit
+uncertainty warning instead of a claim that results are current.
+
+Watchers arm before a new scan, so included mutations during the scan can also
+invalidate the resulting report. Failed replacement scans keep the previous
+monitor. New saved reports retain their exclusion policy; older saved reports
+remain readable and use the current policy as a compatibility fallback. The
+app-owned settings/index trees, standard system/install exclusions and app-bundle
+rules are filtered before invalidation. Windows access-only activity is ignored.
+Monitoring is session-only: no background service or observation while closed,
+and observed-change flags are not a durable filesystem journal.

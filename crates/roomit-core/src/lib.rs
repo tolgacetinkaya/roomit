@@ -7,5 +7,6 @@ mod scanner;
 mod exclusions;
 
 pub use model::*;
+pub use exclusions::Exclusions;
 pub use scanner::{ScanOptions, SizeSink, inspect_workspace, scan_locations, scan_workspace,
     scan_locations_with_sink, scan_workspace_with_sink};

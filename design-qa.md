@@ -164,3 +164,23 @@ was empty, override reset and own tab/server closed. `artifacts/qa/saved-results
 shows clearly labeled sample data. Real native SQLite reopen/replacement and
 retained exact bytes are separately verified in the automated tests. Native UI
 and Mac device acceptance are still pending.
+
+
+## While-open change monitoring follow-up — 2026-11-04
+
+The existing scan banner now turns amber and shows **Sonuçlar güncel değil** when
+an included native change is observed. It leaves grouped/size results historical
+and does not call scan commands. Incomplete monitoring has a distinct
+**Güncellik doğrulanamıyor** state. Restored data keeps its offline caveat.
+
+Browser mocked-IPC checks retained a 5 GB filter, search model-10071 and its row
+when stale arrived; the scan count remained zero. View navigation retained the
+warning. Only clicking **Yeniden tara** raised the count to one and cleared the
+old warning. A simulated monitoring outage was visible, and a later observed
+change still took precedence. Native notification correctness is separately
+verified by real Windows file operations in the automated suite.
+
+`artifacts/qa/live-change-warning.jpg` is clearly labeled sample data. At 720 x
+600, scrollWidth was 705, the warning remained present and scan count stayed one.
+The console was clean, the override was reset and the own test tab/server closed.
+Native Roomit full-screen acceptance and real Mac FSEvents checks remain pending.

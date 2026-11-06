@@ -15,6 +15,7 @@ import { parseMinimumGb } from "./size-filter";
 import { disposeSizeBrowser } from "./size-browser";
 import { installExclusions } from "./exclusions";
 import { snapshotTitle, snapshotDate } from "./snapshot";
+import { installFreshness } from "./freshness";
 import "./styles.css";
 
 function element<T extends HTMLElement>(selector: string): T {
@@ -28,6 +29,7 @@ const button = element<HTMLButtonElement>("#inspect-button");
 const cancelButton = element<HTMLButtonElement>("#cancel-button");
 const status = element<HTMLParagraphElement>("#status");
 const results = element<HTMLDivElement>("#results");
+const freshness = installFreshness();
 installRevealShortcut(results);
 const progressBar = element<HTMLProgressElement>("#scan-progress");
 const currentPath = element<HTMLParagraphElement>("#current-path");
@@ -189,9 +191,11 @@ function renderCurrent(): void {
   clearTimeout(searchTimer);
   disposeSizeBrowser();
   element("#snapshot-banner").hidden = !lastReport;
+  freshness.set(lastReport?.sizeIndexId || null);
   if (lastReport) {
     element("#snapshot-title").textContent = snapshotTitle(lastReport, restoredReport);
     element("#snapshot-date").textContent = snapshotDate(lastReport.scannedAtMs);
+    element("#snapshot-offline").hidden = !restoredReport;
     element("#snapshot-save-error").hidden = !lastReport.persistenceError;
     element("#snapshot-save-error").textContent = lastReport.persistenceError
       ? `Bu tarama kaydedilemedi; yalnızca uygulama açıkken kullanılabilir. Önceki kayıt korundu. ${lastReport.persistenceError}` : "";

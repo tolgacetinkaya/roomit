@@ -1,3 +1,28 @@
+# Live change detection with manual rescan — 2026-11-04
+
+- **86 automated tests passed**: 33 core, 27 native, 26 frontend; one existing
+  interactive reveal smoke ignored. Full check passed: frontend build/tests,
+  core tests, workspace check and native tests. Windows debug/no-bundle build
+  passed; the delivery executable is hash-matched to its native output.
+- Real Windows filesystem/ReadDirectoryChangesW tests detect nested file create,
+  overwrite, rename, deletion and root-directory rename. They verify excluded
+  subtree/.app activity and file reads do not stale a result, sibling prefix
+  names still count, old watcher generations stop influencing replacements, and
+  new sessions begin clean. Tests modify/remove only app-created fixture files.
+- Native tests cover Unicode/bounds notification parsing, missing-root coverage,
+  lost-batch uncertainty and preserving a known stale state through a later
+  error. Existing persisted reports lacking watchPolicy remain deserializable.
+- Frontend notice tests distinguish pending/session-active/stale/incomplete and
+  explicitly state that scanning does not start automatically. Browser mocked-IPC
+  checks retain the 5 GB/path filter and matching row when the warning arrives,
+  with scan count still zero; view changes preserve the warning. A user rescan
+  increments the scan count once and resets it; monitoring failure is explicit.
+- Windows monitoring is tested natively, independently of browser UI fixtures.
+  Mac FSEvents code is present but a Mac build/device test remains pending. The
+  notification mechanism is best effort, not an offline or durable change journal.
+- Existing persistence, exclusions, sizing/paging, progress/cancellation and reveal
+  tests stay green. No automatic scan, file contents read, or deletion feature.
+
 # Last scan persistence and stale-result notice — 2026-11-04
 
 - **77 automated tests passed**: 33 core, 21 native, 23 frontend; one pre-existing

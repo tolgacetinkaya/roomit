@@ -56,7 +56,7 @@
         </section>
         <div id="restore-state" class="restore-state" hidden><p id="restore-message" role="status"></p><button id="retry-last-scan" type="button" class="secondary">Kaydı yeniden aç</button></div>
         <section id="snapshot-banner" class="snapshot-banner" aria-label="Son taramanın güncelliği" hidden>
-          <div><strong id="snapshot-title"></strong><p id="snapshot-date" class="hint"></p><p class="hint">Dosyalar ve klasörler taramadan sonra değişmiş olabilir. Bu sonuçlar canlı güncellenmez; güncel durumu görmek için yeniden tara.</p><p id="snapshot-save-error" class="warning" hidden></p></div>
+          <div><strong id="snapshot-title"></strong><p id="snapshot-date" class="hint"></p><p id="snapshot-watch-state" role="status" aria-live="polite"></p><p id="snapshot-freshness" class="hint">Değişiklik izlemesi hazırlanıyor…</p><p id="snapshot-offline" class="hint" hidden>Uygulama kapalıyken oluşan değişiklikler kontrol edilmedi; kayıtlı sonuçlar değişmiş olabilir.</p><p id="snapshot-save-error" class="warning" hidden></p></div>
           <button id="rescan-snapshot" type="button" class="secondary">Yeniden tara</button>
         </section>
         <section class="report-panel" aria-labelledby="results-title">

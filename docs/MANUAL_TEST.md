@@ -145,11 +145,33 @@ scan. Ordinary filesystem mutations/permission errors still yield partial result
    files may have changed. Apply the GB filter, search and page past 10,000 entries
    without rescanning. Reveal and its shortcut should still validate live paths.
 3. Change files outside Roomit. Saved results remain historical; this version does
-   not detect edits automatically. Press **Yeniden tara** to measure the current
-   state using current exclusions. Ensure the date refreshes.
+   now watches included changes while open. Confirm **Sonuçlar güncel değil**
+   appears, then press **Yeniden tara** to measure using current exclusions. Ensure the date refreshes.
 4. Cancel a scan, reopen and verify explicit cancelled/partial labels. Disconnect
    a scanned disk, reopen and inspect the saved data. Rescan should ask for an
    available target, with no automatic fallback to all disks.
 5. Verify failure states in a disposable test profile: a broken saved record
    shows a recovery message, and a failed new scan/save preserves the previous
    disk record. Do not modify a user's actual saved data for this test.
+
+
+## While-open change detection
+
+1. Scan a small test parent with one included subtree and one excluded subtree.
+   Create/edit/rename/remove a disposable included file in Explorer/Finder.
+   Within a few seconds, **Sonuçlar güncel değil** should appear. No progress
+   indicator or automatic rescan should start; result counts/sizes stay historical.
+2. Keep the GB filter, path search and a later page open when the event arrives.
+   Those controls and page rows must remain intact. Switching views must not
+   clear the warning.
+3. Rescan manually, then change only a file inside the excluded subtree. Normal
+   excluded activity should not produce a change warning. Standard protected
+   system/install roots and app-owned result/settings writes are excluded too.
+4. Rename the scanned root or unplug its disk. The UI should report a change or
+   an inability to monitor; it must not claim current results or scan another disk.
+5. Press **Yeniden tara**. A completed replacement resets the previous warning;
+   a mutation during the new walk may correctly make that replacement stale too.
+6. Close Roomit, change a file, then reopen. There was no monitoring while closed;
+   the saved report must keep its offline caveat. While-open flags are session-only.
+7. On Mac, repeat with native FSEvents and verify privacy/access errors are explicit.
+   Do not use browser fixture behavior as native Mac acceptance evidence.

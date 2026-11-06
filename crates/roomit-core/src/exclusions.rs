@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::{Path, PathBuf}};
 
 /// Component boundaries matter: excluding `app` must not exclude `apple`.
 /// Ancestor lookups avoid comparing every file to every installed application.
-pub(crate) struct Exclusions {
+pub struct Exclusions {
     paths: HashSet<PathBuf>,
     app_bundles: bool,
 }

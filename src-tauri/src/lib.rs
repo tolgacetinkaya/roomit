@@ -3,6 +3,7 @@ mod reveal;
 mod size_index;
 mod exclusions;
 mod saved_scan;
+mod watch;
 
 use std::{
     path::PathBuf,
@@ -22,6 +23,7 @@ struct DesktopReport {
     size_index_id: String,
     scanned_at_ms: u64,
     persistence_error: Option<String>,
+    #[serde(default)] watch_policy: Option<watch::WatchPolicy>,
 }
 
 impl ScanRegistry {
@@ -60,6 +62,7 @@ async fn inspect_workspace(
     queries: tauri::State<'_, size_index::QueryRegistry>,
     exclusions: tauri::State<'_, exclusions::ExclusionStore>,
     saved: tauri::State<'_, saved_scan::SavedScanStore>,
+    watches: tauri::State<'_, watch::WatchRegistry>,
 ) -> Result<DesktopReport, String> {
     if mode != "folder" && mode != "computer" && mode != "disk" { return Err("Geçersiz tarama kapsamı.".into()); }
     let lease = state.begin(scan_id)?;
@@ -73,19 +76,26 @@ async fn inspect_workspace(
     excluded_paths.extend(exclusions::automatic_paths().0);
     queries.cancel_all()?;
     let indexes = indexes.inner().clone();
+    let watches = watches.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let _lease = lease; // Releases registry even on scan errors or worker panic.
         // Keep the previous snapshot available until the replacement succeeds.
         let mut writer = size_index::IndexWriter::new_in(&saved.directory).map_err(|e| format!("Sonuç dizini oluşturulamadı: {e}"))?;
         excluded_paths.extend(writer.directories_to_exclude());
+        let roots = if mode == "folder" { vec![PathBuf::from(&root)] } else {
+            let roots = computer::computer_roots()?;
+            if mode == "disk" { vec![computer::selected_root(&root, &roots)?] } else { roots }
+        };
+        let watch_policy = watch::WatchPolicy { excluded_paths: excluded_paths.clone(), app_bundles: cfg!(target_os = "macos"), system_attributes: cfg!(windows) };
+        // Arm before traversal: a mutation during a scan can already invalidate
+        // its measured rows. Failed scans drop this candidate, keeping the old watch.
+        let monitoring = watch::WatchSession::start(_lease.id.clone(), roots.clone(), watch_policy.clone());
         let mut progress = |progress: &roomit_core::ScanProgress| {
                 if on_progress.send(progress.clone()).is_err() {
                     _lease.cancel.store(true, Ordering::Relaxed);
                 }
         };
         let report = if mode == "computer" || mode == "disk" {
-            let roots = computer::computer_roots()?;
-            let roots = if mode == "disk" { vec![computer::selected_root(&root, &roots)?] } else { roots };
             let mut options = roomit_core::ScanOptions::computer(computer::preferred_home(&roots));
             options.excluded_paths = excluded_paths;
             options.exclude_app_bundles = cfg!(target_os = "macos");
@@ -102,9 +112,10 @@ async fn inspect_workspace(
         }.map_err(|error| error.to_string())?;
         let id = _lease.id.clone();
         let mut snapshot = writer.finish(id.clone())?;
-        let mut report = DesktopReport { report, size_index_id: id, scanned_at_ms, persistence_error: None };
+        let mut report = DesktopReport { report, size_index_id: id, scanned_at_ms, persistence_error: None, watch_policy: Some(watch_policy) };
         if let Err(error) = saved.save(&mut snapshot, &report) { report.persistence_error = Some(error); }
         indexes.publish(snapshot)?;
+        watches.publish(monitoring)?;
         Ok(report)
     })
     .await
@@ -120,15 +131,31 @@ async fn computer_scan_roots() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 async fn load_last_scan(saved: tauri::State<'_, saved_scan::SavedScanStore>, indexes: tauri::State<'_, size_index::ResultIndexes>,
-    scans: tauri::State<'_, ScanRegistry>) -> Result<Option<DesktopReport>, String> {
+    scans: tauri::State<'_, ScanRegistry>, exclusions: tauri::State<'_, exclusions::ExclusionStore>, watches: tauri::State<'_, watch::WatchRegistry>) -> Result<Option<DesktopReport>, String> {
     let saved = saved.inner().clone(); let indexes = indexes.inner().clone(); let scans = scans.inner().clone();
+    let exclusions = exclusions.inner().clone(); let watches = watches.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let active = scans.0.lock().map_err(|_| "Tarama durumu okunamadı.")?;
         if active.is_some() { return Err("Tarama sürerken kayıtlı sonuç yüklenemez.".into()); }
         let Some((report, snapshot)) = saved.load()? else { return Ok(None) };
+        let policy = match &report.watch_policy { Some(policy) => policy.clone(), None => {
+            let mut excluded_paths: Vec<PathBuf> = exclusions.paths()?.into_iter().map(PathBuf::from).collect();
+            excluded_paths.extend(exclusions::automatic_paths().0); excluded_paths.push(exclusions.directory()); excluded_paths.push(saved.directory.clone());
+            watch::WatchPolicy { excluded_paths, app_bundles: cfg!(target_os = "macos"), system_attributes: cfg!(windows) }
+        } };
+        let roots = report.report.roots.iter().filter(|r| r.status != roomit_core::RootStatus::Excluded && r.status != roomit_core::RootStatus::NotScanned)
+            .map(|r| PathBuf::from(&r.path)).collect();
+        let monitoring = watch::WatchSession::start(report.size_index_id.clone(), roots, policy);
         indexes.publish(snapshot)?;
+        watches.publish(monitoring)?;
         Ok(Some(report))
     }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn watch_status(index_id: String, watches: tauri::State<'_, watch::WatchRegistry>) -> Result<watch::WatchStatus, String> {
+    let watches = watches.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || watches.status(&index_id)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -190,12 +217,13 @@ pub fn run() {
         .manage(ScanRegistry::default())
         .manage(size_index::ResultIndexes::default())
         .manage(size_index::QueryRegistry::default())
+        .manage(watch::WatchRegistry::default())
         .setup(|app| {
             app.manage(exclusions::ExclusionStore::new(app.path().app_config_dir()?));
             app.manage(saved_scan::SavedScanStore::new(app.path().app_local_data_dir()?.join("last-scan")));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan])
+        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status])
         .run(tauri::generate_context!())
         .expect("Roomit could not start");
 }

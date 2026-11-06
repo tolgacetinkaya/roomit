@@ -309,8 +309,53 @@ scope is retained; **Yeniden tara** re-discovers disk availability and cannot fa
 back to computer scanning. Failed new scans can redisplay the previous report.
 The timestamp is the scan start; partial/cancelled labels survive reopening.
 
-A persistent banner states that files may have changed and results are not live.
-It offers rescan, never claims an observed change, and adds no recursive watcher,
-background scan, date-based file rule or deletion capability. Exclusion changes
-are still reported as applying to the next scan. Native Windows/Mac screen and
+A persistent banner retains the offline possible-change notice for restored data.
+The subsequent change-monitoring implementation below adds a detected-change
+warning while open. It never automatically scans or changes result rows.
+Exclusion changes are still reported as applying to the next scan. Native Windows/Mac screen and
 real Mac filesystem acceptance remain separate from automated/mock evidence.
+
+
+## Native change monitoring — 2026-11-04
+
+`watch::WatchSession` arms on blocking workers before a filesystem walk and before
+publishing restored results. Candidate sessions remain separate from the current
+snapshot; failed walks drop the candidate without replacing the previous monitor.
+Successful publication swaps registry sessions and drops old native handles outside
+the registry lock. A report's optional `watchPolicy` stores the exact user/native
+exclusions used for that scan. Old JSON reports without this field deserialize
+with None and use the current exclusion policy on restore.
+
+Windows uses ReadDirectoryChangesW directly, with read/list-only access and
+read/write/delete sharing so watches do not block normal user operations. A
+recursive directory handle and non-recursive parent handle cover child mutations
+and root rename/removal/replacement. Each worker owns DWORD-aligned 64 KiB buffers,
+boxed OVERLAPPED storage and a completion event. Drop signals a shared stop event,
+cancels pending IO and drains completion before buffers/handles are released.
+Create/remove/rename, size/write/creation/attribute changes count; last-access
+notifications are not requested. Notification records are bounds-checked and
+UTF-16 names preserve Unicode. The documented zero-byte overflow and error paths
+mark monitoring incomplete; they cannot silently leave a healthy status.
+See [Microsoft's ReadDirectoryChangesW contract](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw).
+
+macOS uses target-specific notify 8.2.1 / FSEvents. Access events are ignored;
+need_rescan, empty-path or error notifications produce uncertainty. It does not
+fall back to PollWatcher or file-content hashing. See [notify's native backend
+and event limitations](https://docs.rs/notify/8.2.1/notify/).
+
+Events are matched to component-boundary roots and the shared core `Exclusions`
+matcher (including canonical paths/Windows case folding/.app ancestors). Existing
+Windows SYSTEM/reparse entries are ignored. Deleted entries whose attributes can
+no longer be inspected may conservatively invalidate a result. Coalesced/lost
+notifications are handled conservatively; no complete durable change log is
+claimed. A small root-path metadata check detects lost/deleted/unplugged roots;
+it does not enumerate child entries. Session flags latch an included change until
+replacement; observed-change flags themselves are not persisted across shutdown.
+
+`watch_status(indexId)` returns only snapshot ID, stale flag and optional coverage
+error. The frontend polls serially every two seconds with generation/ID guards,
+updates only the banner and stops polling once stale. It does not rerender result
+lists, alter filters, or call inspect_workspace. Stale events show **Sonuçlar güncel
+değil**; incomplete monitoring shows **Güncellik doğrulanamıyor**. Restored reports
+also retain an offline caveat. New scanning is still exclusively a user action.
+No deletion command or expanded WebView capability is added.

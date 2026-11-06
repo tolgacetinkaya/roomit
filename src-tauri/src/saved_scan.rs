@@ -91,10 +91,18 @@ mod tests {
     use roomit_core::{EntryKind, SizedEntry, SizeSink};
     use std::sync::atomic::AtomicBool;
     fn report(id: &str, root: &Path) -> DesktopReport {
-        DesktopReport { report: roomit_core::inspect_workspace(root).unwrap(), size_index_id: id.into(), scanned_at_ms: 1_794_000_000_000, persistence_error: None }
+        DesktopReport { report: roomit_core::inspect_workspace(root).unwrap(), size_index_id: id.into(), scanned_at_ms: 1_794_000_000_000, persistence_error: None, watch_policy: None }
     }
     fn request(id: &str, query: &str) -> PageRequest {
         PageRequest { index_id: id.into(), request_id: "test-query".into(), kind: "file".into(), minimum_bytes: "5000000000".into(), query: query.into(), cursor: None, direction: "next".into(), include_total: true }
+    }
+    #[test]
+    fn saved_reports_from_before_monitoring_load_without_a_watch_policy() {
+        let fixture = tempfile::tempdir().unwrap();
+        let mut json = serde_json::to_value(report("legacy", fixture.path())).unwrap();
+        json.as_object_mut().unwrap().remove("watchPolicy");
+        let restored: DesktopReport = serde_json::from_value(json).unwrap();
+        assert!(restored.watch_policy.is_none()); assert_eq!(restored.size_index_id, "legacy");
     }
     #[test]
     fn reopened_store_restores_report_exact_bytes_partial_flags_and_full_paged_index() {
