@@ -4,17 +4,16 @@ Your local AI workspace: tools, resources, and the data they leave behind.
 
 Roomit is a local-first Windows/macOS desktop project for understanding files
 left by development and AI tools. Its Rust library is independent of the
-Tauri 2 + TypeScript interface. The repository is local; no remote or publishing
-is configured. MIT licensed.
+Tauri 2 + TypeScript interface. The project is open source under the MIT license:
+[tolgacetinkaya/roomit](https://github.com/tolgacetinkaya/roomit).
 
 ## Current capabilities
 
-**Current Windows build: 0.4.0 (live resource charts).** Open
-`G:\special-repos\roomit\artifacts\current\Roomit-0.4.0.exe` after closing an older
-Roomit window. The sidebar and Roomit menu show 0.4.0. Older executables at the root
-of `artifacts` are historical development builds.
-The older `artifacts/current/Roomit.exe` was open/locked during this delivery and
-was preserved; the current manifest points to the versioned 0.4.0 executable.
+**Current development version: 0.4.0 (live resource charts).**
+Build from source using the instructions below. Local EXEs, test screenshots,
+scan indexes and build caches are excluded from Git; this initial source upload
+does not include a packaged release. The application menu and sidebar show its
+version. Windows behavior has been tested; macOS native acceptance is pending.
 
 - CPU, RAM and recognized-AI GPU cards include live two-minute charts on a fixed
   0–100% scale. History uses actual sequential samples, stays bounded in memory
