@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tolgacetinkaya/roomit/releases/latest">Download</a> ·
+  <a href="#download">Download for Windows or Mac</a> ·
   <a href="#get-started">Get started</a> ·
   <a href="docs/ROADMAP.md">Roadmap</a> ·
   <a href="CONTRIBUTING.md">Contribute</a> ·
@@ -39,11 +39,11 @@ scanned files unchanged. No account or AI API key is required.
 | Can I keep the results? | The latest scan and exclusions persist. Changes detected while Roomit is open show a stale warning; you decide when to rescan. |
 | What about other large files? | Scan a folder, one disk or local disks, then filter **Large items** by minimum GB without rescanning. |
 
-**Current release: [v0.4.4](https://github.com/tolgacetinkaya/roomit/releases/tag/v0.4.4)** — per-app AI data scans with a saved application scope.
-
 ## Download
 
-Open the **[latest Windows release](https://github.com/tolgacetinkaya/roomit/releases/latest)** and choose:
+### Windows x64 · stable release
+
+Get the installer or portable EXE from the **[latest Windows release](https://github.com/tolgacetinkaya/roomit/releases/latest)**.
 
 | File | Use it for |
 | --- | --- |
@@ -56,9 +56,15 @@ for updates → Review update…** offers **Install and restart** or **Download 
 portable EXE**. Installing from a portable copy installs Roomit; it does not replace
 the original portable file. [Update behavior and signatures →](docs/RELEASING.md)
 
-Windows packages carry updater signatures, but currently have no Windows
-Authenticode publisher certificate. **macOS is experimental source support**:
-there is no published Mac binary, and native Mac validation is pending.
+Windows update packages carry Roomit's updater signature. The Windows executables currently ship without an Authenticode publisher certificate.
+
+### Apple Silicon Mac · test release
+
+**[Download the v0.4.4 test DMG](https://github.com/tolgacetinkaya/roomit/releases/download/v0.4.4-macos-test.1/Roomit-0.4.4-macos-arm64.dmg)** for M1 and newer Macs, including M4, running macOS 13 or later. Open the DMG, drag **Roomit** to **Applications**, eject the disk image and launch Roomit from Applications.
+
+The test build uses an ad-hoc signature and has no Apple notarization. If macOS blocks the first launch, follow the [Mac testing guide](docs/MACOS-TESTING.md). Roomit checks for signed Mac updates at startup and every six hours while open and visible. Choose **Review update… → Install and restart** to apply an update.
+
+CPU and RAM monitoring are available on Mac. Per-process GPU readings are currently available on Windows only. Automated Apple Silicon tests and a launch check passed. Interactive M4 testing and a version-to-version update installation are still pending. [Mac test release notes](https://github.com/tolgacetinkaya/roomit/releases/tag/v0.4.4-macos-test.1)
 
 ## Get started
 

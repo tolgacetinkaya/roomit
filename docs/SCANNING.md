@@ -59,7 +59,7 @@ roots are listed. The user's home branch/volume is preferred where possible.
 Overlapping requested roots are partitioned to avoid duplicate measurement.
 On Unix, volume crossings are skipped; macOS APFS System and Data are separate
 roots, avoiding traversal through Data firmlinks from the System tree. These
-skips conservatively mark totals partial. Native Mac behavior awaits testing.
+skips conservatively mark totals partial. Validation of this behavior on a physical MacBook is pending.
 
 Normal OS permissions apply; the app does not request elevation. Inaccessible
 areas, mount boundaries and entry limits yield partial results. Whole-computer

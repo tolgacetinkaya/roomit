@@ -20,7 +20,7 @@ Describe the actual behavior and what you expected instead.
 
 - Roomit version:
 - OS version and architecture:
-- Setup / portable / source build:
+- Installation method (Windows setup, portable EXE, Mac test DMG or source build):
 - Affected tool and version, if relevant:
 - Scan scope, exclusions and partial/stale warnings, if relevant:
 

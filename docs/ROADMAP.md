@@ -11,6 +11,7 @@ schedule or a list of features already available.
 - Per-app scans, an interactive storage map and folder/disk scanning.
 - Persistent exclusions and the latest saved scan, with manual rescan and change warnings.
 - Windows setup, portable EXE and signed updates with installation consent.
+- [Apple Silicon test DMG](../README.md#download) with a separate signed Mac update feed.
 
 ## Proposed priorities
 
@@ -20,7 +21,7 @@ schedule or a list of features already available.
 | 2 | Custom storage locations per tool | Let users attach a folder on another disk to a tool and remember it. Apply exclusions, deduplicate overlaps and handle missing drives without widening the scan. |
 | 3 | Compare scan snapshots | Show which apps and folders grew or shrank, with dates. Compare equivalent scopes and exclusions; never treat a partial scan as proof that data disappeared. |
 | 4 | Resource and storage thresholds | Optional local alerts while Roomit is open. Separate sustained usage from short spikes and let users control notification frequency. |
-| 5 | Broader platform confidence | PR checks in CI, reproducible fixtures, Windows package verification and native Mac validation before publishing a Mac build. |
+| 5 | Broader platform confidence | Expand CI coverage and reproducible fixtures. Verify Windows packages and exercise first launch, scans and a version-to-version update on a physical MacBook. |
 
 ## Explore later
 
