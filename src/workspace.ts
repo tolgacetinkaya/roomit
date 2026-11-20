@@ -5,8 +5,11 @@ import type { InspectionReport } from "./report";
 import type { GroupedReport } from "./groups";
 import { renderStorageMap } from "./storage-map";
 import { toolLogo, toolId } from "./tool-logos";
-import { toolUsage, gpuText } from "./workspace-model";
+import { formatMemory, toolUsage, gpuText } from "./workspace-model";
 import {activityState,prioritizeTools,runningToolIds} from "./tool-activity";
+import {CPU_CEILING, OBSERVATION_MINUTES, RAM_FLOOR, observeToolMemory} from "./tool-memory";
+import type {ToolMemoryObservation} from "./tool-memory";
+import {toolMemoryCard} from "./tool-memory-card";
 import type { ProcessRow, GpuReading, ProcessSort } from "./workspace-model";
 import {memoryMode,memoryBreakdown,recordUsage,validPercent} from "./resource-history";
 import type {MemoryMode,UsagePoint} from "./resource-history";
@@ -36,6 +39,14 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
   let processTable:ReturnType<typeof createProcessTable>|null=null;
   let processGpuNote:HTMLElement|null=null,networkSelect:HTMLSelectElement|null=null,networkReading:HTMLElement|null=null,networkStatus:HTMLElement|null=null;
   let history:UsagePoint[]=[],pendingBreak=false,displayMode:MemoryMode="both";
+  const observations = new Map<string, ToolMemoryObservation>();
+  const memoryCards = new Map<string, ReturnType<typeof toolMemoryCard>>();
+  let samplingGeneration = 0;
+  function interruptSampling() {
+    observations.clear();
+    pendingBreak = true;
+    samplingGeneration++;
+  }
   try{displayMode=memoryMode(localStorage.getItem("roomit-ram-display"));}catch{}
   let metrics:HTMLElement|null=null,toolsList:HTMLElement|null=null,processes:HTMLElement|null=null,sampleLabel:HTMLElement|null=null,networkSummary:HTMLElement|null=null;
   const visible=()=>["control","tools","activity"].includes(current)&&!document.hidden;
@@ -46,20 +57,23 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
   }
   async function poll():Promise<void>{
     clearTimeout(timer);if(!visible()||paused||monitorBusy||!isTauri())return;monitorBusy=true;
-    try{const next=await invoke<Snapshot>("resource_snapshot");if(!visible()||paused){pendingBreak=true;return;}snapshot=next;monitorError="";
+    const generation = samplingGeneration;
+    try{const next=await invoke<Snapshot>("resource_snapshot");if(!visible()||paused||generation!==samplingGeneration)return;snapshot=next;monitorError="";
       const ram=memoryBreakdown(snapshot.memoryTotal,snapshot.memoryUsed,snapshot.memoryAvailable),gpu=snapshot.gpuAi;
       const at=snapshot.sampledAtMs;
+      observeToolMemory(observations, at, snapshot.processes);
       if(at>(history[history.length-1]?.at||0)){
         history=recordUsage(history,{at,cpu:validPercent(snapshot.cpuPercent),ram:ram?.usedPercent??null,gpu:gpu&&(gpu.status==="measured"||gpu.status==="partial")?validPercent(gpu.percent):null,gpuPartial:gpu?.status==="partial",breakBefore:pendingBreak});pendingBreak=false;
       }
       updateLive();}
-    catch(e){if(visible()&&!paused){monitorError=String(e);history=recordUsage(history,{at:Date.now(),cpu:null,ram:null,gpu:null,gpuPartial:false,breakBefore:true});updateLive();}}finally{monitorBusy=false;if(visible()&&!paused)timer=setTimeout(()=>void poll(),2000);}
+    catch(e){if(visible()&&!paused&&generation===samplingGeneration){interruptSampling();monitorError=String(e);history=recordUsage(history,{at:Date.now(),cpu:null,ram:null,gpu:null,gpuPartial:false,breakBefore:true});updateLive();}}finally{monitorBusy=false;if(visible()&&!paused)timer=setTimeout(()=>void poll(),2000);}
   }
-  document.addEventListener("visibilitychange",()=>{clearTimeout(timer);if(!visible())pendingBreak=true;else {updateLive();void poll();}});
+  document.addEventListener("visibilitychange",()=>{clearTimeout(timer);if(!visible())interruptSampling();else {updateLive();void poll();}});
   let resizeFrame=0;window.addEventListener("resize",()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(()=>updateLive());});
   function updateLive():void{
     if(!visible())return;
     if(toolsList&&renderedToolState!==toolStateKey()){renderTools();return;}
+    for (const [id, card] of memoryCards) card.update(observations.get(id));
     if(metrics){
       const running=snapshot?new Set(snapshot.processes.filter(p=>p.toolId).map(p=>p.toolId)).size:0;
       const available=snapshot?.networks||[];
@@ -89,7 +103,9 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     const active=document.activeElement instanceof HTMLElement&&toolsList.contains(document.activeElement)?document.activeElement:null;
     const focusedCard=active?.closest<HTMLElement>("article[data-tool-id]");
     const focusIndex=focusedCard&&active?[...focusedCard.querySelectorAll<HTMLElement>("button,summary,a,input,select")].indexOf(active):-1;
-    const opened=new Set(Array.from(toolsList.querySelectorAll<HTMLElement>("article[data-tool-id]")).filter(card=>card.querySelector<HTMLDetailsElement>("details")?.open).map(card=>card.dataset.toolId));
+    const openGraphs = new Set([...memoryCards].filter(([, card]) => card.element.open).map(([id]) => id));
+    memoryCards.clear();
+    const opened=new Set(Array.from(toolsList.querySelectorAll<HTMLElement>("article[data-tool-id]")).filter(card=>card.querySelector<HTMLDetailsElement>("details.tool-evidence")?.open).map(card=>card.dataset.toolId));
     toolsList.replaceChildren();toolsList.setAttribute("aria-busy",String(inventoryBusy));
     if(inventoryError)toolsList.append(el("p",`Tool discovery failed: ${inventoryError}. Running tools may still be shown from process measurements.`,"warning"));
     if(!inventory&&!snapshot){toolsList.append(el("p",isTauri()?"Discovering installed AI tools…":"Tool discovery is available in the desktop app.","hint"));return;}
@@ -122,7 +138,10 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       if(!tool.evidence.length&&!tool.installations.length)details.append(el("p","A data folder is not proof of installation. It may remain from a previous installation.","hint"));
       const paths=[...new Set([...tool.installations,...tool.dataPaths])];
       for(const path of paths)details.append(el("p",path,"report-path"));
-      details.append(revealActions(paths));card.append(heading,usage,gpu,bytes,actions,details);toolsList.append(card);
+      details.append(revealActions(paths));
+      const memory = toolMemoryCard(tool.name, openGraphs.has(tool.id));
+      memoryCards.set(tool.id, memory);
+      card.append(heading,usage,gpu,memory.element,bytes,actions,details);toolsList.append(card);
     }
     if(focusedCard&&focusIndex>=0){const restored=[...toolsList.querySelectorAll<HTMLElement>("article[data-tool-id]")].find(card=>card.dataset.toolId===focusedCard.dataset.toolId);restored?.querySelectorAll<HTMLElement>("button,summary,a,input,select")[focusIndex]?.focus({preventScroll:true});}
     updateLive();
@@ -155,6 +174,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     return monitorError?`GPU unavailable: no live measurement. ${monitorError}`:`GPU · ${(snapshot?.gpuStatus||"Waiting for measurement").replace(/\.+$/,"")}. GPU usage is measured on this device, not on cloud model servers. Missing values do not mean zero. Partial percentages are measured lower bounds.`;
   }
   function render():void{
+    memoryCards.clear();
     container.replaceChildren();metrics=null;toolsList=null;processes=null;sampleLabel=null;networkSummary=null;processTable=null;processGpuNote=null;networkSelect=null;networkReading=null;networkStatus=null;
     container.classList.toggle("control-workspace",current==="control");
     if(!["control","tools","activity"].includes(current))return;
@@ -163,7 +183,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     for(const [value,text]of [["capacity","GiB / MiB"],["percent","Percent"],["both","Capacity + percent"]])mode.add(new Option(text,value));mode.value=displayMode;
     mode.title="RAM display for cards, tools, and processes. Percentages use the system total. Your preference is saved on this device.";
     mode.onchange=()=>{displayMode=memoryMode(mode.value);try{localStorage.setItem("roomit-ram-display",displayMode);}catch{}updateLive();};label.append(mode);controls.append(label);
-    const pause=document.createElement("button");pause.type="button";pause.className="text-button";pause.textContent=paused?"Resume monitoring":"Pause monitoring";pause.disabled=!isTauri();pause.onclick=()=>{paused=!paused;pendingBreak=true;pause.textContent=paused?"Resume monitoring":"Pause monitoring";clearTimeout(timer);updateLive();if(!paused)void poll();};controls.append(pause);liveHeader.append(controls);
+    const pause=document.createElement("button");pause.type="button";pause.className="text-button";pause.textContent=paused?"Resume monitoring":"Pause monitoring";pause.disabled=!isTauri();pause.onclick=()=>{paused=!paused;interruptSampling();pause.textContent=paused?"Resume monitoring":"Pause monitoring";clearTimeout(timer);updateLive();if(!paused)void poll();};controls.append(pause);liveHeader.append(controls);
     metrics=el("div","","resource-grid");networkSummary=el("p","","resource-network hint");container.append(liveHeader,metrics,el("p","Last 2 minutes · 0–100% scale · History accumulates while this view is open. Missing or paused measurements leave gaps.","history-note hint"),networkSummary);
     const controlLayout=current==="control"?el("div","","control-layout"):null;
     if(controlLayout){controlLayout.append(renderStorageMap(groups,report?.sizeIndexId, Boolean(report && (!report.totalSizeComplete || report.status!=="completed" || report.resultsTruncated))));container.append(controlLayout);}
@@ -172,6 +192,7 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
       const refresh=document.createElement("button");refresh.type="button";refresh.className="secondary";refresh.textContent="Refresh discovery";refresh.disabled=!isTauri();refresh.onclick=()=>void discover();heading.append(title,refresh);panel.append(heading);
       const disclosure=document.createElement("details");disclosure.className="catalog-note";const summary=document.createElement("summary");summary.textContent=`Discovery scope · ${inventory?.supportedCount||catalog.length} tools`;disclosure.append(summary,el("p",`${catalog.map(t=>t.name).join(" · ")}. Checks PATH, known app locations, and installation records. Custom installations, plugins, WSL, container internals, and AI websites are not automatically discovered.`,"hint"));panel.append(disclosure);
       toolsList=el("div","","installed-tools");panel.append(toolsList);
+      disclosure.append(el("p",`A tool card shows its CPU and RAM history after ${OBSERVATION_MINUTES} observed minutes at or below ${CPU_CEILING}% of device CPU with at least ${formatMemory(String(RAM_FLOOR))} resident RAM. Monitoring gaps restart the timer. Tools can still be serving requests.`,"hint"));
       if(current==="control"){const all=document.createElement("button");all.type="button";all.className="text-button";all.textContent="View all tools and locations";all.onclick=()=>navigate("tools");panel.append(all);}
       if(inventory?.warnings.length)panel.append(el("p",inventory.warnings.join(" "),"warning"));(controlLayout||container).append(panel);renderTools();
     } else {
@@ -183,5 +204,5 @@ export function installWorkspace(container:HTMLElement,navigate:(view:"ai"|"tool
     }
     container.append(el("p","Not running does not mean unused. These measurements do not establish past use or whether a file can be safely removed.","hint usage-caveat"));updateLive();
   }
-  return {show(view,nextReport,nextGroups){const changed=current!==view||report!==nextReport||groups!==nextGroups;current=view;if(!visible())pendingBreak=true;report=nextReport;groups=nextGroups;container.hidden=!["control","tools","activity"].includes(view);if(changed)render();clearTimeout(timer);if(visible()&&isTauri()){if(!inventory&&!inventoryBusy)void discover();void poll();}}};
+  return {show(view,nextReport,nextGroups){const changed=current!==view||report!==nextReport||groups!==nextGroups;current=view;if(!visible())interruptSampling();report=nextReport;groups=nextGroups;container.hidden=!["control","tools","activity"].includes(view);if(changed)render();clearTimeout(timer);if(visible()&&isTauri()){if(!inventory&&!inventoryBusy)void discover();void poll();}}};
 }

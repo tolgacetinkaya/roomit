@@ -77,3 +77,17 @@ Browser fixtures confirmed expansion, second-page retention and keyboard focus
 across live samples, independent child values, and PID search without reducing
 totals. Fixture values are sample data; the native sampler tests use real local
 measurements. macOS device checks remain pending.
+## Tools holding RAM at low CPU
+
+In **Your AI tools**, expand the low-CPU observation on a tool's card to see
+its CPU and resident RAM over the last 20 minutes. The card reports the latest
+RAM and the full duration of the observed pattern. It appears after 20 continuous
+minutes with at least 1 GiB of combined resident memory and at most 1% of
+total device CPU across the tool's recognized processes. Shared pages can count
+toward multiple processes. GPU work and remote requests can continue at low CPU.
+
+The existing live sampler runs while the AI control center, tools, or resources
+view is visible. Pausing, leaving those views, hiding the window, a failed
+measurement, or a sample gap over six seconds restarts observation. Exiting
+the tool or crossing either threshold also restarts its timer. History stays
+in memory for the current session.
