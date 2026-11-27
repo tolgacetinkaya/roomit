@@ -3,8 +3,12 @@
 </p>
 
 <h1 align="center">Roomit</h1>
-<p align="center"><strong>See what your AI tools leave behind.</strong></p>
-<p align="center">Discover AI apps. Monitor local resources. Understand their disk usage.</p>
+<p align="center"><strong>See how much disk space Codex, Claude Code and Ollama use on your computer.</strong></p>
+<p align="center">Scan one tool, see its total and open its data folder in Explorer or Finder.</p>
+
+<p align="center">
+  <img src="docs/media/codex-storage-demo.gif" width="960" alt="Roomit scans Codex in a sample workspace on Windows, measures 256 MB across three files and selects the .codex folder in File Explorer." />
+</p>
 
 <p align="center">
   <a href="https://github.com/tolgacetinkaya/roomit/releases/latest"><img src="https://img.shields.io/github/v/release/tolgacetinkaya/roomit?label=download&amp;color=4778ff" alt="Latest release" /></a>
