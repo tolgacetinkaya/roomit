@@ -14,7 +14,7 @@ fn kind_number(kind: &str) -> Result<i64, String> {
 }
 fn search_key(text: &str) -> String { text.replace('I', "ı").replace('İ', "i").to_lowercase() }
 fn size_key(bytes: u64) -> String { format!("{:020}", u64::MAX - bytes) }
-fn map_key(path: &str) -> String {
+pub(crate) fn map_key(path: &str) -> String {
     let path = path.replace('\\', "/");
     if path.as_bytes().get(1) == Some(&b':') { path.trim_end_matches('/').to_lowercase() } else { path.trim_end_matches('/').to_string() }
 }
@@ -22,6 +22,9 @@ fn map_key(path: &str) -> String {
 /// This writer owns an app-created temporary database, never a scanned file.
 /// Each insert updates the disk B-tree; there is no final all-results sort.
 pub(crate) struct IndexWriter {
+    pub category_roots: Vec<(PathBuf, String)>,
+    pub breakdown: crate::storage::Breakdown,
+    pub skipped_models: usize,
     connection: Connection,
     directory: TempDir,
     rows_in_batch: usize,
@@ -59,8 +62,9 @@ impl IndexWriter {
                 search_key TEXT NOT NULL, complete INTEGER NOT NULL, parent_key TEXT NOT NULL,
                 PRIMARY KEY(kind,sort_key,path)) WITHOUT ROWID;
             CREATE INDEX map_children ON entries(parent_key,sort_key,path);
+            CREATE TABLE model_files(bytes INTEGER NOT NULL, identity TEXT NOT NULL, modified TEXT NOT NULL, path TEXT NOT NULL, PRIMARY KEY(bytes,identity)) WITHOUT ROWID;
             BEGIN IMMEDIATE;").map_err(|e| e.to_string())?;
-        Ok(Self { connection, directory, rows_in_batch: 0 })
+        Ok(Self { connection, directory, rows_in_batch: 0, category_roots: crate::storage::category_roots(), breakdown: Default::default(), skipped_models:0 })
     }
     pub fn finish(self, id: String) -> Result<IndexSnapshot, String> {
         self.connection.execute_batch("COMMIT;").map_err(|e| e.to_string())?;
@@ -72,8 +76,10 @@ impl IndexWriter {
 }
 impl SizeSink for IndexWriter {
     fn record(&mut self, entry: &SizedEntry) -> io::Result<()> {
+        crate::storage::record(&mut self.breakdown, &self.category_roots, entry);
         let result = (|| -> rusqlite::Result<()> {
             let kind = if entry.kind == EntryKind::File { 0 } else { 1 };
+            if !crate::models::record(&self.connection,entry)? {self.skipped_models+=1;}
             self.connection.prepare_cached(INSERT)?.execute(params![kind, size_key(entry.logical_bytes),
                 entry.path, search_key(&entry.path), entry.size_complete,
                 map_key(&std::path::Path::new(&entry.path).parent().unwrap_or(std::path::Path::new("")).to_string_lossy())])?;
@@ -153,6 +159,32 @@ pub(crate) struct SizePage {
 }
 
 impl IndexSnapshot {
+    /// Recheck only notified paths. File size matches use the index primary key;
+    /// missing paths use the indexed parent to check for a recorded removal.
+    pub fn storage_difference(&self, paths: std::collections::BTreeMap<PathBuf, bool>, roots: &[PathBuf]) -> Result<Option<String>, String> {
+        let db = Connection::open_with_flags(&self.database, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|e| e.to_string())?;
+        for (path, structural) in paths {
+            let name = roomit_core::display_path(&path);
+            let parent = std::path::Path::new(&name).parent().map(|p| map_key(&p.to_string_lossy())).unwrap_or_default();
+            let matches = match std::fs::symlink_metadata(&path) {
+                Ok(meta) if meta.is_file() => db.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM entries WHERE kind=0 AND sort_key=?1 AND path=?2)",
+                    params![size_key(meta.len()),name], |r| r.get::<_,bool>(0)),
+                Ok(meta) if meta.is_dir() && !structural => {
+                    if roots.contains(&path) { continue; }
+                    db.query_row("SELECT EXISTS(SELECT 1 FROM entries WHERE parent_key=?1 AND path=?2 AND kind=1)",
+                        params![parent,name], |r| r.get(0))
+                }
+                Err(e) if e.kind()==io::ErrorKind::NotFound && !roots.contains(&path) => db.query_row(
+                    "SELECT NOT EXISTS(SELECT 1 FROM entries WHERE parent_key=?1 AND path=?2)",
+                    params![parent,name], |r| r.get(0)),
+                Err(e) if e.kind()!=io::ErrorKind::NotFound => return Err(format!("Could not check {name}: {e}")),
+                _ => return Ok(Some(name)),
+            }.map_err(|e|e.to_string())?;
+            if !matches {return Ok(Some(name));}
+        }
+        Ok(None)
+    }
     pub fn map_children(&self, path: &str) -> Result<Vec<SizedEntry>, String> {
         if path.len() > 131_072 { return Err("Invalid folder path.".into()); }
         let connection = Connection::open_with_flags(&self.database, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|e| e.to_string())?;

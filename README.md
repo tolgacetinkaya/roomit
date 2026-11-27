@@ -1,125 +1,71 @@
-<p align="center">
-  <img src="src-tauri/icons/128x128.png" width="80" alt="Roomit logo" />
-</p>
+# Roomit
 
-<h1 align="center">Roomit</h1>
-<p align="center"><strong>See what your AI tools leave behind.</strong></p>
-<p align="center">Discover AI apps. Monitor local resources. Understand their disk usage.</p>
+Find out how much disk space your AI tools use. Roomit measures model libraries, chat history and other tool data locally on Windows and Apple Silicon Mac. You can open any reported location in Explorer or Finder.
 
-<p align="center">
-  <a href="https://github.com/tolgacetinkaya/roomit/releases/latest"><img src="https://img.shields.io/github/v/release/tolgacetinkaya/roomit?label=download&amp;color=4778ff" alt="Latest release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
-  <a href="https://github.com/tolgacetinkaya/roomit/releases/latest"><img src="https://img.shields.io/badge/Windows-x64-4778ff" alt="Windows x64 downloads" /></a>
-</p>
+**[Download for Windows](https://github.com/tolgacetinkaya/roomit/releases/latest)** · **[Download the Apple Silicon test DMG](https://github.com/tolgacetinkaya/roomit/releases/download/v0.4.4-macos-test.1/Roomit-0.4.4-macos-arm64.dmg)** · [Installation and updates](#installation-and-updates)
 
-<p align="center">
-  <a href="#download">Download for Windows or Mac</a> ·
-  <a href="#get-started">Get started</a> ·
-  <a href="docs/ROADMAP.md">Roadmap</a> ·
-  <a href="CONTRIBUTING.md">Contribute</a> ·
-  <a href="https://github.com/tolgacetinkaya/roomit/issues/new/choose">Report an issue</a>
-</p>
+[![Roomit’s AI storage map showing 42 GB across three tools. Ollama occupies the largest sector at 36 GB.](docs/media/sample-storage.webp)](docs/media/sample-storage.webp)
 
-Roomit is an open-source desktop app for people using AI coding assistants and
-local model tools. Find supported desktop and CLI apps such as **Claude Code,
-Codex, Ollama and LM Studio**, see their local resource usage, and inspect the
-data they accumulate — from one workspace.
+**Where did the space go?** In this example, Ollama uses **36 GB** of the **42 GB** scanned. Codex uses **4 GB** and Claude Code uses **2 GB**. Select a sector to explore the folders behind that number. These are logical sizes. A large folder can still contain models or conversations you use every day.
 
-Built with **Rust + Tauri + TypeScript**. Scans stay on your device and leave
-scanned files unchanged. No account or AI API key is required.
+All screenshots show the v0.4.4 interface with fictional data. The storage sizes, running apps and resource readings come from the same sample workspace.
 
-## What you can do
+## Try it with one tool
 
-| Question | In Roomit |
+1. Open **My tools** and find a tool you use, such as Codex. A **Running now** badge means Roomit detected a local process.
+2. Choose **Scan app data** on its card. Roomit measures that tool’s known data folders. You can start here even if you have several disks.
+3. Open **View scanned data**, pick a folder, then choose **Show in folder** to inspect it yourself. To compare multiple tools in one map, choose **Scan AI data**.
+
+<details>
+<summary><strong>See how running and detected tools appear</strong></summary>
+
+In the example, Ollama and Codex are running. Claude Code is also present and has 2 GB of scanned data. Each card separates current activity from storage measured during a scan.
+
+[![Full My tools window with two running tools and one detected tool in the sample workspace.](docs/media/sample-tools.webp)](docs/media/sample-tools.webp)
+
+Roomit has discovery rules for 19 tool families, including Claude Code, Codex, OpenCode, Ollama, LM Studio, Cursor, Qwen, Kimi and ZCode. Expand **Discovery evidence and locations** to see whether Roomit found an installation, command or data folder. Custom installations can fall outside these rules. Use **New scan → One folder** for a model library stored elsewhere. [Discovery guide](docs/AI_WORKSPACE.md) · [Per-app scans](docs/APP_DATA_SCANS.md)
+
+</details>
+
+## What is using resources right now?
+
+Open **Live resources** without starting a disk scan. The CPU and RAM charts cover the whole device. The Windows GPU chart shows activity for recognized local AI processes. Expand an app in **Running AI & development apps** to inspect its individual processes.
+
+<details>
+<summary><strong>See the live charts and what they measure</strong></summary>
+
+[![Full Live resources window with simulated activity on a device with 32 GiB of RAM.](docs/media/sample-resources.webp)](docs/media/sample-resources.webp)
+
+Charts retain up to two minutes of samples, taken about every two seconds while monitoring is active. RAM can be displayed in GiB, as a percentage or both. Network rates apply to the selected adapter. GPU readings can be partial or unavailable, and the Mac test build shows GPU as unavailable. [Measurement details](docs/LIVE_RESOURCES.md)
+
+</details>
+
+## Explore the rest of a scan
+
+| If you want to… | Open | What to look for |
+| --- | --- | --- |
+| See which repositories account for development files | **Projects** | Dependency folders and build output grouped under recognized projects. |
+| Find large folders or individual files | **Large items** | Set a minimum size in GB, then browse the matching folders or files. Folder totals already include their contents. |
+| See how much of a scan finished | **Overview** or **Scan details** | Totals, inspected locations and any folders Roomit could not read. |
+
+Choose **New scan** to inspect a folder, disk or whole computer. You can exclude personal folders, follow progress or cancel. The latest results stay on your device when you close Roomit. If a watched folder changes while Roomit is open, you can choose when to rescan. [Scan scopes, exclusions and saved results](docs/SCANNING.md)
+
+## Installation and updates
+
+| Platform | What to download |
 | --- | --- |
-| Which AI tools are on this machine? | **My tools** lists supported apps and CLI tools, their discovery evidence and known locations. Running tools appear first. |
-| What is using CPU, RAM or GPU? | **Live resources** shows device charts and expandable app/process groups. Windows GPU values report missing or partial coverage explicitly. |
-| How much data does one tool keep? | Choose **Scan app data** on its card, or select one application in AI scan settings. |
-| Where is that space going? | Explore the **AI storage map**, inspect paths and use **Show in folder** to open Explorer or Finder. |
-| Can I keep the results? | The latest scan and exclusions persist. Changes detected while Roomit is open show a stale warning; you decide when to rescan. |
-| What about other large files? | Scan a folder, one disk or local disks, then filter **Large items** by minimum GB without rescanning. |
+| Windows x64 | Choose the **portable EXE** to run Roomit directly, or the **setup EXE** for a per-user installation. Both require WebView2. [Downloads and checksums](https://github.com/tolgacetinkaya/roomit/releases/latest) |
+| Apple Silicon Mac, macOS 13+ | Open the **arm64 DMG**, drag Roomit into **Applications**, eject the disk image and launch the app. The test build is ad-hoc signed and has not been notarized. [Download the DMG](https://github.com/tolgacetinkaya/roomit/releases/download/v0.4.4-macos-test.1/Roomit-0.4.4-macos-arm64.dmg) · [First launch and Mac testing](docs/MACOS-TESTING.md) |
 
-## Download
+Roomit checks GitHub for published updates. You can also select **Roomit → Check for updates**. On Windows, portable users can download the latest portable EXE or approve running the installer. Windows packages have no Authenticode publisher certificate. Roomit verifies updater signatures separately. [Update guide](docs/RELEASING.md)
 
-### Windows x64 · stable release
+## Privacy
 
-Get the installer or portable EXE from the **[latest Windows release](https://github.com/tolgacetinkaya/roomit/releases/latest)**.
-
-| File | Use it for |
-| --- | --- |
-| `Roomit-VERSION-windows-x64-setup.exe` | A per-user Windows installation. |
-| `Roomit-VERSION.exe` | Running directly without installation. Requires WebView2. |
-| `SHA256SUMS.txt` | Checking download hashes. |
-
-Roomit checks published releases for updates. On 0.4.2 and later, **Roomit → Check
-for updates → Review update…** offers **Install and restart** or **Download latest
-portable EXE**. Installing from a portable copy installs Roomit; it does not replace
-the original portable file. [Update behavior and signatures →](docs/RELEASING.md)
-
-Windows update packages carry Roomit's updater signature. The Windows executables currently ship without an Authenticode publisher certificate.
-
-### Apple Silicon Mac · test release
-
-**[Download the v0.4.4 test DMG](https://github.com/tolgacetinkaya/roomit/releases/download/v0.4.4-macos-test.1/Roomit-0.4.4-macos-arm64.dmg)** for M1 and newer Macs, including M4, running macOS 13 or later. Open the DMG, drag **Roomit** to **Applications**, eject the disk image and launch Roomit from Applications.
-
-The test build uses an ad-hoc signature and has no Apple notarization. If macOS blocks the first launch, follow the [Mac testing guide](docs/MACOS-TESTING.md). Roomit checks for signed Mac updates at startup and every six hours while open and visible. Choose **Review update… → Install and restart** to apply an update.
-
-CPU and RAM monitoring are available on Mac. Per-process GPU readings are currently available on Windows only. Automated Apple Silicon tests and a launch check passed. Interactive M4 testing and a version-to-version update installation are still pending. [Mac test release notes](https://github.com/tolgacetinkaya/roomit/releases/tag/v0.4.4-macos-test.1)
-
-## Get started
-
-1. Open **My tools** to see detected AI applications and terminal tools.
-2. Choose **Scan app data** on a tool such as Codex. To scan all supported tools,
-   use **Scan AI data**. Known per-user locations are scanned; other disks are
-   not searched for custom model folders.
-3. Read the total on the tool card, then choose **View scanned data** to explore
-   the map and locations. Progress and cancellation remain available.
-4. Reopen Roomit to view the saved result. Use **Rescan** when you want a fresh
-   measurement; each completed or cancelled scan replaces the latest snapshot.
-
-For data on another drive, use a folder scan. Configure **Exclusions** before
-scanning folders you want to leave out. See [per-app scans](docs/APP_DATA_SCANS.md).
-
-## Supported AI tools
-
-The bundled catalog currently contains 19 tool families:
-
-| | Tools |
-| --- | --- |
-| Coding assistants and editors | Codex, Claude Code, OpenCode, Cursor, Windsurf, Gemini CLI, Aider, GitHub Copilot, Antigravity, Trae |
-| Local models and AI workspaces | Ollama, LM Studio, Jan, AnythingLLM |
-| Other desktop / CLI tools | Claude, ChatGPT, ZCode, Qwen, Kimi |
-
-Support means known discovery rules, not a guarantee that every installation or
-version will be found. Custom aliases, WSL/container installations, browser AI
-sites and arbitrary model locations are outside automatic discovery. A leftover
-data folder is labeled separately from installation evidence.
-
-Missing a tool? [Request detection support](https://github.com/tolgacetinkaya/roomit/issues/new?template=03_tool_support.md)
-with its official link, platform and a redacted example path.
-
-## Local data, honest measurements
-
-- **Metadata-only scans:** file paths, types and sizes are indexed locally. Source
-  code, secrets and AI conversation contents are not read to classify files.
-- **No deletion actions:** models, histories and settings are not treated as
-  disposable simply because they are large or old. Detailed temporary/cache
-  classification is a [proposed next step](docs/ROADMAP.md).
-- **No telemetry or cloud inference:** update checks and downloads contact GitHub;
-  opening external links uses your browser. Scan results are not uploaded.
-- **Explicit coverage:** sizes are logical bytes, not reclaimable space. Exclusions,
-  inaccessible items and cancellation can produce partial totals. RAM uses GiB/MiB;
-  storage uses decimal GB.
-- **Local resource usage:** CPU/RAM and supported Windows GPU measurements concern
-  processes on this device. Cloud model GPU, VRAM, per-app network traffic and
-  long-term activity history are not measured. Monitoring pauses when its workspace
-  is hidden or paused; there is no background service.
-
-See [measurement details](docs/LIVE_RESOURCES.md) and [scan semantics](docs/SCANNING.md).
+Roomit requires no account or AI API key. Classification uses file metadata such as paths, types and sizes. Source code and conversation contents stay private. Scans are read-only and the index stays on the device. Network access is used for update checks, downloads and links you open.
 
 ## Build and contribute
 
-Install Node.js, Rust and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/), then:
+Install Node.js 22.18+, Rust and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/). Start the desktop app with:
 
 ```sh
 git clone https://github.com/tolgacetinkaya/roomit.git
@@ -128,29 +74,8 @@ npm ci
 npm run tauri -- dev
 ```
 
-Use Node 22.18+ for the native TypeScript tests and a Rust toolchain compatible
-with the workspace's minimum version. Windows also needs C++ build tools, the
-Windows SDK and WebView2. `npm run dev` is a frontend preview; native scanning is
-only available in the desktop app.
-
-Useful contributions include detection rules with fixtures, false-positive
-reports, accessibility improvements and Mac validation. Changes go through a
-**feature branch → tests → pull request → review → merge** workflow.
-
-[Contribution guide](CONTRIBUTING.md) · [Proposed roadmap](docs/ROADMAP.md) ·
-[Issue templates](https://github.com/tolgacetinkaya/roomit/issues/new/choose)
-
-## Documentation
-
-- [AI workspace and discovery](docs/AI_WORKSPACE.md)
-- [Per-application data scans](docs/APP_DATA_SCANS.md)
-- [Live resources and measurement limits](docs/LIVE_RESOURCES.md)
-- [Scan sizes, exclusions and saved results](docs/SCANNING.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Validation](docs/VALIDATION.md) and [manual checks](docs/MANUAL_TEST.md)
-- [Release process and updates](docs/RELEASING.md)
+Detection fixtures, reports of misidentified tools and Mac test results are welcome. When sharing screenshots or logs, redact usernames and local paths. [Contribution guide](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Validation](docs/VALIDATION.md) · [Roadmap](docs/ROADMAP.md) · [Report an issue](https://github.com/tolgacetinkaya/roomit/issues/new/choose)
 
 ## License
 
-[MIT](LICENSE). Tool names and logos identify their respective products; Roomit
-is not affiliated with those vendors. See the [tool artwork notices](src/assets/tools/LICENSE).
+[MIT](LICENSE). Tool names and logos identify their respective products. [Tool artwork notices](src/assets/tools/LICENSE)

@@ -17,3 +17,13 @@ test('incomplete monitoring is explicit and cannot clear an observed change', ()
   assert.equal(notice.title,'Freshness could not be verified'); assert.equal(notice.warning,true);
   assert.equal(freshnessNotice({indexId:'scan',stale:true,unavailable:'Later error'}).title,'Results are out of date');
 });
+test('an AI storage change explains the snapshot and identifies the affected path', () => {
+  const status = {indexId:'scan', storageScan:true, changedPath:'/app/logs/live.log', stale:true, unavailable:null};
+  const notice = freshnessNotice(status);
+  assert.equal(notice.title,'Files changed since this scan');
+  assert.equal(notice.warning,false);
+  assert.match(notice.message,/logs\/live\.log/);
+  const interrupted = freshnessNotice({...status, unavailable:'Events were lost.'});
+  assert.equal(interrupted.warning,true);
+  assert.match(interrupted.message,/Events were lost/);
+});

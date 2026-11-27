@@ -110,7 +110,7 @@ fn same_install_helper(child_name: &str, child_exe: Option<&std::path::Path>, pa
         _ => false,
     }
 }
-fn process_tool(name: &str, exe: &str, script: &str, tools: &[Tool]) -> Option<String> {
+pub(crate) fn process_tool(name: &str, exe: &str, script: &str, tools: &[Tool]) -> Option<String> {
     let name = name.to_lowercase().trim_end_matches(".exe").to_string(); let exe = exe.replace('\\', "/").to_lowercase();
     // Local model engines may run under a different executable name. Require
     // both a known worker name and a product-specific installation/data path;
@@ -119,7 +119,7 @@ fn process_tool(name: &str, exe: &str, script: &str, tools: &[Tool]) -> Option<S
         (exe.contains("/.lmstudio/") || exe.contains("/lm studio/") || exe.contains("/lm-studio/")) {return Some("lmstudio".into());}
     if ["ollama_llama_server", "llama-server"].contains(&name.as_str()) &&
         (exe.contains("/ollama/") || exe.contains("/.ollama/")) {return Some("ollama".into());}
-    if name == "claude" && (exe.contains("/claude_") || exe.contains("/programs/claude/") || exe.contains("/claude.app/")) { return Some("claude".into()); }
+    if name == "claude" && (exe.contains("/claude_") || exe.contains("/programs/claude/") || exe.contains("/anthropicclaude/") || exe.contains("/anthropic.claude_") || exe.contains("/claude.app/")) { return Some("claude".into()); }
     for tool in tools {
         if tool.commands.iter().any(|c| c == &name) { return Some(tool.id.clone()); }
         // Electron app names and fixed package identifiers; never match arbitrary prompt text.

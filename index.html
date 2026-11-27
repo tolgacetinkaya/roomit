@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light dark" />
+    <script src="/appearance.js"></script>
     <title>Roomit 0.4.4 — Your AI workspace</title>
     <script type="module" src="/src/main.ts"></script>
   </head>
@@ -29,7 +30,7 @@
         </details>
       </div>
       <div class="titlebar-context" data-window-drag><span data-window-drag>This device</span><img src="/node_modules/@phosphor-icons/core/assets/regular/caret-right.svg" class="ui-icon" width="12" height="12" alt="" data-window-drag /><strong id="shell-view-title" data-window-drag>Your AI workspace</strong></div>
-      <div class="titlebar-end"><span class="shell-local">Local workspace</span><div class="window-controls" aria-label="Window controls"><button id="window-minimize" class="chrome-button" type="button" aria-label="Minimize window" title="Minimize"></button><button id="window-maximize" class="chrome-button" type="button" aria-label="Maximize window" title="Maximize"></button><button id="window-close" class="chrome-button" type="button" aria-label="Close window" title="Close"></button></div></div>
+      <div class="titlebar-end"><label class="theme-picker"><span></span><select id="theme-choice"></select></label><span class="shell-local">Local workspace</span><div class="window-controls" aria-label="Window controls"><button id="window-minimize" class="chrome-button" type="button" aria-label="Minimize window" title="Minimize"></button><button id="window-maximize" class="chrome-button" type="button" aria-label="Maximize window" title="Maximize"></button><button id="window-close" class="chrome-button" type="button" aria-label="Close window" title="Close"></button></div></div>
     </header>
     <p id="shell-status" class="shell-status" role="status" hidden></p>
     <div class="app">
@@ -61,11 +62,15 @@
           <p id="update-portable-hint">Prefer no installation? Download the latest portable EXE and open it yourself.</p>
           <div class="update-confirm-actions"><button id="confirm-install-update" type="button">Install and restart</button><button id="confirm-download-portable" type="button" class="secondary">Download latest portable EXE</button><button id="cancel-install-update" type="button" class="secondary" autofocus>Cancel</button></div>
         </dialog>
-        <header class="page-heading"><div><p class="eyebrow">YOUR LOCAL AI CONTROL CENTER</p><h1 id="page-title">Your AI workspace</h1><p id="page-description">Your tools, live resources, and the AI data they leave behind.</p></div><div class="heading-actions"><span class="read-only">Read-only</span><button id="quick-ai-scan" type="button">Scan AI data</button><button id="new-scan" type="button" class="secondary">New scan</button></div></header>
-        <section id="ai-scan-panel" class="ai-scan-panel" aria-labelledby="ai-start-title">
-          <div class="ai-start-copy"><p class="eyebrow">AI-FOCUSED SCANNING</p><h2 id="ai-start-title">Your AI tools. Your resources.<br />All in one place.</h2><p class="ai-start-description">Roomit helps you understand the AI tools on your computer and the data they leave behind. Explore models, history, and large data folders.</p><div class="ai-start-actions"><button id="scan-ai" type="button">Scan AI folders</button><button id="configure-scan" type="button" class="secondary">Choose folder or disk</button></div><p class="hint ai-start-trust">Other disks are not scanned. Your files stay unchanged.</p></div>
-          <div class="ai-tool-preview" hidden><p class="eyebrow">LOCATIONS TO EXPLORE</p><div class="supported-tools"><span>Codex<small>User data</small></span><span>Claude Code<small>User data</small></span><span>Cursor<small>User data</small></span><span>Ollama<small>Data and models</small></span></div><p class="hint">May include history, settings, and models. Not every item is a temporary file.</p></div>
-        </section>
+        <header class="page-heading">
+          <div><h1 id="page-title">AI storage on disk</h1><p id="page-description" hidden></p></div>
+          <div class="heading-actions">
+            <span class="read-only">Read-only</span>
+            <button id="open-map" type="button" hidden></button>
+            <button id="quick-ai-scan" type="button">Scan AI data</button>
+          </div>
+        </header>
+        <section id="workspace-panel" aria-label="AI workspace"></section>
         <section class="scan-panel" aria-labelledby="inspect-title">
           <div class="scan-heading"><div><h2 id="inspect-title">Where should we look?</h2><p id="scan-caption" class="muted">Choose a scope. Roomit helps you understand what is inside.</p></div><div class="scan-header-actions"><span id="scan-elapsed" class="scan-elapsed" hidden></span><button id="cancel-button" type="button" class="secondary" hidden>Cancel</button><button id="toggle-scan" type="button" class="secondary" aria-expanded="false" aria-controls="inspect-form" hidden>Change scope</button></div></div>
           <form id="inspect-form">
@@ -100,10 +105,9 @@
           <div class="scan-state"><progress id="scan-progress" aria-label="Scan in progress" hidden></progress><p id="status" role="status" aria-live="polite">No scans yet.</p><p id="current-path" class="current-path" aria-live="off"></p></div>
         </section>
         <section id="snapshot-banner" class="snapshot-banner" aria-label="Latest scan freshness" hidden>
-          <div><strong id="snapshot-title"></strong><p id="snapshot-date" class="hint"></p><p id="snapshot-watch-state" role="status" aria-live="polite"></p><p id="snapshot-freshness" class="hint">Preparing change monitoring…</p><p id="snapshot-offline" class="hint" hidden>Changes made while Roomit was closed were not monitored. Saved results may be out of date.</p><p id="snapshot-save-error" class="warning" hidden></p></div>
+          <div><p id="snapshot-watch-state" role="status" aria-live="polite"></p><p id="snapshot-save-status" class="warning" hidden></p><details id="snapshot-details"><summary id="snapshot-title"></summary><p id="snapshot-date" class="hint"></p><p id="snapshot-freshness" class="hint">Preparing change monitoring…</p><p id="snapshot-offline" class="hint" hidden>Changes made while Roomit was closed were not monitored. Saved results may be out of date.</p><p id="snapshot-save-error" class="warning" hidden></p></details></div>
           <button id="rescan-snapshot" type="button" class="secondary">Rescan</button>
         </section>
-        <section id="workspace-panel" aria-label="AI workspace"></section>
         <div id="restore-state" class="restore-state" hidden><p id="restore-message" role="status"></p><button id="retry-last-scan" type="button" class="secondary">Reopen saved scan</button></div>
         <section class="report-panel" aria-labelledby="results-title">
           <div class="results-header"><div><p class="eyebrow">SCAN RESULTS</p><h2 id="results-title">Discovered tools</h2><p id="result-caption" class="muted">Start with your first scan.</p></div><div class="result-tools"><div class="search-row"><label for="result-search" class="sr-only">Search results</label><input id="result-search" type="search" placeholder="Search tools or folders…" disabled /></div><label id="result-sort-label" class="sort-control"><span class="sr-only">Result sort order</span><select id="result-sort" aria-label="Result sort order"><option value="size">Size: largest first</option><option value="name">Name: A–Z</option></select></label></div></div>
@@ -115,7 +119,6 @@
           <p id="reveal-hint" class="hint" hidden></p>
           <div id="results" aria-busy="false"></div>
         </section>
-        <footer><span>Visibility into your AI tools. Your data stays on this device.</span><span>ROOMIT</span></footer>
       </main>
     </div>
   </body>

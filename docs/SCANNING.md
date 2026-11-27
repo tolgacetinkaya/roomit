@@ -82,6 +82,22 @@ of output-list retention. Whole-computer scanning stops on cancellation, access
 failures for particular subtrees, or OS errors, never because of an item/depth
 budget. Existing link/mount partition rules continue to apply.
 
+## Project sizes and Git activity
+
+The **Projects** view lists each detected project, including projects without
+recognized build outputs. Size sorting uses the logical bytes in each project's
+direct `node_modules` directory. A workspace package with its own installation
+gets its own row. Hoisted dependencies appear under the parent that holds them.
+Links, omissions and interrupted measurements can produce partial sizes.
+
+Desktop scans also query local Git through libgit2. The commit date follows
+the project's directory in the checked-out history. A later commit affecting
+only a sibling package leaves that date unchanged. The changes field includes
+staged, unstaged and untracked files under the project, respecting Git ignores.
+Git may inspect tracked file content to determine status. The report stores the
+date and change indicator. When an explicit exclusion falls inside the project,
+the status is unavailable. Older saved reports can be rescanned for these fields.
+
 ## Persistent exclusion settings
 
 Choices are saved in `scan-exclusions.json` in Tauri's per-user app configuration
@@ -123,6 +139,16 @@ is used. The UI reads the small monitoring status every two seconds and changes
 only the notice, preserving open filters/pages. This is best-effort monitoring:
 permissions, disconnected roots or dropped event batches produce an explicit
 uncertainty warning instead of a claim that results are current.
+
+For **Scan app data** and **All AI tools**, Roomit checks notified file paths
+against the completed size index. A write already reflected in the measurement,
+a same-length rewrite, or a temporary file absent from both the scan and the
+current folder leaves the size snapshot usable. A different file size, added
+or missing file, or structural directory change shows **App storage changed**
+with the affected path. Up to 128 distinct pending paths are coalesced between
+checks. Overflow and read errors surface a monitoring warning. The user can
+rescan at any time. Windows parent watches subscribe only to name changes
+needed to detect removal or replacement of the watched root.
 
 Watchers arm before a new scan, so included mutations during the scan can also
 invalidate the resulting report. Failed replacement scans keep the previous

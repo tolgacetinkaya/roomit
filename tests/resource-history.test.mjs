@@ -1,8 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {memoryBreakdown,memoryPercent,memoryMode,recordUsage,usageSegments,HISTORY_MS,HISTORY_LIMIT} from '../src/resource-history.ts';
+import {isHighUsage,memoryBreakdown,memoryPercent,memoryMode,recordUsage,usageSegments,HISTORY_MS,HISTORY_LIMIT} from '../src/resource-history.ts';
+import {gpuUsagePercent} from '../src/workspace-model.ts';
 // Chart input is tested independently of canvas drawing and native sampling.
 const point=(at,values={})=>({at,cpu:20,ram:40,gpu:0,gpuPartial:false,breakBefore:false,...values});
+test('high usage starts at 80% and only usable GPU measurements can trigger it',()=>{
+  for(const value of [null,NaN,Infinity,0,79.99]) assert.equal(isHighUsage(value),false);
+  for(const value of [80,100,105]) assert.equal(isHighUsage(value),true); // Group resident memory can exceed capacity.
+  for(const status of ['measured','partial']) assert.equal(isHighUsage(gpuUsagePercent({status,percent:81})),true);
+  for(const status of ['noProcess','warmingUp','unavailable']) assert.equal(isHighUsage(gpuUsagePercent({status,percent:99})),false);
+  assert.equal(isHighUsage(gpuUsagePercent({status:'measured',percent:101})),false);
+});
 test('RAM used and available partition OS total, excluding installed/reserved capacity',()=>{
  const result=memoryBreakdown('107374182400','32000000000','80530636800');
  assert.deepEqual(result,{used:'26843545600',available:'80530636800',total:'107374182400',usedPercent:25,availablePercent:75});

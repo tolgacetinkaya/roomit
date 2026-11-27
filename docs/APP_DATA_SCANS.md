@@ -22,7 +22,28 @@ Custom model directories, environment-variable overrides and project-local tool
 data outside these known roots are not discovered by this scope. Use a folder
 scan to inspect them. An installed tool can have no known data yet.
 
-Scans read filesystem metadata, not file contents. Existing exclusions, protected
+The Windows storage preview adds **Local data by type** to the Codex and Claude
+Code cards. It counts file lengths within the tool's detected roots. Known
+session transcripts and input history contribute to Chats. Claude project
+transcripts also have a per-project subtotal. Known log locations, debug files
+and cache directories have their own rows. Other files includes everything
+else measured in those roots. Each populated row can reveal its locations.
+Category sizes cover the latest scan. A category with incomplete coverage is
+labeled partial.
+
+**Overview** and **AI storage map** show changes in scan-root totals, immediate
+subfolders, project dependencies and tool categories. Comparison uses the last
+finished scan with matching scope, tool, roots and exclusions among the eight
+most recent scopes. Partial snapshots only supply comparable measurements.
+Cancelled scans preserve the previous baseline. These rows can overlap.
+
+**Possible model copies** groups nonempty GGUF, safetensors, ONNX and Ollama
+model blobs by size within the current scan. File identities collapse hardlink
+aliases. Select **Verify contents (SHA-256)** to read and compare one group.
+Changed, excluded and inaccessible files are skipped. Verification can be
+cancelled. Verified groups describe the contents observed during that check.
+
+Category scans use names, locations and filesystem metadata. Existing exclusions, protected
 data rules, cancellation, progress and stale-result monitoring continue to apply.
 These sizes do not establish whether data is unused or safe to delete. No deletion
 action is available.

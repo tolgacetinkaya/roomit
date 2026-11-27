@@ -65,6 +65,16 @@ impl PartialOrd for SizedEntry {
 pub struct Project {
     pub path: String,
     pub ecosystems: Vec<String>,
+    #[serde(default)]
+    pub node_modules: Option<ProjectSize>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSize {
+    #[serde(serialize_with = "serialize_bytes", deserialize_with = "deserialize_bytes")]
+    pub logical_bytes: u64,
+    pub size_complete: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

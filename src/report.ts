@@ -14,7 +14,10 @@ export interface Finding extends SizedEntry {
   ruleId: string;
   reason: string;
 }
-export interface Project { path: string; ecosystems: string[] }
+export interface ProjectSize { logicalBytes: string; sizeComplete: boolean }
+export interface Project { path: string; ecosystems: string[]; nodeModules?: ProjectSize | null }
+export type ProjectGit = { state: "noRepository" | "unavailable" }
+  | { state: "repository"; lastCommitTime: number | null; dirty: boolean | null };
 export interface ScanStats {
   filesScanned: number;
   directoriesScanned: number;
@@ -38,16 +41,23 @@ export interface RootReport {
   error: string | null;
 }
 export interface InspectionReport {
+  modelGroups?: {bytes:string;paths:string[]}[] | null;
+  skippedModels?: number;
+  growth?: {previousMs:number|null; note:string; changes:{ label:string; location:string; delta:string }[]} | null;
+  breakdown?: Record<string, import("./storage-insights").ToolStorage>;
   root: string;
   scope: "recursive" | "computer" | "disk" | "ai";
   status: ScanStatus;
   totalSizeComplete: boolean;
   stats: ScanStats;
   projects: Project[];
+  projectGit?: Record<string, ProjectGit>;
   findings: Finding[];
   largestEntries: SizedEntry[];
   sizeIndexId: string;
   scannedAtMs?: number;
+  scanDurationMs?: number | null;
+  aiRootOwners?: Record<string,string>;
   aiToolId?: string | null;
   persistenceError?: string | null;
   warnings: string[];

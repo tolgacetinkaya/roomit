@@ -361,3 +361,29 @@ fn app_owned_index_directory_is_excluded_without_hiding_user_results() {
     assert!(paths.iter().all(|path| !path.contains("roomit-index")));
     assert_eq!(fs::read(fixture.path().join("roomit-index/results.sqlite")).unwrap().len(), 11);
 }
+#[test]
+fn project_modules_have_independent_totals_even_if_findings_are_truncated() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    for (path, bytes) in [("package.json", 1), ("node_modules/a/node_modules/b", 8),
+        ("web/package.json", 1), ("web/node_modules/lib", 12), ("empty/package.json", 1)] {
+        file(root, path, bytes);
+    }
+    let scan = |excluded_paths| scan_workspace(root, ScanOptions {
+        excluded_paths, ..Default::default()
+    }, &AtomicBool::new(false), |_| {}).unwrap();
+    let report = scan(vec![]);
+    let size = |report: &roomit_core::InspectionReport, name: &str| {
+        let size = report.projects.iter().find(|p| Path::new(&p.path).ends_with(name)).unwrap().node_modules.as_ref().unwrap();
+        (size.logical_bytes, size.size_complete)
+    };
+    assert_eq!(size(&report, "web"), (12, true));
+    assert_eq!(size(&report, "empty"), (0, true));
+    assert_eq!(size(&report, root.file_name().unwrap().to_str().unwrap()), (8, true));
+    assert_eq!(size(&scan(vec![root.join("web/node_modules")]), "web"), (0, false));
+    assert_eq!(size(&scan(vec![root.join("web/node_modules/lib")]), "web"), (0, false));
+    let limited = scan_workspace(root, ScanOptions { max_findings: 1, ..Default::default() },
+        &AtomicBool::new(false), |_| {}).unwrap();
+    assert!(limited.results_truncated);
+    assert_eq!(limited.projects[0].node_modules.as_ref().unwrap().logical_bytes, 8);
+}

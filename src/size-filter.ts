@@ -1,4 +1,8 @@
 const GB = 1_000_000_000n;
+export function formatGb(bytes: bigint): string {
+  const fraction = (bytes % GB).toString().padStart(9, "0").replace(/0+$/, "");
+  return `${(bytes / GB).toLocaleString("en-US")}${fraction ? "." + fraction : ""} GB`;
+}
 const MAX_BYTES = 18_446_744_073_709_551_615n;
 export type MinimumSize = { bytes: bigint; error: null } | { bytes: null; error: string };
 export function parseMinimumGb(raw: string): MinimumSize {

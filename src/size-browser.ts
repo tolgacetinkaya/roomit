@@ -5,6 +5,13 @@ import { pathName } from "./groups";
 import { icon } from "./icons";
 import { revealActions } from "./reveal";
 
+import type {LocationContext} from "./project-context";
+
+type EntryKind = "directory"|"file";
+let selectedKind:EntryKind="directory";
+let grid=true;
+try { grid=localStorage.getItem("roomit-size-layout")!=="list"; } catch {}
+
 interface Cursor { sortKey: string; path: string }
 interface SizePage {
   entries: SizedEntry[]; total: string | null; first: Cursor | null; last: Cursor | null;
@@ -15,29 +22,53 @@ export function disposeSizeBrowser(): void { activeCleanup?.(); activeCleanup = 
 const node = (tag: string, text = "", className = ""): HTMLElement => {
   const element = document.createElement(tag); element.textContent = text; element.className = className; return element;
 };
-function entryCard(entry: SizedEntry): HTMLElement {
+function entryCard(entry: SizedEntry, context:LocationContext, maximum:bigint): HTMLElement {
   const card = node("article", "", "result-card size-result"); card.tabIndex = 0; card.dataset.revealOwner = "";
   const heading = node("div", "", "member-heading");
   const title = node("span", "", "size-entry-title");
   title.append(icon(entry.kind === "file" ? "file" : "folder"), node("strong", pathName(entry.path)));
   heading.append(title, node("span", sizeLabel(entry.logicalBytes, entry.sizeComplete)));
-  card.append(heading, node("p", entry.path, "report-path"), revealActions([entry.path])); return card;
+  const bar=node("div","","size-track");
+  const fill=node("span");fill.style.width=String(maximum?Number(BigInt(entry.logicalBytes)*1000n/maximum)/10:0)+"%";
+  bar.append(fill);bar.setAttribute("aria-hidden","true");
+  card.append(heading,bar,node("p",entry.path,"report-path"));
+  if(context.project){const owner=node("p","Project · "+pathName(context.project),"item-context");owner.title=context.project;card.append(owner);}
+  if(context.linkedProjects?.length){
+    const paths=context.linkedProjects;
+    const labels=paths.slice(0,2).map(pathName);
+    const links=node("p","Recent session projects · "+labels.join(", ")+(paths.length>2?" +"+String(paths.length-2):""),"item-context");
+    links.title=paths.join("\n");card.append(links);
+  }
+  if(context.tools.length)card.append(node("p",context.tools.join(" · "),"item-context"));
+  card.append(revealActions([entry.path])); return card;
 }
 
-export function renderSizeBrowser(indexId: string, minimum: bigint, search: string): HTMLElement {
+export function renderSizeBrowser(indexId: string, minimum: bigint, search: string, lookup:(path:string)=>LocationContext): HTMLElement {
   const root = node("div", "", "size-browser");
   root.append(node("p", `${minimum > 0n ? formatBytes(minimum.toString()) + " and above" : "No minimum size"} · Measured files and subfolders`, "size-filter-summary"),
-    node("p", "All matches are paged. Folder totals include their files. Do not add overlapping sizes together.", "hint"));
-  const jumps = node("nav", "", "size-jumps"); jumps.setAttribute("aria-label", "Go to size lists"); root.append(jumps);
-  const cleanup: (() => void)[] = [];
-  activeCleanup = () => { for (const dispose of cleanup) dispose(); };
-  for (const kind of ["file", "directory"] as const) {
+    node("p", "Bars compare sizes on this page. Folder totals include their contents.", "hint"));
+  const toolbar=node("div","","size-toolbar");
+  const kinds=node("div","","view-switch"),layouts=node("div","","view-switch");
+  const content=node("div");toolbar.append(kinds,layouts);root.append(toolbar,content);
+  let cleanup=()=>{};
+  activeCleanup=()=>cleanup();
+  function choice(label:string,host:HTMLElement,action:()=>void){
+    const button=document.createElement("button");button.type="button";button.className="secondary";button.textContent=label;
+    button.onclick=action;host.append(button);return button;
+  }
+  const folders=choice("Folders",kinds,()=>show("directory")),files=choice("Files",kinds,()=>show("file"));
+  const gridButton=choice("Grid",layouts,()=>layout(true)),listButton=choice("List",layouts,()=>layout(false));
+  function layout(useGrid:boolean){
+    grid=useGrid;root.classList.toggle("size-grid",grid);
+    gridButton.setAttribute("aria-pressed",String(grid));listButton.setAttribute("aria-pressed",String(!grid));
+    try{localStorage.setItem("roomit-size-layout",grid?"grid":"list");}catch{}
+  }
+  function show(kind:EntryKind){
+    cleanup();selectedKind=kind;content.replaceChildren();
+    folders.setAttribute("aria-pressed",String(kind==="directory"));files.setAttribute("aria-pressed",String(kind==="file"));
     const panel = node("section", "", "size-page-panel");
     const heading = node("div", "", "section-header");
     const name = kind === "file" ? "Files" : "Folders";
-    const jump = document.createElement("button"); jump.type = "button"; jump.className = "text-button";
-    jump.textContent = kind === "file" ? "Go to files" : "Go to folders";
-    jump.addEventListener("click", () => { panel.scrollIntoView({ block: "start" }); heading.tabIndex = -1; heading.focus({ preventScroll: true }); }); jumps.append(jump);
     const count = node("span", "Loading…", "section-count");
     heading.append(node("h3", name), count);
     const status = node("p", "", "hint"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
@@ -55,7 +86,7 @@ export function renderSizeBrowser(indexId: string, minimum: bigint, search: stri
     const topControls = node("div", "", "size-page-top-controls"); topControls.append(previousTop, nextTop); heading.append(topControls);
     cancel.setAttribute("aria-label", `${name}: cancel loading`);
     retry.hidden = true; controls.append(previous, next, cancel, retry);
-    panel.append(heading, status, progress, list, controls); root.append(panel);
+    panel.append(heading, status, progress, list, controls); content.append(panel);
     let disposed = false, currentRequest: string | null = null, total: string | null = null;
     let page: SizePage | null = null, pageNumber = 1;
     let lastAttempt: { cursor: Cursor | null; direction: "next" | "previous"; target: number } = { cursor: null, direction: "next", target: 1 };
@@ -80,7 +111,8 @@ export function renderSizeBrowser(indexId: string, minimum: bigint, search: stri
         } });
         if (disposed || currentRequest !== requestId) return;
         page = response; pageNumber = target; total = response.total ?? total;
-        list.replaceChildren(...response.entries.map(entryCard));
+        const maximum=BigInt(response.entries[0]?.logicalBytes??"0");
+        list.replaceChildren(...response.entries.map(entry=>entryCard(entry,lookup(entry.path),maximum)));
         if (!response.entries.length) list.append(node("div", "No items match this size and search.", "empty-note"));
         status.textContent = response.entries.length ? `This page: ${response.entries.length} items shown.` : "No matches.";
         if (cursor) { panel.scrollIntoView({ block: "start" }); heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
@@ -100,8 +132,8 @@ export function renderSizeBrowser(indexId: string, minimum: bigint, search: stri
       status.className = "hint"; status.textContent = "Result loading cancelled. You can try again.";
       retry.hidden = false; update();
     });
-    cleanup.push(() => { disposed = true; if (currentRequest) cancelRequest(currentRequest); currentRequest = null; });
+    cleanup=() => { disposed = true; if (currentRequest) cancelRequest(currentRequest); currentRequest = null; };
     void load(null, "next", 1);
   }
-  return root;
+  layout(grid);show(selectedKind);return root;
 }

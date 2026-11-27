@@ -1,4 +1,5 @@
-import {gpuText} from "./workspace-model";
+import {gpuText,gpuUsagePercent} from "./workspace-model";
+import {isHighUsage,memoryPercent,validPercent} from "./resource-history";
 import type {ProcessRow,ProcessSort} from "./workspace-model";
 import {memoryText,percentText} from "./resource-cards";
 import type {MemoryMode} from "./resource-history";
@@ -45,6 +46,14 @@ export function createProcessTable(state:ProcessTableState):{element:HTMLElement
     cells.ram.textContent=input.error?"Unavailable":memoryText(value.memoryBytes,input.totalMemory,input.mode);
     cells.gpu.textContent=gpuText(input.error?undefined:value.gpu);
     cells.gpu.title=input.error||value.gpu?.reason||"No group GPU measurement is available. Missing values do not mean zero.";
+    const readings = [[cells.cpu,validPercent(value.cpuPercent)],[cells.ram,memoryPercent(value.memoryBytes,input.totalMemory)],[cells.gpu,gpuUsagePercent(value.gpu)]] as const;
+    for(const [cell,percent] of readings){
+      const high=!input.error&&isHighUsage(percent);
+      cell.classList.toggle("high-usage",high);
+      cell.classList.toggle("has-reading",!input.error && percent!==null);
+      cell.style.setProperty("--reading",String(percent??0)+"%");
+      if(high)cell.append(" · High");
+    }
   }
   function makeGroup(value:AppGroup):Group {
     const head=document.createElement("tbody"),body=document.createElement("tbody"),row=document.createElement("tr");

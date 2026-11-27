@@ -1,6 +1,6 @@
-import {formatMemory,memoryCapacity,gpuText} from "./workspace-model";
+import {formatMemory,memoryCapacity,gpuText,gpuUsagePercent} from "./workspace-model";
 import type {GpuReading} from "./workspace-model";
-import {HISTORY_MS,memoryPercent,memoryBreakdown,usageSegments,validPercent} from "./resource-history";
+import {HISTORY_MS,HIGH_USAGE_PERCENT,isHighUsage,memoryPercent,memoryBreakdown,usageSegments,validPercent} from "./resource-history";
 import type {MemoryMode,UsagePoint,ResourceKey} from "./resource-history";
 export interface ResourceSnapshot {sampledAtMs:number;cpuPercent:number|null;memoryUsed:string;memoryTotal:string;memoryAvailable?:string;memoryInstalled?:string|null;gpuAi?:GpuReading}
 const el=(tag:string,text="",cls="")=>{const element=document.createElement(tag);element.textContent=text;element.className=cls;return element;};
@@ -25,10 +25,11 @@ function chart(card:HTMLElement,key:ResourceKey,history:readonly UsagePoint[],em
     const width=canvas.clientWidth,height=canvas.clientHeight,dpr=Math.min(devicePixelRatio||1,2);
     if(!width||!height)return;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
     const context=canvas.getContext("2d");if(!context)return;context.scale(dpr,dpr);
-    context.strokeStyle="#2c384b";context.lineWidth=1;
+    const theme=getComputedStyle(canvas);
+    context.strokeStyle=theme.getPropertyValue("--chart-grid").trim();context.lineWidth=1;
     for(const y of [1,height/2,height-1]){context.beginPath();context.moveTo(0,y);context.lineTo(width,y);context.stroke();}
     const end=history[history.length-1]?.at??Date.now(),start=end-HISTORY_MS;
-    const color=key==="ram"?"#8cb6ff":key==="gpu"?"#b4a4ff":"#5b9bff";
+    const color=theme.getPropertyValue("--chart-"+key).trim();
     for(const segment of segments){
       const point=(p:UsagePoint)=>({x:Math.max(1,Math.min(width-1,(p.at-start)/HISTORY_MS*width)),y:height-2-p[key]!/100*(height-4)});
       context.strokeStyle=color;context.lineWidth=2;context.setLineDash(key==="gpu"&&segment[0].gpuPartial?[4,3]:[]);
@@ -37,17 +38,27 @@ function chart(card:HTMLElement,key:ResourceKey,history:readonly UsagePoint[],em
     }
   });
 }
-function card(label:string,value:string,hint:string,cls:string):HTMLElement {
+function card(label:string,value:string,hint:string,cls:string,usage:number|null):HTMLElement {
   const node=el("section","",`resource-metric ${cls}`);node.setAttribute("aria-label",label);
   const heading=el("div","","resource-card-heading");heading.append(el("span",label));
+  if(isHighUsage(usage)){
+    node.classList.add("high-usage");
+    const badge=el("span","High usage","usage-badge");
+    badge.title=`Latest measured usage is ${HIGH_USAGE_PERCENT}% or higher.`;
+    heading.append(badge);
+  }
   node.append(heading,el("strong",value,"resource-value"),el("small",hint,"resource-caption"));return node;
 }
-export function renderResourceCards(snapshot:ResourceSnapshot|null,history:readonly UsagePoint[],mode:MemoryMode,error:string,running:number):DocumentFragment {
+export function renderResourceCards(snapshot:ResourceSnapshot|null,history:readonly UsagePoint[],mode:MemoryMode,error:string,running:number,compact=false):DocumentFragment {
   const fragment=document.createDocumentFragment(),live=error?null:snapshot;
-  const cpu=card("CPU · device",live?percentText(validPercent(live.cpuPercent)):"Unavailable","Total CPU capacity","cpu-metric");
-  chart(cpu,"cpu",history,live?.cpuPercent===null?"Waiting for first sample":"Measurement unavailable");
+  const cpuPercent=validPercent(live?.cpuPercent);
+  const cpu=card("CPU · device",percentText(cpuPercent),"Total CPU capacity","cpu-metric",cpuPercent);
   const ram=live?memoryBreakdown(live.memoryTotal,live.memoryUsed,live.memoryAvailable):null;
-  const ramCard=card("RAM · device",ram?memoryText(ram.used,ram.total,mode):"Unavailable","Memory used","ram-metric");
+  const ramCard=card("RAM · device",ram?memoryText(ram.used,ram.total,mode):"Unavailable","Memory used","ram-metric",ram?.usedPercent??null);
+  const gpu=card("GPU · AI processes",gpuText(live?.gpuAi),`${running} running AI tools · on this device`,"gpu-metric",gpuUsagePercent(live?.gpuAi));
+  fragment.append(cpu,ramCard,gpu);
+  if(compact)return fragment;
+  chart(cpu,"cpu",history,live?.cpuPercent===null?"Waiting for first sample":"Measurement unavailable");
   const breakdown=document.createElement("dl");breakdown.className="ram-breakdown";
   for(const [name,value]of [["Free / available",ram?memoryText(ram.available,ram.total,mode):"Unavailable"],["System total",ram?memoryText(ram.total,ram.total,mode):"Unavailable"]]){
     const row=el("div");row.append(el("dt",name),el("dd",value));breakdown.append(row);
@@ -56,9 +67,8 @@ export function renderResourceCards(snapshot:ResourceSnapshot|null,history:reado
   const capacity=el("p",live?memoryCapacity(live.memoryTotal,live.memoryInstalled):"No current memory measurement","ram-installed");
   capacity.title="Installed RAM may differ from the system total. Free / available memory includes cache that can be reclaimed. Percentages use the total RAM available to the operating system.";
   ramCard.append(capacity);chart(ramCard,"ram",history,"Measurement unavailable");
-  const gpu=card("GPU · AI processes",gpuText(live?.gpuAi),`${running} running AI tools · on this device`,"gpu-metric");
   const gpuNote=live?.gpuAi?.status==="partial"?"Dashed line: partial measurement / lower bound":live?.gpuAi?.reason||"A missing GPU value does not mean zero usage.";
   gpu.title=error||live?.gpuAi?.reason||"No current GPU measurement";gpu.append(el("p",gpuNote,"gpu-chart-note"));
   chart(gpu,"gpu",history,live?.gpuAi?.status==="warmingUp"?"Waiting for measurement":"GPU unavailable");
-  fragment.append(cpu,ramCard,gpu);return fragment;
+  return fragment;
 }

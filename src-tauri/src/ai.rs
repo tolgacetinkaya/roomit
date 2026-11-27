@@ -7,6 +7,13 @@ pub(crate) fn roots(tool_id: Option<&str>) -> Result<Vec<PathBuf>, String> {
     if roots.is_empty() { return Err("No known AI data folders found. Choose a folder to scan a custom location.".into()); }
     Ok(roots)
 }
+pub(crate) fn root_owners(tool_id: Option<&str>) -> std::collections::BTreeMap<PathBuf, String> {
+    let Some(home) = crate::computer::user_home() else { return Default::default() };
+    crate::inventory::catalog().into_iter().filter(|tool| tool_id.is_none_or(|id| id == tool.id))
+        .flat_map(|tool| crate::inventory::data_candidates(&tool, &home).into_iter()
+            .filter_map(|path| dunce::canonicalize(path).ok()).map(move |path| (path, tool.name.clone())))
+        .collect()
+}
 #[cfg(test)]
 fn known_roots(home: &Path) -> Vec<PathBuf> {
     selected_roots(home, None).expect("Bundled AI catalog")

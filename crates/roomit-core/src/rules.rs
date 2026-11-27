@@ -83,6 +83,7 @@ pub(crate) fn directory_rule(path: &Path, context: Context, evidence: &Evidence)
                 ".jan" | "Jan" => Some(AiTool::Other("Jan")),
                 ".copilot" => Some(AiTool::Other("GitHub Copilot")),
                 "windsurf" | "Windsurf" => Some(AiTool::Other("Windsurf")),
+                "Open Design" | "OpenDesign" => Some(AiTool::Other("Open Design")),
                 "Claude" => Some(AiTool::Other("Claude")),
                 "anythingllm-desktop" | "AnythingLLM" => Some(AiTool::Other("AnythingLLM")),
                 "Antigravity" => Some(AiTool::Other("Antigravity")),

@@ -19,9 +19,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+dunce = "1"
+sha2 = "0.10"
+git2 = { version = "0.20", default-features = false }
 tauri = { version = "2", features = [] }
 roomit-core = { path = "../crates/roomit-core" }
 tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
 sysinfo = { version = "0.37", default-features = false, features = ["disk", "system", "network"] }
 serde = { version = "1", features = ["derive"] }
 tauri-plugin-opener = { version = "2", default-features = false }
@@ -35,6 +39,7 @@ base64 = "0.22"
 minisign-verify = "0.3"
 
 [target.'cfg(windows)'.dependencies]
+winapi-util = "0.1"
 winreg = "0.56"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Threading", "Win32_Security", "Win32_System_Performance", "Win32_System_SystemInformation"] }
 

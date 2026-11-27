@@ -26,4 +26,8 @@ impl Exclusions {
         normalized.ancestors().any(|ancestor| self.paths.contains(ancestor) ||
             (self.app_bundles && ancestor.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("app"))))
     }
+    pub fn has_descendant(&self, directory: &Path) -> bool {
+        let directory = key(directory);
+        self.paths.iter().any(|excluded| excluded.starts_with(&directory))
+    }
 }

@@ -17,8 +17,6 @@
         "title": "Roomit 0.4.4",
         "decorations": false,
         "shadow": true,
-        "theme": "Dark",
-        "backgroundColor": "#101114",
         "width": 1280,
         "height": 860,
         "minWidth": 720,

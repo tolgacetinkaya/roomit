@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterGroups, groupReport, topLevelFindings } from '../src/groups.ts';
+import { filterGroups, groupReport, sortGroups, topLevelFindings } from '../src/groups.ts';
 
 const finding = (path, bytes, overrides = {}) => ({ path, logicalBytes: String(bytes), sizeComplete: true,
   kind: 'directory', category: 'buildOutput', disposition: 'reviewRequired', tool: '.NET', ruleId: 'test', reason: 'test', ...overrides });
@@ -59,4 +59,24 @@ test('search finds projects, tools and nested member paths', () => {
   assert.equal(filterGroups(groups, 'node_modules').length, 1);
   assert.equal(filterGroups(groups, '.NET').length, 1);
   assert.equal(filterGroups(groups, '').length, 2);
+});
+test('Projects sorts by direct node_modules and retains projects with no outputs or older measurements', () => {
+  const withSize = (path, size) => ({path, ecosystems:['Node.js'], nodeModules:{logicalBytes:size, sizeComplete:true}});
+  const {projects} = groupReport(report([
+    finding('/small/build', 999),
+    finding('/old/node_modules', 8, {ruleId:'node-project-dependencies', tool:'Node.js'}),
+  ], [withSize('/small','1'), withSize('/big','9007199254740993'), withSize('/empty','0'),
+      {path:'/old', ecosystems:['Node.js']}, {path:'/unknown', ecosystems:['Rust']}]));
+  assert.deepEqual(sortGroups(projects,'size',true).map(p=>p.title), ['big','old','small','empty','unknown']);
+  assert.equal(projects.find(p=>p.title==='unknown').nodeModules, undefined);
+});
+
+test('targeted roots keep custom AI folders on the map once even with missing findings', () => {
+  const r = report([finding('C:/AI/custom/model',4)], [], true);
+  r.aiRootOwners = {'c:/ai/custom':'Claude Code','C:/skipped':'OpenCode','C:/design':'Open Design'};
+  r.roots = [['C:/AI/custom','completed','10'],['C:/skipped','excluded','0'],['C:/design','completed','12']]
+    .map(([path,status,logicalBytes])=>({path,status,logicalBytes,sizeComplete:true}));
+  const groups = groupReport(r);
+  assert.deepEqual(groups.ai.map(g=>[g.title,g.logicalBytes]),[['Open Design','12'],['Claude Code','10']]);
+  assert.equal(groups.projects.length,0);
 });

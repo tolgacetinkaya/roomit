@@ -26,14 +26,15 @@ export function gpuText(reading?:GpuReading):string {
   if(!reading)return "Unavailable";
   if(reading.status==="noProcess")return "No running processes";
   if(reading.status==="warmingUp")return "Waiting for measurement";
-  if((reading.status==="measured"||reading.status==="partial")&&reading.percent!==null&&Number.isFinite(reading.percent)&&reading.percent>=0&&reading.percent<=100){
-    const value=`${reading.percent.toLocaleString("en-US",{maximumFractionDigits:1})}%`;
+  const percent=gpuUsagePercent(reading);
+  if(percent!==null){
+    const value=`${percent.toLocaleString("en-US",{maximumFractionDigits:1})}%`;
     return reading.status==="partial"?`At least ${value} · partial`:value;
   }
   return "Unavailable";
 }
-function gpuSortValue(reading?:GpuReading):number {
-  return reading&&(reading.status==="measured"||reading.status==="partial")&&reading.percent!==null&&Number.isFinite(reading.percent)&&reading.percent>=0&&reading.percent<=100?reading.percent:-1;
+export function gpuUsagePercent(reading?:GpuReading):number|null {
+  return reading&&(reading.status==="measured"||reading.status==="partial")&&reading.percent!==null&&Number.isFinite(reading.percent)&&reading.percent>=0&&reading.percent<=100?reading.percent:null;
 }
 export interface ToolUsage { processes:number; cpu:number|null; memory:string }
 export function toolUsage(rows:ProcessRow[],id:string):ToolUsage {
@@ -43,6 +44,6 @@ export function toolUsage(rows:ProcessRow[],id:string):ToolUsage {
 export function processPage(rows:ProcessRow[],query:string,aiOnly:boolean,sort:ProcessSort,page:number):ProcessRow[]{
   const key=query.trim().toLocaleLowerCase("en");
   const matched=rows.filter(p=>(!aiOnly||p.toolId)&&(!key||`${p.name} ${p.pid} ${p.toolId||""}`.toLocaleLowerCase("en").includes(key)));
-  matched.sort((a,b)=>sort==="gpu"?gpuSortValue(b.gpu)-gpuSortValue(a.gpu)||a.pid-b.pid:sort==="cpu"?(b.cpuPercent??-1)-(a.cpuPercent??-1)||a.pid-b.pid:BigInt(a.memoryBytes)>BigInt(b.memoryBytes)?-1:BigInt(a.memoryBytes)<BigInt(b.memoryBytes)?1:a.pid-b.pid);
+  matched.sort((a,b)=>sort==="gpu"?(gpuUsagePercent(b.gpu)??-1)-(gpuUsagePercent(a.gpu)??-1)||a.pid-b.pid:sort==="cpu"?(b.cpuPercent??-1)-(a.cpuPercent??-1)||a.pid-b.pid:BigInt(a.memoryBytes)>BigInt(b.memoryBytes)?-1:BigInt(a.memoryBytes)<BigInt(b.memoryBytes)?1:a.pid-b.pid);
   return matched.slice(page*50,(page+1)*50);
 }

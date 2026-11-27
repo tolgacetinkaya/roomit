@@ -3,8 +3,6 @@
     "windows": [{
       "label": "main",
       "title": "Roomit",
-      "theme": "Dark",
-      "backgroundColor": "#181b20",
       "decorations": true,
       "titleBarStyle": "Overlay",
       "hiddenTitle": true,

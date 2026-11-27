@@ -1,5 +1,6 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { installThemePicker } from "./theme";
 import { icon } from "./icons";
 import type { ResultView } from "./results";
 
@@ -12,6 +13,7 @@ export function installShell(navigate:(view:ResultView)=>void, openScan:()=>void
   toggle.append(icon("sidebar"));minimize.append(icon("minimize"));maximize.append(icon("maximize"));close.append(icon("close"));
   get("sidebar-new-scan").prepend(icon("plus"));
   document.documentElement.classList.toggle("platform-mac",/Mac/i.test(navigator.platform));
+  installThemePicker(get<HTMLSelectElement>("theme-choice"));
   const sidebar=get("app-sidebar");
   const tooltip=document.createElement("div");tooltip.id="sidebar-tooltip";tooltip.className="sidebar-tooltip";tooltip.role="tooltip";tooltip.hidden=true;document.body.append(tooltip);
   let tooltipOwner:HTMLElement|undefined;
@@ -25,7 +27,7 @@ export function installShell(navigate:(view:ResultView)=>void, openScan:()=>void
       if(!collapsed)return;
       hideTooltip();tooltipOwner=control;
       const count=control.querySelector("small")?.textContent?.trim();
-      tooltip.textContent=label+(count&&/\d/.test(count)?` · ${count}`:"");tooltip.hidden=false;
+      tooltip.textContent=label+(count&&/\d/.test(count)?` Â· ${count}`:"");tooltip.hidden=false;
       control.setAttribute("aria-describedby",tooltip.id);
       const rect=control.getBoundingClientRect();
       tooltip.style.left=`${sidebar.getBoundingClientRect().right+8}px`;
@@ -41,7 +43,7 @@ export function installShell(navigate:(view:ResultView)=>void, openScan:()=>void
     sidebar.hidden=false;
     toggle.setAttribute("aria-expanded",String(!collapsed));
     const label=collapsed?"Expand sidebar":"Collapse sidebar";
-    toggle.setAttribute("aria-label",label);toggle.title=`${label} (${ /Mac/i.test(navigator.platform)?"⌘":"Ctrl"}+B)`;menuSidebar.textContent=label;
+    toggle.setAttribute("aria-label",label);toggle.title=`${label} (${ /Mac/i.test(navigator.platform)?"âŒ˜":"Ctrl"}+B)`;menuSidebar.textContent=label;
     // Canvas charts need to redraw after the available workspace width changes.
     window.dispatchEvent(new Event("resize"));
   }

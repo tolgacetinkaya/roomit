@@ -43,8 +43,19 @@
     ],
     "dataPaths": [
       ".local/share/opencode",
-      ".config/opencode"
+      ".config/opencode",
+      ".cache/opencode",
+      ".local/state/opencode"
     ],
+    "storePrefixes": []
+  },
+  {
+    "id": "opendesign",
+    "name": "Open Design",
+    "kind": "Desktop",
+    "commands": ["open-design"],
+    "appNames": ["Open Design", "OpenDesign"],
+    "dataPaths": [],
     "storePrefixes": []
   },
   {

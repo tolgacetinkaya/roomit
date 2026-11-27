@@ -1,4 +1,4 @@
-import type { Finding, InspectionReport, Project } from "./report";
+import type { Finding, InspectionReport, Project, ProjectSize } from "./report";
 
 export type GroupKind = "project" | "ai" | "protected";
 export interface ResultGroup {
@@ -10,10 +10,11 @@ export interface ResultGroup {
   logicalBytes: string;
   sizeComplete: boolean;
   items: Finding[];
+  nodeModules?: ProjectSize | null;
 }
 export interface GroupedReport { projects: ResultGroup[]; ai: ResultGroup[]; protected: ResultGroup[] }
 
-function pathKey(path: string): string {
+export function pathKey(path: string): string {
   const normal = path.replace(/\\/g, "/").replace(/\/+$/, "") || "/";
   return /^[a-z]:/i.test(normal) || normal.startsWith("//") ? normal.toLowerCase() : normal;
 }
@@ -50,7 +51,23 @@ export function topLevelFindings<T extends { path: string; kind: "file" | "direc
 export function groupReport(report: InspectionReport): GroupedReport {
   const projects = new Map<string, Project>(report.projects.map((project) => [pathKey(project.path), project]));
   const groups = new Map<string, ResultGroup>();
-  for (const item of topLevelFindings(report.findings)) {
+  for (const [key, project] of projects) {
+    const id = `project:${key}`;
+    groups.set(id, {id, kind: "project", location: project.path, title: pathName(project.path),
+      logicalBytes: "0", sizeComplete: !report.resultsTruncated, tools: [...project.ecosystems],
+      items: [], nodeModules: project.nodeModules});
+  }
+  // A targeted root has an owner even with a custom directory name or a truncated findings list.
+  const measuredRoots: Finding[] = [];
+  const owners = new Map(Object.entries(report.aiRootOwners ?? {}).map(([path, name]) => [pathKey(path), name]));
+  for (const root of report.roots ?? []) {
+    const tool = owners.get(pathKey(root.path));
+    if (tool && ["completed","limited","cancelled"].includes(root.status)) {
+      measuredRoots.push({path:root.path, kind:"directory", tool, category:"aiUserData", disposition:"protected",
+        logicalBytes:root.logicalBytes, sizeComplete:root.sizeComplete, ruleId:"ai-data-root", reason:"Measured data in this tool's selected local folder."});
+    }
+  }
+  for (const item of topLevelFindings([...measuredRoots, ...report.findings])) {
     let project: Project | undefined;
     for (let key = pathKey(item.path); key && !project; key = parentKey(key)) project = projects.get(key);
     const ai = item.category.startsWith("ai");
@@ -64,6 +81,11 @@ export function groupReport(report: InspectionReport): GroupedReport {
       groups.set(id, group);
     }
     group.items.push(item);
+    // Older reports can still supply the measured direct node_modules finding.
+    if (!group.nodeModules && item.ruleId === "node-project-dependencies" &&
+        parentKey(pathKey(item.path)) === pathKey(group.location)) {
+      group.nodeModules = { logicalBytes: item.logicalBytes, sizeComplete: item.sizeComplete };
+    }
     if (!group.tools.includes(item.tool)) group.tools.push(item.tool);
     group.logicalBytes = (BigInt(group.logicalBytes) + BigInt(item.logicalBytes)).toString();
     group.sizeComplete &&= item.sizeComplete;
@@ -84,7 +106,14 @@ export function filterGroups(groups: ResultGroup[], query: string): ResultGroup[
     .some((text) => text.toLocaleLowerCase("en").includes(key)));
 }
 export type GroupSort = "size" | "name";
-export function sortGroups(groups: ResultGroup[], sort: GroupSort): ResultGroup[] {
+export function sortGroups(groups: ResultGroup[], sort: GroupSort, byModules = false): ResultGroup[] {
   const collator = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
-  return [...groups].sort((a, b) => (sort === "name" ? collator.compare(a.title, b.title) : compareBytes(a.logicalBytes, b.logicalBytes)) || a.id.localeCompare(b.id));
+  return [...groups].sort((a, b) => {
+    if (sort === "size" && byModules) {
+      const order = Number(Boolean(b.nodeModules)) - Number(Boolean(a.nodeModules))
+        || compareBytes(a.nodeModules?.logicalBytes ?? "0", b.nodeModules?.logicalBytes ?? "0");
+      if (order) return order;
+    }
+    return (sort === "name" ? collator.compare(a.title, b.title) : compareBytes(a.logicalBytes, b.logicalBytes)) || a.id.localeCompare(b.id);
+  });
 }

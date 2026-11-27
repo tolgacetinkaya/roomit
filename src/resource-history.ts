@@ -1,6 +1,10 @@
 export type MemoryMode="capacity"|"percent"|"both";
 export const HISTORY_MS=120_000;
 export const HISTORY_LIMIT=121;
+export const HIGH_USAGE_PERCENT=80;
+export function isHighUsage(percent:number|null):boolean {
+  return percent!==null && Number.isFinite(percent) && percent>=HIGH_USAGE_PERCENT;
+}
 export type ResourceKey="cpu"|"ram"|"gpu";
 export interface UsagePoint {at:number;cpu:number|null;ram:number|null;gpu:number|null;gpuPartial:boolean;breakBefore:boolean}
 export function validPercent(value:unknown):number|null {

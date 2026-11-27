@@ -1,8 +1,18 @@
+import {storageCopy} from "./locales/en-storage.ts";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 
-export interface WatchStatus { indexId: string; stale: boolean; unavailable: string | null }
+export interface WatchStatus { indexId: string; stale: boolean; unavailable: string | null; storageScan?: boolean; changedPath?: string | null }
 export function freshnessNotice(status: WatchStatus | null): { title: string; message: string; warning: boolean } {
-  if (status?.stale) return { title: "Results are out of date", message: "Changes detected in scanned folders. Select Rescan to refresh your results. Scanning does not start automatically.", warning: true };
+  if (status?.stale) {
+    const location = status.changedPath ? ` Changed location: ${status.changedPath}.` : "";
+    const monitoring = status.unavailable ? ` ${status.unavailable}` : "";
+    if (status.storageScan) return {
+      title: storageCopy.changed,
+      message: storageCopy.refresh+location+monitoring,
+      warning: Boolean(status.unavailable),
+    };
+    return { title: "Results are out of date", message: `Changes detected in scanned folders. Select Rescan to refresh your results. Scanning does not start automatically.${location}${monitoring}`, warning: true };
+  }
   if (status?.unavailable) return { title: "Freshness could not be verified", message: `${status.unavailable} Rescan to see the current state.`, warning: true };
   if (!status) return { title: "", message: "Preparing change monitoring…", warning: false };
   return { title: "", message: "Changes in this scope are monitored while Roomit is open. You choose when to rescan.", warning: false };

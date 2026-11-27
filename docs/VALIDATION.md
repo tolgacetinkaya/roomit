@@ -533,3 +533,21 @@ to copying; build and test results above completed successfully.
 This is a foundation check, not acceptance of a complete cleaner or a disk-speed
 benchmark. No personal file contents were scanned. No installer, release, remote
 repository, package publication or GitHub push was produced.
+## Projects storage and Git activity
+
+The Windows production frontend build, frontend suite, core scanner tests,
+Rust workspace check and desktop library tests passed locally. The existing
+interactive file-manager test was skipped. Scanner fixtures cover separate
+workspace installations, exclusions, empty projects and truncated findings.
+A local Git fixture covers staged, unstaged and untracked changes, an unborn
+branch, and a later sibling commit. An Edge check with a synthetic saved report
+verified descending dependency sizes and the project activity fields.
+## Local storage insights preview
+
+The combined Windows check passed 61 frontend, 34 core and 64 desktop library
+tests. The interactive file-manager smoke test remained skipped. New native
+fixtures cover category totals, scope-specific baselines across saved reports,
+partial sizes, hardlink identity, same-size files with different contents,
+exclusions, changed files and cancellation. A production Edge fixture checked
+the eight category reveal actions on the two cards, Claude project subtotals,
+growth display and explicit verification. Physical macOS testing is pending.

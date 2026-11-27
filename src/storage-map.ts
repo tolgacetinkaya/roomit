@@ -1,31 +1,96 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { formatBytes, sizeLabel } from "./report";
+import type {InspectionReport} from "./report";
+import {scanReadout} from "./scan-readout";
+import {snapshotDate,snapshotDuration} from "./snapshot";
+import {storageCopy as copy} from "./locales/en-storage";
+import { formatBytes, formatCount, sizeLabel } from "./report";
 import type { SizedEntry } from "./report";
 import { pathName } from "./groups";
-import { aiMapTree, mapSlices, withRemainder } from "./map-model";
+import { aiMapTree, mapTiles, storageSeries, withRemainder } from "./map-model";
 import type { MapNode } from "./map-model";
 import type { GroupedReport } from "./groups";
 import { revealActions } from "./reveal";
-const NS="http://www.w3.org/2000/svg";
-const colors=["#508dff","#66bcff","#7180ed","#4274cb","#89aef4","#386895","#accaff","#5e69ae"];
-function sector(start:number,end:number,inner:number,outer:number):string {
-  const a=start*Math.PI*2-Math.PI/2, b=(end-start>=.999999 ? end-.000001 : end)*Math.PI*2-Math.PI/2;
-  const p=(r:number,t:number)=>`${200+r*Math.cos(t)},${200+r*Math.sin(t)}`;
-  return `M${p(outer,a)} A${outer},${outer} 0 ${b-a>Math.PI?1:0} 1 ${p(outer,b)} L${p(inner,b)} A${inner},${inner} 0 ${b-a>Math.PI?1:0} 0 ${p(inner,a)} Z`;
+import "./kesit-storage.css";
+
+const seriesColor = (series: number) => `var(--storage-series-${series})`;
+export function storageSummary(groups:GroupedReport|null, report:InspectionReport|null, open?:(tool?: string)=>void, compact=false):HTMLElement {
+  const panel=document.createElement("section");panel.className="panel storage-summary scan-readout";
+  if(!open){
+    const header=document.createElement("div");header.className="panel-heading";
+    const title=document.createElement("h2");title.textContent=copy.heading;header.append(title);
+    panel.append(header);
+  }
+  if(!groups||!report){
+    const note=document.createElement("p");note.className="hint";note.textContent=copy.unmeasured+" · "+copy.start;panel.append(note);return panel;
+  }
+  const model=scanReadout(report,groups);
+  const scope=document.createElement("p");scope.className="readout-scope";
+  scope.textContent=[copy.scan+" · "+model.scope,snapshotDate(report.scannedAtMs),snapshotDuration(report.scanDurationMs)].filter(Boolean).join("  ·  ");
+  const size=document.createElement("strong");size.className="storage-total";
+  if(model.missing || !model.complete) {
+    size.textContent=model.missing??sizeLabel(String(model.total),false);
+    size.classList.add("qualified-total");
+  } else {
+    const [amount,unit]=formatBytes(String(model.total)).split(" ");
+    const suffix=document.createElement("small");suffix.textContent=unit;
+    size.append(amount," ",suffix);
+  }
+  const counts=document.createElement("span");counts.className="hint";
+  counts.textContent=formatCount(model.files)+" "+(model.files===1?copy.oneFile:copy.files);
+  if(!(report.scope==="ai" && report.aiToolId))counts.textContent+=" · "+formatCount(model.toolCount)+" "+(model.toolCount===1?copy.tool:copy.tools);
+  const hero=document.createElement("div");hero.className="storage-hero";
+  const headline=document.createElement("div");headline.className="readout-total";headline.append(size,counts);hero.append(headline);panel.append(scope,hero);
+  if(model.largestTool && !model.missing){
+    const leader=document.createElement("p");leader.className="readout-leader";
+    const name=document.createElement("strong");name.textContent=model.largestTool.title;
+    const value=document.createElement("span");value.textContent=sizeLabel(model.largestTool.logicalBytes,model.largestTool.sizeComplete);
+    leader.append(copy.largestTool+" · ",name," · ",value);
+    headline.append(leader);
+  }
+  if(compact && model.rows.length)return panel;
+  if(!model.rows.length){
+    if(!model.missing && !model.total && model.complete){const note=document.createElement("p");note.className="hint";note.textContent=report.aiToolId?copy.emptySize:copy.empty;panel.append(note);}
+    return panel;
+  }
+  const plot=document.createElement("div");plot.className="storage-plot";
+  const label=document.createElement("h3");label.className="readout-label";label.textContent=model.label;
+  const bar=document.createElement("div");bar.className="storage-share";bar.title=copy.rulerScale;
+  const list=document.createElement("ul");list.className="storage-legend";
+  for(const [index,row] of model.rows.entries()){
+    const tool=model.label===copy.byTool?groups.ai.find(group=>group.title===row.label):undefined;
+    const swatch=document.createElement("i");
+    const size=sizeLabel(String(row.bytes),row.complete);
+    const li=document.createElement("li"),name=document.createElement("span"),value=document.createElement("strong");
+    name.textContent=row.label;value.textContent=size;
+    let segment:HTMLElement;
+    if(open && tool){
+      const button=document.createElement("button");button.type="button";
+      button.setAttribute("aria-label",copy.exploreTool(row.label,size));button.title=copy.exploreTool(row.label,size);
+      button.onclick=()=>open(tool.id);segment=button;
+      const link=document.createElement("button");link.type="button";link.className="storage-key";
+      link.setAttribute("aria-label",button.title);link.onclick=button.onclick;
+      link.append(swatch,name,value);li.append(link);
+    }else{
+      segment=document.createElement("span");li.append(swatch,name,value);
+    }
+    const color=seriesColor(model.label===copy.byTool?storageSeries(row.label):index+1);
+    segment.style.flexBasis=Number(row.bytes)/Number(model.total)*100+"%";
+    segment.style.background=swatch.style.background=color;bar.append(segment);
+    list.append(li);
+  }
+  plot.append(label,bar,list);hero.append(plot);return panel;
 }
-export function renderStorageMap(groups:GroupedReport|null,indexId?:string,incomplete=false):HTMLElement {
+export function renderStorageMap(groups:GroupedReport|null,indexId?:string,incomplete=false,initialTool?:string):HTMLElement {
   const root=groups ? aiMapTree(groups) : {id:"ai",name:"AI data",bytes:"0",complete:true,children:[]} as MapNode;
   root.complete &&= !incomplete;
-  const panel=document.createElement("section"); panel.className="storage-map panel"; panel.setAttribute("aria-label","Interactive AI storage map");
+  const panel=document.createElement("section"); panel.className="storage-map panel"; panel.setAttribute("aria-label",copy.mapLabel);
   const header=document.createElement("div"); header.className="panel-heading";
-  const title=document.createElement("div"); const h=document.createElement("h2");h.textContent="AI space map";
-  const sub=document.createElement("p");sub.className="hint";sub.textContent="Select a sector to explore tools and folders.";title.append(h,sub);
-  const back=document.createElement("button");back.type="button";back.className="secondary map-back";back.textContent="Up one level";header.append(title,back);
+  const title=document.createElement("div"); const h=document.createElement("h2");h.textContent=copy.mapHeading;
+  const sub=document.createElement("p");sub.className="hint";sub.textContent=copy.mapHint;title.append(h,sub);
+  const back=document.createElement("button");back.type="button";back.className="secondary map-back";back.textContent=copy.mapLevelUp;header.append(title,back);
   const body=document.createElement("div");body.className="map-body";
-  const visual=document.createElement("div");visual.className="map-visual";
-  const svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox","0 0 400 400");svg.setAttribute("role","group");svg.setAttribute("aria-label","AI data by size");
-  const center=document.createElement("div");center.className="map-center";
-  const centerLabel=document.createElement("span"),centerBytes=document.createElement("strong"),centerHint=document.createElement("small");center.append(centerLabel,centerBytes,centerHint);visual.append(svg,center);
+  const visual=document.createElement("div");visual.className="storage-tiles";
+  visual.setAttribute("role","group");visual.setAttribute("aria-label",copy.mapHeading);
   const detail=document.createElement("div");detail.className="map-detail";
   const crumb=document.createElement("p");crumb.className="map-crumb";
   const list=document.createElement("div");list.className="map-list";
@@ -34,13 +99,15 @@ export function renderStorageMap(groups:GroupedReport|null,indexId?:string,incom
   detail.append(crumb,list,actions,note);body.append(visual,detail);panel.append(header,body);
   const caveat=document.createElement("p");caveat.className="hint map-caveat";caveat.textContent="Logical file sizes, not reclaimable space or unused data. Models, history, and settings are protected.";panel.append(caveat);
   const stack:MapNode[]=[root];let revision=0;
+  const selectedTool=root.children?.find(node=>node.id===initialTool);
+  if(selectedTool)stack.push(selectedTool);
   async function open(node:MapNode):Promise<void>{
+    const request=++revision;
     if(!node.children && !node.directory){
       actions.dataset.revealOwner="";actions.tabIndex=0;actions.replaceChildren(revealActions(node.path?[node.path]:[]));
       note.textContent=node.path||"Smaller items are grouped on the map. Find every measured result in Large items.";
       actions.querySelector<HTMLButtonElement>("button")?.focus({preventScroll:true});return;
     }
-    const request=++revision;
     if(node.directory && !node.children){
       if(!indexId || !isTauri()){note.textContent="Start a new desktop scan to explore subfolders.";return;}
       note.textContent="Loading subfolders…";
@@ -55,29 +122,32 @@ export function renderStorageMap(groups:GroupedReport|null,indexId?:string,incom
   function draw():void{
     const current=stack[stack.length-1];const nodes=current.children||[];
     back.disabled=stack.length===1;crumb.textContent=stack.map(n=>n.name).join(" / ");crumb.title=current.path||crumb.textContent;
-    centerLabel.textContent=current.name;centerBytes.textContent=groups?formatBytes(current.bytes):"—";centerHint.textContent=groups?(current.complete?"Scanned AI data":"Partial measurement"):"Not scanned yet";
-    svg.replaceChildren();list.replaceChildren();actions.replaceChildren();note.textContent="";
+    if(groups)crumb.append(" · ",sizeLabel(current.bytes,current.complete));
+    visual.replaceChildren();list.replaceChildren();actions.replaceChildren();note.textContent="";
     if(current.path){actions.dataset.revealOwner="";actions.tabIndex=0;actions.append(revealActions([current.path]));}
-    const slices=mapSlices(nodes,current.bytes);
-    if(!slices.length){const circle=document.createElementNS(NS,"circle");circle.setAttribute("cx","200");circle.setAttribute("cy","200");circle.setAttribute("r","137");circle.setAttribute("fill","none");circle.setAttribute("stroke","#273346");circle.setAttribute("stroke-width","58");svg.append(circle);
-      const empty=document.createElement("p");empty.className="map-empty";empty.textContent=groups?"No measured child items at this level.":"Scan AI data folders to create your map.";list.append(empty);}
-    for(const [i,slice]of slices.entries()){
-      const node=slice.node,color=colors[i%colors.length];
-      const path=document.createElementNS(NS,"path");path.setAttribute("d",sector(slice.start,slice.end,99,175));path.setAttribute("fill",color);path.setAttribute("class","map-segment");path.setAttribute("role","button");path.setAttribute("tabindex","0");path.setAttribute("aria-label",`${node.name}, ${sizeLabel(node.bytes,node.complete)}`);
-      const tip=document.createElementNS(NS,"title");tip.textContent=`${node.name} · ${sizeLabel(node.bytes,node.complete)}`;path.append(tip);
-      const show=()=>{centerLabel.textContent=node.name;centerBytes.textContent=formatBytes(node.bytes);centerHint.textContent=node.directory||node.children?"Select for details":"File";};
-      const reset=()=>{centerLabel.textContent=current.name;centerBytes.textContent=formatBytes(current.bytes);centerHint.textContent=current.complete?"Scanned AI data":"Partial measurement";};
-      path.addEventListener("pointerenter",show);path.addEventListener("pointerleave",reset);path.addEventListener("focus",show);path.addEventListener("blur",reset);
-      path.addEventListener("click",()=>void open(node));path.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();void open(node);}});svg.append(path);
-      // Outer ring previews the known next level; every arc uses measured bytes.
-      if(node.children){for(const child of mapSlices(node.children,node.bytes)){
-        const p=document.createElementNS(NS,"path");p.setAttribute("d",sector(slice.start+(slice.end-slice.start)*child.start,slice.start+(slice.end-slice.start)*child.end,180,195));p.setAttribute("fill",color);p.setAttribute("opacity",".5");p.setAttribute("pointer-events","none");svg.append(p);
-      }}
+    const tiles=mapTiles(nodes);
+    visual.hidden=!tiles.length;
+    if(!tiles.length){
+      const empty=document.createElement("p");empty.className="map-empty";empty.textContent=groups?copy.mapEmptyLevel:copy.mapEmpty;list.append(empty);
+    }
+    for(const [index,{node,x,y,width,height}] of tiles.entries()){
+      const owner=stack[1]??node;
+      const ink=seriesColor(storageSeries(owner.name));
+      const color=stack.length===1?ink:`color-mix(in srgb, ${ink} ${100-(index%5)*10}%, var(--panel))`;
+      const tile=document.createElement("button");tile.type="button";tile.className="storage-tile";
+      tile.setAttribute("aria-label",`${node.name}, ${sizeLabel(node.bytes,node.complete)}`);
+      tile.title=`${node.name} · ${sizeLabel(node.bytes,node.complete)}`;
+      const tileLabel=document.createElement("span");tileLabel.className="map-tile-label";
+      tileLabel.textContent=node.name;tile.append(tileLabel);
+      Object.assign(tile.style,{left:x+"%",top:y+"%",width:width+"%",height:height+"%",backgroundColor:color});
+      tile.addEventListener("click",()=>void open(node));visual.append(tile);
       const row=document.createElement("button");row.type="button";row.className="map-item secondary";
       const swatch=document.createElement("span");swatch.className="map-swatch";swatch.style.background=color;
-      const label=document.createElement("span");label.textContent=node.name;label.title=node.path||node.name;
+      const label=document.createElement("span");label.textContent=node.name;
       const bytes=document.createElement("strong");bytes.textContent=sizeLabel(node.bytes,node.complete);
-      row.append(swatch,label,bytes);row.addEventListener("click",()=>{if(node.children||node.directory)void open(node);else{actions.dataset.revealOwner="";actions.replaceChildren(revealActions(node.path?[node.path]:[]));note.textContent=node.path||"Smaller items are grouped on the map. Find every measured result in Large items.";}});list.append(row);
+      row.onpointerenter=row.onfocus=()=>tile.classList.add("legend-highlight");
+      row.onpointerleave=row.onblur=()=>tile.classList.remove("legend-highlight");
+      row.append(swatch,label,bytes);row.addEventListener("click",()=>void open(node));list.append(row);
     }
   }
   back.addEventListener("click",()=>{revision++;if(stack.length>1)stack.pop();draw();if(stack.length===1)list.querySelector<HTMLButtonElement>("button")?.focus({preventScroll:true});});

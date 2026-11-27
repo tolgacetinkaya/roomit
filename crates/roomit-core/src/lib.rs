@@ -8,5 +8,5 @@ mod exclusions;
 
 pub use model::*;
 pub use exclusions::Exclusions;
-pub use scanner::{ScanOptions, SizeSink, inspect_workspace, scan_locations, scan_workspace,
+pub use scanner::{ScanOptions, SizeSink, display_path, inspect_workspace, scan_locations, scan_workspace,
     scan_locations_with_sink, scan_workspace_with_sink};

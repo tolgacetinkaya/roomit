@@ -10,6 +10,14 @@ mod monitor;
 mod gpu;
 mod updates;
 mod development;
+mod project_git;
+mod workspaces;
+mod storage;
+mod growth;
+mod models;
+mod archive;
+#[derive(Default)]
+struct ModelJobs(ScanRegistry);
 
 use std::{
     path::PathBuf,
@@ -25,12 +33,19 @@ struct ScanLease { registry: ScanRegistry, id: String, cancel: Arc<AtomicBool> }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopReport {
+    #[serde(default)] model_groups: Option<Vec<models::ModelGroup>>,
+    #[serde(default)] skipped_models: usize,
+    #[serde(default)] growth: Option<growth::Growth>,
+    #[serde(default)] breakdown: storage::Breakdown,
     #[serde(flatten)] report: roomit_core::InspectionReport,
     size_index_id: String,
     scanned_at_ms: u64,
+    #[serde(default)] scan_duration_ms: Option<u64>,
     persistence_error: Option<String>,
     #[serde(default)] watch_policy: Option<watch::WatchPolicy>,
+    #[serde(default)] ai_root_owners: std::collections::BTreeMap<PathBuf, String>,
     #[serde(default)] ai_tool_id: Option<String>,
+    #[serde(default)] project_git: std::collections::BTreeMap<String, project_git::ProjectGit>,
 }
 
 impl ScanRegistry {
@@ -76,6 +91,7 @@ async fn inspect_workspace(
     if mode != "ai" && ai_tool_id.is_some() { return Err("An AI tool can only be selected for an AI scan.".into()); }
     let ai_tool_name = ai::tool_name(ai_tool_id.as_deref())?;
     let lease = state.begin(scan_id)?;
+    let scan_started = std::time::Instant::now();
     let scanned_at_ms = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
     let saved = saved.inner().clone();
     // Snapshot persisted choices before starting. A read error blocks the scan;
@@ -91,21 +107,23 @@ async fn inspect_workspace(
         let _lease = lease; // Releases registry even on scan errors or worker panic.
         // Keep the previous snapshot available until the replacement succeeds.
         let mut writer = size_index::IndexWriter::new_in(&saved.directory).map_err(|e| format!("Could not create result directory: {e}"))?;
-        excluded_paths.extend(writer.directories_to_exclude());
         let roots = if mode == "ai" { ai::roots(ai_tool_id.as_deref())? } else if mode == "folder" { vec![PathBuf::from(&root)] } else {
             let roots = computer::computer_roots()?;
             if mode == "disk" { vec![computer::selected_root(&root, &roots)?] } else { roots }
         };
+        let scope_key = growth::scope(&mode, ai_tool_id.as_deref(), &roots, &excluded_paths);
+        excluded_paths.extend(writer.directories_to_exclude());
         let watch_policy = watch::WatchPolicy { excluded_paths: excluded_paths.clone(), app_bundles: cfg!(target_os = "macos"), system_attributes: cfg!(windows) };
         // Arm before traversal: a mutation during a scan can already invalidate
         // its measured rows. Failed scans drop this candidate, keeping the old watch.
-        let monitoring = watch::WatchSession::start(_lease.id.clone(), roots.clone(), watch_policy.clone());
+        let mut monitoring = watch::WatchSession::start(_lease.id.clone(), roots.clone(), watch_policy.clone(), mode == "ai");
         let mut progress = |progress: &roomit_core::ScanProgress| {
+                if progress.finished { return; } // Git inspection follows the filesystem walk.
                 if on_progress.send(progress.clone()).is_err() {
                     _lease.cancel.store(true, Ordering::Relaxed);
                 }
         };
-        let report = if mode != "folder" {
+        let mut report = if mode != "folder" {
             let mut options = roomit_core::ScanOptions::computer(computer::preferred_home(&roots));
             options.excluded_paths = excluded_paths;
             options.exclude_app_bundles = cfg!(target_os = "macos");
@@ -121,11 +139,50 @@ async fn inspect_workspace(
                 exclude_system_attributes: cfg!(windows), ..Default::default() };
             roomit_core::scan_workspace_with_sink(&PathBuf::from(root), options, &_lease.cancel, &mut progress, &mut writer)
         }.map_err(|error| error.to_string())?;
+        let policy = roomit_core::Exclusions::new(&watch_policy.excluded_paths, watch_policy.app_bundles);
+        let mut project_git = std::collections::BTreeMap::new();
+        let mut last_progress = std::time::Instant::now();
+        for project in &report.projects {
+            if _lease.cancel.load(Ordering::Relaxed) { break; }
+            if project_git.is_empty() || last_progress.elapsed().as_millis() >= 150 {
+                progress(&roomit_core::ScanProgress {
+                    current_path: project.path.clone(), stats: report.stats.clone(), finished: false,
+                    root_index: roots.len(), root_count: roots.len(),
+                });
+                last_progress = std::time::Instant::now();
+            }
+            project_git.insert(project.path.clone(), project_git::inspect(std::path::Path::new(&project.path), &policy, &_lease.cancel));
+        }
+        if _lease.cancel.load(Ordering::Relaxed) { report.status = roomit_core::ScanStatus::Cancelled; }
+        let _ = on_progress.send(roomit_core::ScanProgress {
+            current_path: String::new(), stats: report.stats.clone(), finished: true,
+            root_index: roots.len(), root_count: roots.len(),
+        });
         let id = _lease.id.clone();
+        let category_roots=std::mem::take(&mut writer.category_roots);
+        for (path, tool) in &category_roots {
+            if let Some(root)=report.roots.iter().find(|r| path == std::path::Path::new(&r.path) && r.status == roomit_core::RootStatus::Completed) {
+                let info=writer.breakdown.entry(tool.clone()).or_default();
+                if root.size_complete {info.covered_roots.insert(path.clone());}
+            }
+        }
+        for (tool,info) in &mut writer.breakdown {
+            info.complete=report.status==roomit_core::ScanStatus::Completed &&
+                category_roots.iter().filter(|(_,id)|id==tool).all(|(p,_)|info.covered_roots.contains(p));
+        }
+        let breakdown = std::mem::take(&mut writer.breakdown);
+        let skipped_models = writer.skipped_models;
         let mut snapshot = writer.finish(id.clone())?;
-        let mut report = DesktopReport { report, size_index_id: id, scanned_at_ms, persistence_error: None, watch_policy: Some(watch_policy), ai_tool_id };
+        let model_groups = Some(models::groups(&snapshot).map_err(|e|e.to_string())?);
+        let mut ai_root_owners = if mode == "ai" { ai::root_owners(ai_tool_id.as_deref()) } else { Default::default() };
+        ai_root_owners.retain(|path, _| report.roots.iter().any(|root| std::path::Path::new(&root.path) == path));
+        let mut report = DesktopReport { ai_root_owners, model_groups, skipped_models, growth: None, breakdown, report, size_index_id: id, scanned_at_ms, scan_duration_ms: None, persistence_error: None, watch_policy: Some(watch_policy), ai_tool_id, project_git };
+        report.growth = Some(growth::compare(&saved, &snapshot, &report, &scope_key).unwrap_or_else(|error|
+            growth::Growth { note:format!("Comparison unavailable: {error}"), ..Default::default() }));
+        report.scan_duration_ms = Some(scan_started.elapsed().as_millis() as u64);
         if let Err(error) = saved.save(&mut snapshot, &report) { report.persistence_error = Some(error); }
         indexes.publish(snapshot)?;
+        if mode == "ai" { monitoring.storage_index = Some(indexes.get(&report.size_index_id)?); }
         watches.publish(monitoring)?;
         Ok(report)
     })
@@ -156,8 +213,10 @@ async fn load_last_scan(saved: tauri::State<'_, saved_scan::SavedScanStore>, ind
         } };
         let roots = report.report.roots.iter().filter(|r| r.status != roomit_core::RootStatus::Excluded && r.status != roomit_core::RootStatus::NotScanned)
             .map(|r| PathBuf::from(&r.path)).collect();
-        let monitoring = watch::WatchSession::start(report.size_index_id.clone(), roots, policy);
+        let ai_storage = report.report.scope == "ai";
+        let mut monitoring = watch::WatchSession::start(report.size_index_id.clone(), roots, policy, ai_storage);
         indexes.publish(snapshot)?;
+        if ai_storage { monitoring.storage_index = Some(indexes.get(&report.size_index_id)?); }
         watches.publish(monitoring)?;
         Ok(Some(report))
     }).await.map_err(|e| e.to_string())?
@@ -228,6 +287,16 @@ async fn map_children(index_id: String, path: String, indexes: tauri::State<'_, 
     tauri::async_runtime::spawn_blocking(move || index.map_children(&path)).await.map_err(|e| e.to_string())?
 }
 #[tauri::command]
+async fn discover_projects(store: tauri::State<'_, exclusions::ExclusionStore>) -> Result<workspaces::Discovery,String> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut paths: Vec<_> = store.paths()?.into_iter().map(PathBuf::from).collect();
+        paths.extend(exclusions::automatic_paths().0);
+        let home = computer::user_home().ok_or("Home folder unavailable")?;
+        Ok(workspaces::discover(roomit_core::Exclusions::new(&paths,cfg!(target_os="macos")), &home))
+    }).await.map_err(|e|e.to_string())?
+}
+#[tauri::command]
 async fn discover_ai_tools() -> Result<inventory::Inventory, String> {
     tauri::async_runtime::spawn_blocking(inventory::discover).await.map_err(|e| e.to_string())?
 }
@@ -236,22 +305,47 @@ async fn resource_snapshot(state: tauri::State<'_, monitor::Monitor>) -> Result<
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || state.0.lock().map_err(|_| "Could not read live monitoring state.".to_string()).map(|mut sampler| sampler.sample())).await.map_err(|e| e.to_string())?
 }
+#[tauri::command]
+async fn verify_models(index_id:String, bytes:String, request_id:String, on_progress:Channel<models::Progress>,
+    indexes:tauri::State<'_,size_index::ResultIndexes>,jobs:tauri::State<'_,ModelJobs>, exclusions:tauri::State<'_,exclusions::ExclusionStore>)->Result<models::Verified,String>{
+    let index=indexes.get(&index_id)?;
+    let lease=jobs.0.begin(request_id)?;
+    let exclusions=exclusions.inner().clone();
+    tauri::async_runtime::spawn_blocking(move||{
+        let mut paths:Vec<PathBuf>=exclusions.paths()?.into_iter().map(PathBuf::from).collect();
+        paths.extend(exclusions::automatic_paths().0);
+        let policy=roomit_core::Exclusions::new(&paths,cfg!(target_os="macos"));
+        let _lease=lease;
+        models::verify(&index,bytes.parse().map_err(|_|"Invalid model size.")?,&policy,&_lease.cancel,|p|on_progress.send(p).is_ok())
+    }).await.map_err(|e|e.to_string())?
+}
+#[tauri::command]
+fn cancel_verification(request_id:String,jobs:tauri::State<'_,ModelJobs>)->Result<bool,String>{jobs.0.cancel(&request_id)}
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::Updates::default())
         .manage(ScanRegistry::default())
+        .manage(ModelJobs::default())
         .manage(monitor::Monitor::default())
         .manage(size_index::ResultIndexes::default())
         .manage(size_index::QueryRegistry::default())
         .manage(watch::WatchRegistry::default())
+        .manage(archive::ArchiveStore::default())
         .setup(|app| {
             app.manage(exclusions::ExclusionStore::new(app.path().app_config_dir()?));
             app.manage(saved_scan::SavedScanStore::new(app.path().app_local_data_dir()?.join("last-scan")));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status, discover_ai_tools, resource_snapshot, map_children, updates::check_for_update, updates::install_release, updates::download_latest_portable])
+        .invoke_handler(tauri::generate_handler![verify_models, cancel_verification, inspect_workspace, cancel_scan, computer_scan_roots, local_disks, reveal_path, query_size_entries, cancel_size_query, get_exclusions, change_exclusions, load_last_scan, watch_status, discover_projects, discover_ai_tools, resource_snapshot, map_children, archive::personal_folders, archive::scan_archive, archive::archive_page, updates::check_for_update, updates::install_release, updates::download_latest_portable])
         .run(tauri::generate_context!())
         .expect("Roomit could not start");
 }

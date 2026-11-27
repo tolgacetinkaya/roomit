@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMinimumGb } from '../src/size-filter.ts';
+import { formatGb, parseMinimumGb } from '../src/size-filter.ts';
+test('archive minimum labels preserve the applied decimal GB value', () => {
+ assert.equal(formatGb(0n), '0 GB');
+ assert.equal(formatGb(1_500_000_000n), '1.5 GB');
+ assert.equal(formatGb(1_000_000_001n), '1.000000001 GB');
+ assert.equal(formatGb(18_446_744_073_709_551_615n), '18,446,744,073.709551615 GB');
+});
 test('GB input accepts comma or dot decimals, blank and zero with exact bytes', () => {
  for (const [text, expected] of [['5',5000000000n],['0,5',500000000n],['0.5',500000000n],[' 1,25 ',1250000000n],['',0n],['0',0n],['0.000000001',1n]]) assert.deepEqual(parseMinimumGb(text),{bytes:expected,error:null});
 });

@@ -190,10 +190,12 @@ struct Frame {
     bytes: u64,
     complete: bool,
     children: Vec<PathBuf>,
+    project_index: Option<usize>,
+    excluded_before: u64,
 }
 impl Frame {
     fn unread(path: PathBuf, depth: usize, context: Context, rule: Option<Rule>, matched_ancestor: bool) -> Self {
-        Self { path, depth, context, rule, matched_ancestor, evidence: Evidence::default(), bytes: 0, complete: false, children: Vec::new() }
+        Self { path, depth, context, rule, matched_ancestor, evidence: Evidence::default(), bytes: 0, complete: false, children: Vec::new(), project_index: None, excluded_before: 0 }
     }
 }
 
@@ -246,6 +248,12 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 let frame = stack.pop().unwrap();
                 self.record_directory(&frame);
                 if let Some(parent) = stack.last_mut() {
+                    if let Some(index) = parent.project_index.filter(|_| frame.path.ends_with("node_modules")) {
+                        self.report.projects[index].node_modules = Some(ProjectSize {
+                            logical_bytes: frame.bytes,
+                            size_complete: frame.complete && frame.excluded_before == self.report.stats.excluded_entries,
+                        });
+                    }
                     parent.bytes = self.add_bytes(parent.bytes, frame.bytes);
                     parent.complete &= frame.complete;
                 } else { root_result = (frame.bytes, frame.complete); }
@@ -285,6 +293,8 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
 
     fn open_directory(&mut self, path: PathBuf, depth: usize, context: Context, rule: Option<Rule>, matched_ancestor: bool) -> io::Result<Frame> {
         let mut frame = Frame::unread(path, depth, context, rule, matched_ancestor);
+        frame.excluded_before = self.report.stats.excluded_entries;
+        let mut saw_modules = false;
         if self.should_stop() { return Ok(frame); }
         // Recheck immediately before opening a queued directory. This reduces
         // link-swap exposure but cannot make a live walk race-free.
@@ -318,6 +328,7 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
                 }
             };
             let path = entry.path();
+            if context.discovers_projects() && path.ends_with("node_modules") { saw_modules = true; }
             if self.exclusions.contains(&path) {
                 self.report.stats.excluded_entries += 1;
                 continue;
@@ -369,7 +380,11 @@ impl<F: FnMut(&ScanProgress)> Scanner<'_, F> {
             if !ecosystems.is_empty() {
                 self.report.stats.projects_found += 1;
                 if self.report.projects.len() < self.options.max_findings {
-                    self.report.projects.push(Project { path: display_path(&frame.path), ecosystems: ecosystems.into_iter().map(String::from).collect() });
+                    frame.project_index = Some(self.report.projects.len());
+                    // A seen folder starts unmeasured until its frame finishes. This
+                    // also covers excluded folders, links and cancellation before descent.
+                    let node_modules = Some(ProjectSize { logical_bytes: 0, size_complete: !saw_modules && frame.complete });
+                    self.report.projects.push(Project { path: display_path(&frame.path), ecosystems: ecosystems.into_iter().map(String::from).collect(), node_modules });
                 } else { self.report.results_truncated = true; }
             }
         }
@@ -427,7 +442,7 @@ fn retain_largest(heap: &mut BinaryHeap<Reverse<SizedEntry>>, entry: &SizedEntry
     if heap.len() > limit { heap.pop(); true } else { false }
 }
 
-fn display_path(path: &Path) -> String {
+pub fn display_path(path: &Path) -> String {
     let text = path.to_string_lossy();
     #[cfg(windows)]
     {

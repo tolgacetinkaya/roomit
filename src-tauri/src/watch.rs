@@ -1,4 +1,4 @@
-use std::{path::{Path, PathBuf}, sync::{Arc, Mutex}};
+use std::{collections::BTreeMap, path::{Path, PathBuf}, sync::{Arc, Mutex}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -7,15 +7,34 @@ pub(crate) struct WatchPolicy { pub excluded_paths: Vec<PathBuf>, pub app_bundle
 
 #[derive(Clone, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct WatchStatus { pub index_id: String, pub stale: bool, pub unavailable: Option<String> }
+pub(crate) struct WatchStatus {
+    pub index_id: String, pub stale: bool, pub unavailable: Option<String>,
+    pub storage_scan: bool, pub changed_path: Option<String>,
+}
 
-struct Changes { status: Mutex<WatchStatus>, roots: Vec<PathBuf>, excluded: roomit_core::Exclusions, system_attributes: bool }
+struct Changes {
+    status: Mutex<WatchStatus>, roots: Vec<PathBuf>, excluded: roomit_core::Exclusions, system_attributes: bool,
+    pending: Option<Mutex<BTreeMap<PathBuf, bool>>>,
+}
 impl Changes {
     fn changed(&self, path: &Path) {
+        self.observed(path, true);
+    }
+    fn observed(&self, path: &Path, structural: bool) {
         if self.status.lock().is_ok_and(|s| s.stale) { return; }
         if !self.roots.iter().any(|root| inside(path, root)) || self.excluded.contains(path) { return; }
         if self.system_attributes && system_entry(path) { return; }
-        if let Ok(mut status) = self.status.lock() { status.stale = true; }
+        if let Some(pending) = &self.pending {
+            let mut paths = pending.lock().unwrap();
+            if let Some(prior) = paths.get_mut(path) { *prior |= structural; }
+            else if paths.len() < 128 { paths.insert(path.to_owned(), structural); }
+            else { self.unavailable("Too many different paths changed to verify this snapshot."); }
+        } else { self.mark_stale(roomit_core::display_path(path)); }
+    }
+    fn mark_stale(&self, path: String) {
+        let mut status = self.status.lock().unwrap();
+        status.stale = true;
+        status.changed_path.get_or_insert(path);
     }
     fn unavailable(&self, reason: &str) {
         if let Ok(mut status) = self.status.lock() { status.unavailable.get_or_insert_with(|| reason.into()); }
@@ -40,21 +59,24 @@ fn link(metadata: &std::fs::Metadata) -> bool {
     { metadata.is_symlink() }
 }
 
-pub(crate) struct WatchSession { changes: Arc<Changes>, _native: Native }
+pub(crate) struct WatchSession {
+    changes: Arc<Changes>, _native: Native,
+    pub storage_index: Option<Arc<crate::size_index::IndexSnapshot>>,
+}
 impl WatchSession {
-    pub fn start(id: String, roots: Vec<PathBuf>, policy: WatchPolicy) -> Self {
+    pub fn start(id: String, roots: Vec<PathBuf>, policy: WatchPolicy, storage_scan: bool) -> Self {
         let excluded = roomit_core::Exclusions::new(&policy.excluded_paths, policy.app_bundles);
         let mut rejected = false;
         let mut roots: Vec<_> = roots.into_iter().filter(|p| !excluded.contains(p)).filter(|p| {
             if std::fs::symlink_metadata(p).is_ok_and(|m| link(&m)) { rejected = true; false } else { true }
         }).map(|p| p.canonicalize().unwrap_or(p)).collect();
         roots.sort(); roots.dedup();
-        let changes = Arc::new(Changes { status: Mutex::new(WatchStatus { index_id: id, stale: false, unavailable: None }), roots,
-            excluded, system_attributes: policy.system_attributes });
+        let changes = Arc::new(Changes { status: Mutex::new(WatchStatus { index_id: id, stale: false, unavailable: None, storage_scan, changed_path: None }), roots,
+            excluded, system_attributes: policy.system_attributes, pending: storage_scan.then(Mutex::default) });
         if changes.roots.is_empty() { changes.unavailable("No scan locations could be monitored."); }
         if rejected { changes.unavailable("A scan location was replaced by a link and is not monitored."); }
         let native = Native::start(changes.clone());
-        Self { changes, _native: native }
+        Self { changes, _native: native, storage_index: None }
     }
     pub fn status(&self) -> WatchStatus {
         // Probe only the small list of root handles/paths, never enumerate files.
@@ -64,7 +86,17 @@ impl WatchSession {
             for root in &self.changes.roots {
                 if !std::fs::symlink_metadata(root).is_ok_and(|m| m.is_dir() && !link(&m)) {
                     self.changes.unavailable("A scanned location is inaccessible. Changes cannot be monitored.");
-                    self.changes.changed(root);
+                    self.changes.mark_stale(roomit_core::display_path(root));
+                }
+            }
+            if let (Some(index),Some(pending)) = (&self.storage_index,&self.changes.pending) {
+                let paths = std::mem::take(&mut *pending.lock().unwrap());
+                if !paths.is_empty() {
+                    match index.storage_difference(paths,&self.changes.roots) {
+                        Ok(Some(path)) => self.changes.mark_stale(path),
+                        Err(message) => self.changes.unavailable(&message),
+                        Ok(None) => {}
+                    }
                 }
             }
         }
@@ -145,10 +177,14 @@ mod windows_native {
         // DWORD-aligned and at the 64 KiB network limit. Neither this buffer
         // nor OVERLAPPED moves or drops until pending IO has completed/cancelled.
         let mut buffer = vec![0u32; 16_384]; let mut ready = Some(ready);
+        // The parent subscription exists only for root rename, removal or replacement.
+        // Directory metadata notifications here also reflect excluded children's activity.
+        let names = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME;
+        let filter = if recursive { names | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_ATTRIBUTES } else { names };
         loop {
             unsafe { ResetEvent(completed.0); }
             let queued = unsafe { ReadDirectoryChangesW(directory.0, buffer.as_mut_ptr().cast(), (buffer.len() * 4) as u32, recursive.into(),
-                FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_CREATION | FILE_NOTIFY_CHANGE_ATTRIBUTES,
+                filter,
                 ptr::null_mut(), &mut *overlapped, None) };
             if queued == 0 && unsafe { GetLastError() } != ERROR_IO_PENDING { return Err(io::Error::last_os_error()); }
             if let Some(ready) = ready.take() { let _ = ready.send(()); }
@@ -172,17 +208,21 @@ mod windows_native {
                 if bytes as usize > buffer.len() * 4 { return Err(io::Error::other("Invalid change event packet.")); }
                 let data = unsafe { std::slice::from_raw_parts(buffer.as_ptr().cast::<u8>(), bytes as usize) };
                 match parse_names(data) {
-                    Ok(names) => for name in names { changes.changed(&root.join(name)); },
+                    Ok(names) => for (name, structural) in names {
+                        if structural { changes.changed(&root.join(name)); } else { changes.observed(&root.join(name), false); }
+                    },
                     Err(_) => changes.unavailable("Some file changes could not be read. Rescanning is recommended."),
                 }
             }
         }
     }
-    pub(super) fn parse_names(data: &[u8]) -> Result<Vec<PathBuf>, ()> {
+    pub(super) fn parse_names(data: &[u8]) -> Result<Vec<(PathBuf, bool)>, ()> {
         let mut names = Vec::new(); let mut offset = 0;
         loop {
             let header = data.get(offset..offset + 12).ok_or(())?;
             let next = u32::from_le_bytes(header[0..4].try_into().unwrap()) as usize;
+            let action = u32::from_le_bytes(header[4..8].try_into().unwrap());
+            if !(1..=5).contains(&action) { return Err(()); }
             let length = u32::from_le_bytes(header[8..12].try_into().unwrap()) as usize;
             if length == 0 || length % 2 != 0 { return Err(()); }
             let end = offset.checked_add(12).and_then(|v| v.checked_add(length)).ok_or(())?;
@@ -190,7 +230,7 @@ mod windows_native {
             let units: Vec<u16> = name.chunks_exact(2).map(|s| u16::from_le_bytes([s[0], s[1]])).collect();
             let path = PathBuf::from(std::ffi::OsString::from_wide(&units));
             if path.is_absolute() || path.components().any(|c| !matches!(c, std::path::Component::Normal(_))) { return Err(()); }
-            names.push(path);
+            names.push((path, action != FILE_ACTION_MODIFIED));
             if next == 0 { return Ok(names); }
             if next < 12 + length || next % 4 != 0 { return Err(()); }
             offset = offset.checked_add(next).ok_or(())?;
@@ -241,11 +281,62 @@ mod tests {
     }
     #[cfg(windows)]
     #[test]
+    fn active_app_writes_are_compared_to_the_finished_scan() {
+        use roomit_core::{SizeSink, SizedEntry, EntryKind};
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("app");
+        fs::create_dir(&root).unwrap();
+        let log = root.join("active.log");
+        let mut session = WatchSession::start("storage".into(),vec![root.clone()],policy(vec![]),true);
+        // The watcher sees the new file before its size is measured.
+        fs::write(&log,b"one").unwrap();
+        let mut writer=crate::size_index::IndexWriter::new().unwrap();
+        let name=roomit_core::display_path(&log.canonicalize().unwrap());
+        writer.record(&SizedEntry {path:name.clone(),kind:EntryKind::File,logical_bytes:3,size_complete:true}).unwrap();
+        session.storage_index=Some(Arc::new(writer.finish("storage".into()).unwrap()));
+        let wait_event = || {
+            let deadline=Instant::now()+Duration::from_secs(5);
+            while session.changes.pending.as_ref().unwrap().lock().unwrap().is_empty() {
+                assert!(Instant::now()<deadline,"expected a native change notification");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        };
+        wait_event();
+        assert!(!session.status().stale,"creation was already measured");
+        fs::write(&log,b"two").unwrap();
+        wait_event();
+        assert!(!session.status().stale,"rewriting three bytes preserves the measured size");
+        fs::write(&log,b"now larger").unwrap();
+        wait_stale(&session);
+        assert_eq!(session.status().changed_path.as_deref(),Some(name.as_str()));
+        assert!(session.status().unavailable.is_none());
+    }
+    #[test]
+    fn storage_snapshot_detects_added_and_removed_files_and_ignores_absent_temporary_files() {
+        use roomit_core::{SizeSink, SizedEntry, EntryKind};
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        let removed = root.join("removed");
+        let created = root.join("created");
+        let temporary = root.join("temporary");
+        fs::write(&created, b"new file").unwrap();
+        let mut writer = crate::size_index::IndexWriter::new().unwrap();
+        writer.record(&SizedEntry { path: roomit_core::display_path(&removed), kind: EntryKind::File,
+            logical_bytes: 6, size_complete: true }).unwrap();
+        let index = writer.finish("storage".into()).unwrap();
+        for (path, different) in [(temporary, false), (created, true), (removed, true)] {
+            let expected = different.then(|| roomit_core::display_path(&path));
+            let observed = index.storage_difference(BTreeMap::from([(path, true)]), std::slice::from_ref(&root)).unwrap();
+            assert_eq!(observed, expected);
+        }
+    }
+    #[cfg(windows)]
+    #[test]
     fn windows_native_detects_create_modify_rename_remove_and_root_rename() {
         for action in ["create", "modify", "rename", "remove", "root-rename"] {
             let fixture = tempfile::tempdir().unwrap(); let root = fixture.path().join("watched");
             fs::create_dir_all(root.join("nested")).unwrap(); fs::write(root.join("nested/file"), b"old").unwrap();
-            let session = WatchSession::start(action.into(), vec![root.clone()], policy(vec![]));
+            let session = WatchSession::start(action.into(), vec![root.clone()], policy(vec![]), false);
             assert!(session.status().unavailable.is_none(), "{:?}", session.status());
             match action {
                 "create" => fs::write(root.join("nested/new-file"), b"new").unwrap(),
@@ -263,7 +354,7 @@ mod tests {
         let fixture = tempfile::tempdir().unwrap(); let root = fixture.path().join("watched");
         for dir in ["skip", "skip-sibling", "Editor.app/Contents"] { fs::create_dir_all(root.join(dir)).unwrap(); }
         fs::write(root.join("keep"), b"unchanged").unwrap();
-        let session = WatchSession::start("excluded".into(), vec![root.clone()], policy(vec![root.join("skip")]));
+        let session = WatchSession::start("excluded".into(), vec![root.clone()], policy(vec![root.join("skip")]), false);
         fs::write(root.join("skip/new"), b"excluded").unwrap(); fs::write(root.join("Editor.app/Contents/new"), b"installed").unwrap();
         assert_eq!(fs::read(root.join("keep")).unwrap(), b"unchanged");
         std::thread::sleep(Duration::from_millis(400));
@@ -276,9 +367,9 @@ mod tests {
         let fixture = tempfile::tempdir().unwrap(); let one = fixture.path().join("one"); let two = fixture.path().join("two");
         fs::create_dir(&one).unwrap(); fs::create_dir(&two).unwrap();
         let registry = WatchRegistry::default();
-        let old = WatchSession::start("old".into(), vec![one.clone()], policy(vec![]));
+        let old = WatchSession::start("old".into(), vec![one.clone()], policy(vec![]), false);
         fs::write(one.join("old"), b"change").unwrap(); wait_stale(&old); registry.publish(old).unwrap();
-        registry.publish(WatchSession::start("new".into(), vec![two.clone()], policy(vec![]))).unwrap();
+        registry.publish(WatchSession::start("new".into(), vec![two.clone()], policy(vec![]), false)).unwrap();
         assert!(registry.status("old").is_err()); fs::write(one.join("ignored"), b"old scope").unwrap();
         std::thread::sleep(Duration::from_millis(150)); assert!(!registry.status("new").unwrap().stale);
         fs::write(two.join("new"), b"new scope").unwrap();
@@ -289,9 +380,9 @@ mod tests {
     #[test]
     fn missing_root_and_lost_events_never_claim_complete_monitoring() {
         let fixture = tempfile::tempdir().unwrap();
-        let session = WatchSession::start("missing".into(), vec![fixture.path().join("missing")], policy(vec![]));
+        let session = WatchSession::start("missing".into(), vec![fixture.path().join("missing")], policy(vec![]), false);
         assert!(session.status().unavailable.is_some());
-        let state = Changes { status: Mutex::new(WatchStatus { index_id: "loss".into(), stale: false, unavailable: None }), roots: vec![fixture.path().to_path_buf()], excluded: roomit_core::Exclusions::new(&[], false), system_attributes: false };
+        let state = Changes { status: Mutex::new(WatchStatus { index_id: "loss".into(), stale: false, unavailable: None, changed_path: None, storage_scan: false }), roots: vec![fixture.path().to_path_buf()], excluded: roomit_core::Exclusions::new(&[], false), system_attributes: false, pending: None };
         state.unavailable("Event batch lost"); assert!(state.status.lock().unwrap().unavailable.is_some());
         state.changed(&fixture.path().join("included")); assert!(state.status.lock().unwrap().stale);
         state.unavailable("Later error"); assert!(state.status.lock().unwrap().stale);
@@ -303,7 +394,7 @@ mod tests {
         let mut packet = vec![0u8; 12]; packet[4..8].copy_from_slice(&1u32.to_le_bytes());
         packet[8..12].copy_from_slice(&((units.len() * 2) as u32).to_le_bytes());
         for unit in units { packet.extend_from_slice(&unit.to_le_bytes()); }
-        assert_eq!(windows_native::parse_names(&packet).unwrap(), [PathBuf::from("nested/Türkçe file.txt")]);
+        assert_eq!(windows_native::parse_names(&packet).unwrap(), [(PathBuf::from("nested/Türkçe file.txt"),true)]);
         assert!(windows_native::parse_names(&[]).is_err());
         assert!(windows_native::parse_names(&packet[..packet.len() - 1]).is_err());
         packet[0..4].copy_from_slice(&4u32.to_le_bytes()); assert!(windows_native::parse_names(&packet).is_err());

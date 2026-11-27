@@ -1,0 +1,25 @@
+.archive-nav {margin:14px 0 18px;flex-wrap:wrap}
+.archive-panel {display:grid;gap:16px}
+.archive-config,.archive-results {min-width:0}
+.archive-config fieldset {min-width:0;border:0;margin:0;padding:0}
+.archive-config legend,.archive-results h3 {font:inherit;font-weight:700;margin:0}
+.archive-choices,.archive-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,255px),1fr));gap:10px;margin-block:14px}
+.archive-choice {display:flex;align-items:center;gap:10px;min-width:0;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.archive-choice:has(:checked) {border-color:var(--accent);background:var(--selected-surface)}
+.archive-choice input {accent-color:var(--accent);flex-shrink:0}
+.archive-choice span,.archive-choice small {display:block;min-width:0;overflow-wrap:anywhere}
+.archive-choice .report-path {margin:2px 0 0}
+.archive-actions,.archive-size {display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.archive-size {margin:16px 0;border-top:1px solid var(--line);padding-top:14px}
+.archive-size label {font-weight:650}
+.archive-size small {flex-basis:100%}
+.archive-size input {max-width:8em}
+.archive-config progress {display:block;margin-top:12px;width:100%}
+.archive-config [role=status],.archive-results .warning {overflow-wrap:anywhere}
+.archive-config [role=status]:empty {display:none}
+.archive-results .archive-total {color:var(--ink);font-weight:650}
+.archive-grid .archive-card {min-width:0;padding:16px}
+.archive-card .member-heading {align-items:baseline;flex-wrap:wrap;overflow-wrap:anywhere;gap:10px}
+.archive-card .report-path,.archive-results>.report-path {overflow-wrap:anywhere}
+.archive-card .item-context {display:block;margin-top:8px}
+.archive-results .view-switch {margin-top:12px}

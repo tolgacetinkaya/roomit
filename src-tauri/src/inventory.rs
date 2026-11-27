@@ -45,7 +45,7 @@ pub(crate) fn data_candidates(tool: &Tool, home: &Path) -> Vec<PathBuf> {
     #[cfg(windows)] {
         let roaming = home.join("AppData/Roaming");
         let names: &[&str] = match tool.id.as_str() {
-            "cursor" => &["Cursor"], "windsurf" => &["Windsurf"], "claude" => &["Claude"],
+            "opendesign" => &["Open Design", "OpenDesign"], "cursor" => &["Cursor"], "windsurf" => &["Windsurf"], "claude" => &["Claude"],
             "lmstudio" => &["LM Studio"], "jan" => &["Jan"], "anythingllm" => &["anythingllm-desktop"],
             "antigravity" => &["Antigravity"], "trae" => &["Trae"],
             "qwen" => &["Qwen"], "kimi" => &["Kimi"], "zcode" => &["ZCode", "@zcodedesktop"], _ => &[],
@@ -55,6 +55,20 @@ pub(crate) fn data_candidates(tool: &Tool, home: &Path) -> Vec<PathBuf> {
     }
     #[cfg(target_os = "macos")] {
         for name in &tool.app_names { paths.push(home.join("Library/Application Support").join(name)); }
+    }
+    if crate::computer::user_home().as_deref() == Some(home) {
+        let setting = match tool.id.as_str() {
+            "claude-code" => Some("CLAUDE_CONFIG_DIR"),
+            "codex" => Some("CODEX_HOME"),
+            "opendesign" => Some("OD_DATA_DIR"),
+            _ => None,
+        };
+        if let Some(dir) = setting.and_then(std::env::var_os).map(PathBuf::from) {
+            if local(&dir) && dir.parent().is_some() && dir != home && !home.starts_with(&dir)
+                && !dir.components().any(|c| c == std::path::Component::ParentDir) {
+                paths.push(dir);
+            }
+        }
     }
     paths
 }

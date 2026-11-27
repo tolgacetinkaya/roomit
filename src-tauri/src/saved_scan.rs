@@ -91,7 +91,7 @@ mod tests {
     use roomit_core::{EntryKind, SizedEntry, SizeSink};
     use std::sync::atomic::AtomicBool;
     fn report(id: &str, root: &Path) -> DesktopReport {
-        DesktopReport { report: roomit_core::inspect_workspace(root).unwrap(), size_index_id: id.into(), scanned_at_ms: 1_794_000_000_000, persistence_error: None, watch_policy: None, ai_tool_id: None }
+        DesktopReport { ai_root_owners:Default::default(), model_groups:None, skipped_models:0, growth: None, breakdown: Default::default(), report: roomit_core::inspect_workspace(root).unwrap(), size_index_id: id.into(), scanned_at_ms: 1_794_000_000_000, scan_duration_ms: Some(94_150), persistence_error: None, watch_policy: None, ai_tool_id: None, project_git: Default::default() }
     }
     fn request(id: &str, query: &str) -> PageRequest {
         PageRequest { index_id: id.into(), request_id: "test-query".into(), kind: "file".into(), minimum_bytes: "5000000000".into(), query: query.into(), cursor: None, direction: "next".into(), include_total: true }
@@ -102,9 +102,11 @@ mod tests {
         let mut json = serde_json::to_value(report("legacy", fixture.path())).unwrap();
         json.as_object_mut().unwrap().remove("watchPolicy");
         json.as_object_mut().unwrap().remove("aiToolId");
+        json.as_object_mut().unwrap().remove("scanDurationMs");
         let restored: DesktopReport = serde_json::from_value(json).unwrap();
         assert!(restored.watch_policy.is_none()); assert_eq!(restored.size_index_id, "legacy");
         assert!(restored.ai_tool_id.is_none());
+        assert!(restored.scan_duration_ms.is_none());
     }
     #[test]
     fn ai_scope_survives_saved_scan_reopening() {
@@ -117,6 +119,31 @@ mod tests {
         let restored = store.load().unwrap().unwrap().0;
         assert_eq!(restored.report.scope, "ai");
         assert_eq!(restored.ai_tool_id.as_deref(), Some("codex"));
+        assert_eq!(restored.scan_duration_ms, Some(94_150));
+    }
+
+    #[test]
+    fn growth_baselines_survive_restart_interleaved_scopes_and_cancelled_scans() {
+        let tmp=tempfile::tempdir().unwrap();
+        let source=tmp.path().join("project");
+        fs::create_dir_all(source.join("node_modules")).unwrap();
+        fs::write(source.join("package.json"),"{}").unwrap();
+        let store=SavedScanStore::new(tmp.path().join("history"));
+        let run=|id:&str,scope:&str,n:usize,cancelled:bool| {
+            fs::write(source.join("node_modules/lib"),vec![0;n]).unwrap();
+            let mut r=report(id,&source);
+            if cancelled {r.report.status=roomit_core::ScanStatus::Cancelled;}
+            let mut index=IndexWriter::new_in(&store.directory).unwrap().finish(id.into()).unwrap();
+            let growth=crate::growth::compare(&store,&index,&r,scope).unwrap();
+            store.save(&mut index,&r).unwrap();
+            growth
+        };
+        assert!(run("one","folder+policy1",10,false).previous_ms.is_none());
+        assert!(run("two","folder+policy2",15,false).previous_ms.is_none());
+        assert!(run("three","folder+policy1",17,true).previous_ms.is_none());
+        let changed=run("four","folder+policy1",20,false);
+        assert!(changed.previous_ms.is_some());
+        assert!(changed.changes.iter().any(|c|c.label=="Project dependencies" && c.delta=="10"));
     }
     #[test]
     fn reopened_store_restores_report_exact_bytes_partial_flags_and_full_paged_index() {

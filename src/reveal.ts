@@ -6,7 +6,7 @@ const mac = /Mac|iPhone|iPad/.test(navigator.platform);
 export const revealShortcut = mac ? "⌘+Enter" : "Ctrl+Enter";
 let opening = false;
 
-export function revealActions(paths: string[]): HTMLElement {
+export function revealActions(paths: string[], summaryName?: string): HTMLElement {
   const actions = document.createElement("div"); actions.className = "reveal-actions";
   const unique = [...new Set(paths.filter(Boolean))];
   if (!unique.length) return actions;
@@ -16,8 +16,9 @@ export function revealActions(paths: string[]): HTMLElement {
   const addButton = (path: string, label: string, parent: HTMLElement): HTMLButtonElement => {
     const button = document.createElement("button"); button.type = "button";
     button.className = "secondary reveal-button"; button.dataset.revealPath = path;
-    button.title = `${path}\nSelect in parent folder · ${revealShortcut}`;
-    button.setAttribute("aria-label", `Show in folder: ${path}`);
+    const location = unique.length === 1 && summaryName ? summaryName : path;
+    button.title = `${location}\nSelect in parent folder · ${revealShortcut}`;
+    button.setAttribute("aria-label", `Show in folder: ${location}`);
     button.setAttribute("aria-keyshortcuts", mac ? "Meta+Enter" : "Control+Enter");
     button.append(icon("folder"), document.createTextNode(label));
     button.disabled = !isTauri();

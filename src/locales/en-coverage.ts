@@ -1,0 +1,22 @@
+export const coverageCopy = {
+  title: "What affected the scan?",
+  completed: "Roomit finished measuring the included locations.",
+  partial: "The total covers the files Roomit measured. Some entries were skipped.",
+  cancelled: "You stopped the scan. The total covers the files measured up to that point.",
+  limited: "The scan reached a limit. The total covers the files measured before it stopped.",
+  noReadErrors: "No read errors were reported.",
+  reasons: {
+    errors: ["Read errors", "Roomit could not read an entry or folder. Expand the scan log for the system message and location."],
+    skippedLinks: ["Links skipped", "Roomit skips links and Windows reparse points to avoid following redirects or counting data twice. To measure a linked folder, scan its target directly."],
+    skippedMounts: ["Volume boundaries skipped", "Roomit stopped at a mounted volume or another scan root. Check Scanned locations to see which volumes were measured separately."],
+    skippedSpecial: ["Special entries skipped", "Items such as sockets and device files have no ordinary file size to add to the total."],
+    excludedEntries: ["Excluded entries", "Each excluded file or folder counts once. Roomit skips everything inside an excluded folder."],
+  },
+  log: (count: string) => `Scan log · ${count}`,
+  filtered: (matches: string, saved: string) => `${matches} of ${saved} saved messages match your search.`,
+  omitted: (count: string) => `Additional messages without saved details: ${count}.`,
+  method: "How sizes are calculated",
+  partialNotice: "Sizes are partial. Scan details explains what affected the total.",
+  sizes: "Roomit adds the reported length of each file. If two hard links point to the same data, both paths contribute to the total. The space used on disk can therefore differ.",
+  summaries: "Large items lists all measured entries. The tool and project summaries can show fewer items.",
+} as const;
